@@ -1,10 +1,14 @@
-# Release v2.0.4 — 25 April 2026
+# Release v2.0.5 — 25 April 2026
 
-> Generato automaticamente da DELTA il 25/04/2026 00:56
+> Generato automaticamente da DELTA il 25/04/2026 19:38
 
 ## Changelog
 
-- Nessun commit nuovo dall'ultimo tag.
+- Keep input_images empty
+- Update user manual
+- Add initial test suite
+- Fix Telegram training flow
+- Add DELTAPLANO learning-by-doing
 
 ## Informazioni tecniche
 
@@ -13,7 +17,7 @@
 | Classi modello AI | 7 |
 | Dimensione modello | 2675 KB |
 | Branch | `main` |
-| Tag precedente | `v2.0.3` |
+| Tag precedente | `v2.0.4` |
 
 ## Note di installazione
 

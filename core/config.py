@@ -309,7 +309,7 @@ API_CONFIG = {
 # TELEGRAM BOT (OPZIONALE)
 # ─────────────────────────────────────────────
 TELEGRAM_CONFIG = {
-    "enable_telegram": False,          # Abilitare manualmente
+    "enable_telegram": True,           # Abilitato di default
     "token_env": "DELTA_TELEGRAM_TOKEN",
     "authorized_users": [],            # Lista ID Telegram (vuota = accesso aperto)
     "authorized_usernames": [],        # Lista nickname (con @) (vuota = accesso aperto)
