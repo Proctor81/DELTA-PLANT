@@ -28,7 +28,7 @@ for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEA
 MODEL_CONFIG = {
     "model_path": str(MODELS_DIR / "plant_disease_model.tflite"),
     "labels_path": str(MODELS_DIR / "labels.txt"),
-    "validation_image_path": str(INPUT_IMAGES_DIR / "validation_sample.jpg"),
+    "validation_image_path": str(MODELS_DIR / "validation_sample.jpg"),
     "preflight_min_confidence": 0.50,  # Soglia minima preflight gate di deploy
     "input_size": (224, 224),          # WxH
     "input_dtype": "uint8",            # INT8 quantizzato

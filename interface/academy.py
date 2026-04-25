@@ -910,7 +910,7 @@ class DeltaAcademy:
         print("Comandi operativi da ricordare:")
         print("  python ai/train_keras_classifier.py --dataset datasets/training --output models")
         print("  python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization int8 --representative-data datasets/training")
-        print("  python main.py --preflight-only --validation-image input_images/validation_sample.jpg")
+        print("  python main.py --preflight-only --validation-image models/validation_sample.jpg")
 
         self._check_badges()
         self._save_progress()
