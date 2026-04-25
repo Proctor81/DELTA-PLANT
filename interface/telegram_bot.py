@@ -1679,18 +1679,32 @@ def run_telegram_bot(agent=None):
     application.add_handler(upload_handler)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
 
+    _conflict_handled = False
+
     async def _error_handler(update, context) -> None:
+        nonlocal _conflict_handled
         from telegram.error import Conflict, NetworkError, TimedOut
         err = context.error
         if isinstance(err, Conflict):
+            if _conflict_handled:
+                return
+            _conflict_handled = True
             logger.error(
                 "Bot Telegram: conflitto di polling — un'altra istanza di DELTA è attiva. "
                 "Il bot verrà fermato. Chiudere le istanze duplicate e riavviare DELTA."
             )
-            # Ferma il polling per non ciclare all'infinito
-            asyncio.get_event_loop().call_soon_threadsafe(
-                lambda: asyncio.ensure_future(context.application.stop())
-            )
+            # Ferma prima l'Updater (polling HTTP), poi l'Application
+            try:
+                updater = context.application.updater
+                if updater is not None and updater.running:
+                    await updater.stop()
+            except Exception:
+                pass
+            try:
+                if context.application.running:
+                    await context.application.stop()
+            except Exception:
+                pass
         elif isinstance(err, (NetworkError, TimedOut)):
             logger.warning("Bot Telegram: errore di rete temporaneo: %s", err)
         else:
