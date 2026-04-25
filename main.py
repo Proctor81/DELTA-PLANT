@@ -17,6 +17,7 @@ import signal
 import logging
 import argparse
 import time
+import atexit
 
 # ── Carica variabili da .env se presente ─────────────────────
 _ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -33,6 +34,39 @@ from data.logger import setup_logger
 setup_logger("delta")
 
 logger = logging.getLogger("delta.main")
+
+# ── Singleton: impedisce più istanze in parallelo ────────────
+_PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "delta.pid")
+
+
+def _acquire_pid_lock() -> None:
+    """Scrive il PID corrente su file. Termina se un'altra istanza è attiva."""
+    if os.path.isfile(_PID_FILE):
+        try:
+            with open(_PID_FILE) as _pf:
+                old_pid = int(_pf.read().strip())
+            # Controlla se il processo è ancora vivo (kill -0 non invia segnale)
+            os.kill(old_pid, 0)
+            print(
+                f"[DELTA] Un'altra istanza è già in esecuzione (PID {old_pid}).\n"
+                f"  Terminarla prima di avviare DELTA, oppure eliminare: {_PID_FILE}"
+            )
+            sys.exit(1)
+        except (ValueError, ProcessLookupError, PermissionError):
+            # PID file stale o processo già terminato: si sovrascrive
+            pass
+
+    with open(_PID_FILE, "w") as _pf:
+        _pf.write(str(os.getpid()))
+
+    def _release():
+        try:
+            if os.path.isfile(_PID_FILE):
+                os.remove(_PID_FILE)
+        except OSError:
+            pass
+
+    atexit.register(_release)
 
 from core.agent import DeltaAgent
 from interface.cli import CLI
@@ -102,6 +136,7 @@ def _run_preflight(validation_image: str, min_confidence: float = 0.50):
 def main():
     """Funzione principale di avvio DELTA."""
     args = _build_parser().parse_args()
+    _acquire_pid_lock()
     logger.info("═══ AVVIO DELTA AI AGENT ═══")
 
     if args.preflight or args.preflight_only:
