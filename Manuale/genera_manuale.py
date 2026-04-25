@@ -1023,8 +1023,9 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._subsection("Learning-by-Doing (upload + metadati)")
     lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
     pdf._body(
-        "Con il comando /upload l'operatore invia una foto, inserisce il nome della pianta "
-        "e seleziona la classe (foglia/fiore/frutto). "
+        "Con il comando /upload (o inviando una foto direttamente in chat) l'operatore "
+        "inserisce il nome della pianta, seleziona l'organo (foglia/fiore/frutto) "
+        "e poi la classe specifica dell'organo. "
         "L'immagine viene salvata in input_images e nel dataset di training dedicato, "
         "mentre i metadati vengono registrati in JSON per ogni immagine."
     )

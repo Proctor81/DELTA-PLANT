@@ -208,7 +208,7 @@ Comandi principali (DELTAPLANO):
   `/export`, `/preflight`, `/finetune`, `/academy`, `/license`, `/health`, `/batch`
 
 Upload learning-by-doing:
-- `/upload` richiede **nome pianta** e permette etichettatura **foglia/fiore/frutto**
+- `/upload` (o invio diretto foto in chat) richiede **nome pianta**, scelta **organo** e **classe** (foglia/fiore/frutto)
 - Salva in `input_images/` + dataset training dedicati + metadati JSON in `datasets/learning_by_doing/`
 - Dataset dedicati: `datasets/training` (foglia), `datasets/training_flower`, `datasets/training_fruit`
 

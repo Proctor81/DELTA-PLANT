@@ -63,6 +63,7 @@ logger = logging.getLogger("delta.interface.telegram")
     STATE_DIAG_EC,
     STATE_UPLOAD_WAIT_PHOTO,
     STATE_UPLOAD_PLANT,
+    STATE_UPLOAD_ORGAN,
     STATE_UPLOAD_LABEL,
     STATE_ACADEMY_MENU,
     STATE_ACADEMY_TUTORIAL,
@@ -71,7 +72,7 @@ logger = logging.getLogger("delta.interface.telegram")
     STATE_ACADEMY_SIM_ACTION,
     STATE_ACADEMY_QUIZ,
     STATE_PRECHECK_IMAGE,
-) = range(20)
+ ) = range(21)
 
 CMD_DIAGNOSE = "CMD_DIAGNOSE"
 CMD_UPLOAD = "CMD_UPLOAD"
@@ -93,6 +94,9 @@ DIAG_SENSOR_AUTO = "DIAG_SENSOR_AUTO"
 DIAG_SENSOR_MANUAL = "DIAG_SENSOR_MANUAL"
 
 UPLOAD_SKIP_LABEL = "UPLOAD_SKIP_LABEL"
+UPLOAD_ORGAN_LEAF = "UPLOAD_ORGAN_LEAF"
+UPLOAD_ORGAN_FLOWER = "UPLOAD_ORGAN_FLOWER"
+UPLOAD_ORGAN_FRUIT = "UPLOAD_ORGAN_FRUIT"
 
 
 def _get_token() -> str:
@@ -219,7 +223,7 @@ async def _send_long(update: Update, text: str, reply_markup: Optional[InlineKey
         await _send(update, chunk, reply_markup if idx == 0 else None)
 
 
-def _get_labels(agent) -> List[str]:
+def _leaf_labels(agent) -> List[str]:
     labels = []
     if agent and getattr(agent, "model_loader", None):
         labels = list(agent.model_loader.labels or [])
@@ -227,15 +231,15 @@ def _get_labels(agent) -> List[str]:
         labels_path = MODEL_CONFIG.get("labels_path")
         if labels_path and Path(labels_path).exists():
             labels = [l.strip() for l in Path(labels_path).read_text(encoding="utf-8").splitlines() if l.strip()]
-    labels.extend(list(FLOWER_LABELS))
-    labels.extend(list(FRUIT_LABELS))
-    seen = set()
-    unique = []
-    for lbl in labels:
-        if lbl not in seen:
-            seen.add(lbl)
-            unique.append(lbl)
-    return unique
+    return labels
+
+
+def _labels_for_organ(agent, organ: str) -> List[str]:
+    if organ == "flower":
+        return list(FLOWER_LABELS)
+    if organ == "fruit":
+        return list(FRUIT_LABELS)
+    return _leaf_labels(agent)
 
 
 def _sanitize_label(label: str) -> str:
@@ -349,6 +353,14 @@ def _resolve_organ(label: str) -> str:
 
 def _finetune_target(label: str) -> dict:
     organ = _resolve_organ(label)
+    if organ == "flower":
+        return FINETUNING_FLOWER_CONFIG
+    if organ == "fruit":
+        return FINETUNING_FRUIT_CONFIG
+    return FINETUNING_CONFIG
+
+
+def _finetune_target_by_organ(organ: str) -> dict:
     if organ == "flower":
         return FINETUNING_FLOWER_CONFIG
     if organ == "fruit":
@@ -726,10 +738,6 @@ def _labels_keyboard(prefix: str, labels: List[str]) -> InlineKeyboardMarkup:
 
 
 async def _prompt_label_review(update: Update, context: ContextTypes.DEFAULT_TYPE, image_path: Path):
-    labels = _get_labels(_get_agent(context))
-    if not labels:
-        await _send(update, "Nessuna etichetta disponibile per la revisione.")
-        return
     context.user_data["pending_label_path"] = str(image_path)
     context.user_data["pending_label_mode"] = "REVIEW"
     context.user_data["pending_label_need_name"] = True
@@ -759,6 +767,7 @@ async def receive_upload_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["pending_label_path"] = str(saved)
     context.user_data["pending_label_mode"] = "TRAIN"
     context.user_data["pending_label_need_name"] = True
+    context.user_data.pop("pending_label_organ", None)
     await _send(update, "Inserisci il nome della pianta (obbligatorio per training):")
     return STATE_UPLOAD_PLANT
 
@@ -774,15 +783,54 @@ async def handle_plant_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return STATE_UPLOAD_PLANT
     context.user_data["pending_label_plant"] = plant_name
     context.user_data["pending_label_need_name"] = False
-    labels = _get_labels(_get_agent(context))
+    mode = context.user_data.get("pending_label_mode")
+    if mode == "REVIEW":
+        labels = _labels_for_organ(_get_agent(context), "leaf")
+        if not labels:
+            await _send(update, "Nessuna etichetta disponibile.")
+            return ConversationHandler.END
+        await _send(
+            update,
+            "Seleziona la classe corretta (foglia) o salta:",
+            reply_markup=_labels_keyboard("LABEL_REVIEW_", labels),
+        )
+        return STATE_UPLOAD_LABEL
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Foglia", callback_data=UPLOAD_ORGAN_LEAF)],
+        [InlineKeyboardButton("Fiore", callback_data=UPLOAD_ORGAN_FLOWER)],
+        [InlineKeyboardButton("Frutto", callback_data=UPLOAD_ORGAN_FRUIT)],
+    ])
+    await _send(update, "Seleziona l'organo per il training:", reply_markup=keyboard)
+    return STATE_UPLOAD_ORGAN
+
+
+async def handle_organ_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return ConversationHandler.END
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    await query.answer()
+    organ = None
+    if query.data == UPLOAD_ORGAN_LEAF:
+        organ = "leaf"
+    elif query.data == UPLOAD_ORGAN_FLOWER:
+        organ = "flower"
+    elif query.data == UPLOAD_ORGAN_FRUIT:
+        organ = "fruit"
+    if not organ:
+        await _send(update, "Scelta non valida.")
+        return ConversationHandler.END
+    context.user_data["pending_label_organ"] = organ
+    labels = _labels_for_organ(_get_agent(context), organ)
     if not labels:
         await _send(update, "Nessuna etichetta disponibile.")
         return ConversationHandler.END
-    prefix = "LABEL_REVIEW_" if context.user_data.get("pending_label_mode") == "REVIEW" else "LABEL_TRAIN_"
     await _send(
         update,
-        "Seleziona la classe per l'addestramento (foglia/fiore/frutto) o salta:",
-        reply_markup=_labels_keyboard(prefix, labels),
+        f"Seleziona la classe ({organ}) o salta:",
+        reply_markup=_labels_keyboard("LABEL_TRAIN_", labels),
     )
     return STATE_UPLOAD_LABEL
 
@@ -791,6 +839,26 @@ async def pending_label_name_router(update: Update, context: ContextTypes.DEFAUL
     if not context.user_data.get("pending_label_need_name"):
         return
     await handle_plant_name(update, context)
+
+
+async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    # Se non c'è nessun flow attivo, tratta la foto come upload learning-by-doing
+    if context.user_data.get("pending_label_path") or context.user_data.get("diag_image_path"):
+        await _send(update, "Hai già un'operazione in corso. Completa l'etichettatura oppure usa /annulla per ricominciare.")
+        return ConversationHandler.END
+    saved = await _download_telegram_image(update)
+    if not saved:
+        await _send(update, "Immagine non valida.")
+        return ConversationHandler.END
+    await _send(update, f"Immagine salvata in input_images: {saved.name}")
+    context.user_data["pending_label_path"] = str(saved)
+    context.user_data["pending_label_mode"] = "TRAIN"
+    context.user_data["pending_label_need_name"] = True
+    context.user_data.pop("pending_label_organ", None)
+    await _send(update, "Inserisci il nome della pianta (obbligatorio per training):")
+    return STATE_UPLOAD_PLANT
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -809,13 +877,14 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 Path(path_str),
                 plant_name=plant_name,
                 label=None,
-                organ=None,
+                organ=context.user_data.get("pending_label_organ"),
                 user_info=_user_info(update),
             )
         await _send(update, "Etichettatura saltata.")
         context.user_data.pop("pending_label_path", None)
         context.user_data.pop("pending_label_mode", None)
         context.user_data.pop("pending_label_plant", None)
+        context.user_data.pop("pending_label_organ", None)
         context.user_data.pop("pending_label_need_name", None)
         return ConversationHandler.END
 
@@ -826,7 +895,9 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await _send(update, "Scelta non valida.")
             return ConversationHandler.END
         idx = int(idx_str)
-        labels = _get_labels(_get_agent(context))
+        mode = context.user_data.get("pending_label_mode")
+        organ = context.user_data.get("pending_label_organ") if mode != "REVIEW" else "leaf"
+        labels = _labels_for_organ(_get_agent(context), organ or "leaf")
         if idx >= len(labels):
             await _send(update, "Classe non valida.")
             return ConversationHandler.END
@@ -848,7 +919,7 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await _send(update, "Errore sistema: agent non disponibile.")
             return ConversationHandler.END
         from ai.fine_tuning import FineTuner
-        target_cfg = _finetune_target(label)
+        target_cfg = _finetune_target_by_organ(organ or _resolve_organ(label))
         tuner = FineTuner(
             agent.model_loader,
             dataset_dir=target_cfg.get("dataset_dir"),
@@ -861,12 +932,11 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
             logger.error("Errore salvataggio training: %s", exc, exc_info=True)
             await _send(update, "Errore durante il salvataggio del campione.")
             return ConversationHandler.END
-        organ = _resolve_organ(label)
         _store_learning_record(
             Path(path_str),
             plant_name=plant_name,
             label=label,
-            organ=organ,
+            organ=organ or _resolve_organ(label),
             user_info=_user_info(update),
             training_image=Path(saved_path),
         )
@@ -874,6 +944,7 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data.pop("pending_label_path", None)
         context.user_data.pop("pending_label_mode", None)
         context.user_data.pop("pending_label_plant", None)
+        context.user_data.pop("pending_label_organ", None)
         context.user_data.pop("pending_label_need_name", None)
         return ConversationHandler.END
 
@@ -1556,6 +1627,7 @@ def run_telegram_bot(agent=None):
         entry_points=[
             CommandHandler("upload", start_upload),
             CallbackQueryHandler(start_upload, pattern=f"^{CMD_UPLOAD}$"),
+            MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo),
         ],
         states={
             STATE_UPLOAD_WAIT_PHOTO: [
@@ -1564,6 +1636,12 @@ def run_telegram_bot(agent=None):
             ],
             STATE_UPLOAD_PLANT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_plant_name),
+            ],
+            STATE_UPLOAD_ORGAN: [
+                CallbackQueryHandler(
+                    handle_organ_selection,
+                    pattern=f"^({UPLOAD_ORGAN_LEAF}|{UPLOAD_ORGAN_FLOWER}|{UPLOAD_ORGAN_FRUIT})$",
+                )
             ],
             STATE_UPLOAD_LABEL: [
                 CallbackQueryHandler(handle_label_callback, pattern=r"^(LABEL_TRAIN_|LABEL_REVIEW_|UPLOAD_SKIP_LABEL)"),

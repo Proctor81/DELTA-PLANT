@@ -30,6 +30,13 @@ Icon
 
 # Dataset captures (generati a runtime)
 datasets/captures/
+datasets/training/
+datasets/training_flower/
+datasets/training_fruit/
+datasets/learning_by_doing/
+
+# Immagini caricate via Telegram
+input_images/
 
 # Credenziali
 data/auth.json
