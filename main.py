@@ -16,6 +16,7 @@ if os.path.isfile(_VENV_PYTHON) and os.path.abspath(sys.executable) != os.path.a
 import signal
 import logging
 import argparse
+import time
 
 # ── Setup logging prima di qualsiasi import interno ──────────
 from data.logger import setup_logger
@@ -26,7 +27,8 @@ logger = logging.getLogger("delta.main")
 from core.agent import DeltaAgent
 from interface.cli import CLI
 from interface.api import run_api
-from core.config import API_CONFIG, MODEL_CONFIG
+from interface.telegram_bot import run_telegram_bot
+from core.config import API_CONFIG, MODEL_CONFIG, TELEGRAM_CONFIG
 from core.auth import initialize_password
 from ai.preflight_validator import validate_model_artifacts, PreflightGateError
 
@@ -54,6 +56,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=MODEL_CONFIG.get("preflight_min_confidence", 0.50),
         metavar="SOGLIA",
         help="Confidenza minima richiesta per il gate di deploy (default: %(default).2f)",
+    )
+    parser.add_argument(
+        "--enable-api",
+        action="store_true",
+        help="Abilita temporaneamente l'API REST senza modificare la config",
+    )
+    parser.add_argument(
+        "--enable-telegram",
+        action="store_true",
+        help="Abilita temporaneamente il bot Telegram (richiede token)",
     )
     return parser
 
@@ -98,6 +110,14 @@ def main():
         if args.preflight_only:
             return
 
+    if args.enable_api:
+        API_CONFIG["enable_api"] = True
+        logger.info("Flag --enable-api attivo: API REST abilitata.")
+
+    if args.enable_telegram:
+        TELEGRAM_CONFIG["enable_telegram"] = True
+        logger.info("Flag --enable-telegram attivo: bot Telegram abilitato.")
+
     # Inizializza il sistema di autenticazione (idempotente)
     initialize_password()
 
@@ -122,17 +142,31 @@ def main():
     # ── Avvio API Flask (opzionale) ──────────────────────────
     run_api(agent)
 
+    # ── Avvio bot Telegram (opzionale) ───────────────────────
+    run_telegram_bot(agent)
+
     # ── Interfaccia CLI ──────────────────────────────────────
-    cli = CLI(agent)
-    try:
-        cli.run()
-    except KeyboardInterrupt:
-        logger.info("Interruzione utente (CTRL+C).")
-    except Exception as exc:
-        logger.critical("Errore critico non gestito: %s", exc, exc_info=True)
-    finally:
-        agent.shutdown()
-        logger.info("═══ DELTA AI AGENT SPENTO ═══")
+    if sys.stdin.isatty():
+        cli = CLI(agent)
+        try:
+            cli.run()
+        except KeyboardInterrupt:
+            logger.info("Interruzione utente (CTRL+C).")
+        except Exception as exc:
+            logger.critical("Errore critico non gestito: %s", exc, exc_info=True)
+        finally:
+            agent.shutdown()
+            logger.info("═══ DELTA AI AGENT SPENTO ═══")
+    else:
+        logger.info("STDIN non interattivo: CLI disabilitata. Processo in attesa.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Interruzione utente (CTRL+C).")
+        finally:
+            agent.shutdown()
+            logger.info("═══ DELTA AI AGENT SPENTO ═══")
 
 
 if __name__ == "__main__":

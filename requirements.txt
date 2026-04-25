@@ -59,6 +59,10 @@ ai-edge-litert==1.2.0
 # ── API opzionale ────────────────────────────────────────────
 flask>=3.0.0
 
+# ── Telegram bot (opzionale) ─────────────────────────────────
+python-telegram-bot[job-queue]>=20.7
+requests>=2.31.0
+
 # ── Edge TPU / AI HAT 2+ ─────────────────────────────────────
 # Installare seguendo: https://coral.ai/docs/accelerator/get-started/
 # pycoral>=2.0.0

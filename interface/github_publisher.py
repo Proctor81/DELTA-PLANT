@@ -711,6 +711,20 @@ class GitHubPublisher:
 
         # ── 6. Push ───────────────────────────────────────────
         self._step("Push su GitHub")
+
+        # Configura gh come credential helper se disponibile e non già impostato
+        import shutil as _shutil
+        if _shutil.which("gh"):
+            _cred_check = subprocess.run(
+                ["git", "config", "--global", "credential.https://github.com.helper"],
+                capture_output=True, text=True,
+            )
+            if "gh" not in _cred_check.stdout:
+                subprocess.run(
+                    ["gh", "auth", "setup-git"],
+                    capture_output=True, text=True,
+                )
+
         push_args = ["git", "push", "origin", data["git"]["branch"]]
         if create_tag:
             push_args += ["--tags"]
@@ -723,9 +737,17 @@ class GitHubPublisher:
         if result.returncode == 0:
             self._ok("Push completato")
         else:
+            stderr = result.stderr.strip()
+            hint = ""
+            if "authentication" in stderr.lower() or "credentials" in stderr.lower() or "403" in stderr or "401" in stderr:
+                hint = (
+                    "\n\n  💡 Suggerimento: eseguire da terminale:\n"
+                    "     gh auth login\n"
+                    "     gh auth setup-git"
+                )
             self._fail(
-                f"Push fallito:\n{result.stderr.strip()}\n"
-                "Verificare connessione internet e credenziali GitHub."
+                f"Push fallito:\n{stderr}\n"
+                f"Verificare connessione internet e credenziali GitHub.{hint}"
             )
             return
 

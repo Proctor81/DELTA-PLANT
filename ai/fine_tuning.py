@@ -26,11 +26,18 @@ class FineTuner:
     Approccio leggero compatibile con Raspberry Pi 5.
     """
 
-    def __init__(self, model_loader):
+    def __init__(
+        self,
+        model_loader,
+        dataset_dir: Optional[Path | str] = None,
+        save_path: Optional[Path | str] = None,
+        min_samples_per_class: Optional[int] = None,
+    ):
         self.model_loader = model_loader
-        self.dataset_dir = Path(FINETUNING_CONFIG["dataset_dir"])
+        self.dataset_dir = Path(dataset_dir) if dataset_dir else Path(FINETUNING_CONFIG["dataset_dir"])
         self.dataset_dir.mkdir(parents=True, exist_ok=True)
-        self.save_path = FINETUNING_CONFIG["model_save_path"]
+        self.save_path = str(save_path) if save_path else FINETUNING_CONFIG["model_save_path"]
+        self.min_samples_per_class = min_samples_per_class or FINETUNING_CONFIG["min_samples_per_class"]
 
     # ─────────────────────────────────────────────
     # GESTIONE DATASET
@@ -95,7 +102,7 @@ class FineTuner:
                     stats["total"], len(stats["classes"]))
 
         # Verifica dati sufficienti
-        min_samples = FINETUNING_CONFIG["min_samples_per_class"]
+        min_samples = self.min_samples_per_class
         insufficient = [
             cls for cls, cnt in stats["classes"].items()
             if cnt < min_samples

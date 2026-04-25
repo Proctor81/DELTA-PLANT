@@ -16,9 +16,10 @@ DATASETS_DIR = BASE_DIR / "datasets"
 EXPORTS_DIR = BASE_DIR / "exports"
 LOGS_DIR = BASE_DIR / "logs"
 INPUT_IMAGES_DIR = BASE_DIR / "input_images"   # Cartella immagini manuali (no camera)
+LEARNING_BY_DOING_DIR = DATASETS_DIR / "learning_by_doing"
 
 # Crea directory se non esistono
-for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR]:
+for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEARNING_BY_DOING_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
@@ -273,6 +274,27 @@ FINETUNING_CONFIG = {
     "min_samples_per_class": 10,
 }
 
+# Dataset separati per fiore e frutto (learning-by-doing)
+FINETUNING_FLOWER_CONFIG = {
+    "epochs": 10,
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "train_split": 0.8,
+    "model_save_path": str(MODELS_DIR / "flower_model_finetuned.tflite"),
+    "dataset_dir": str(DATASETS_DIR / "training_flower"),
+    "min_samples_per_class": 10,
+}
+
+FINETUNING_FRUIT_CONFIG = {
+    "epochs": 10,
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "train_split": 0.8,
+    "model_save_path": str(MODELS_DIR / "fruit_model_finetuned.tflite"),
+    "dataset_dir": str(DATASETS_DIR / "training_fruit"),
+    "min_samples_per_class": 10,
+}
+
 # ─────────────────────────────────────────────
 # API FLASK
 # ─────────────────────────────────────────────
@@ -281,4 +303,19 @@ API_CONFIG = {
     "port": 5000,
     "debug": False,
     "enable_api": False,               # Abilitare manualmente
+}
+
+# ─────────────────────────────────────────────
+# TELEGRAM BOT (OPZIONALE)
+# ─────────────────────────────────────────────
+TELEGRAM_CONFIG = {
+    "enable_telegram": False,          # Abilitare manualmente
+    "token_env": "DELTA_TELEGRAM_TOKEN",
+    "authorized_users": [],            # Lista ID Telegram (vuota = accesso aperto)
+    "authorized_usernames": [],        # Lista nickname (con @) (vuota = accesso aperto)
+    "authorized_usernames_file": str(BASE_DIR / "data" / "telegram_scientists.json"),
+    "api_base_url": "http://localhost:5000",
+    "request_timeout_sec": 5,
+    "conversation_timeout_sec": 300,   # 5 minuti
+    "poll_interval_sec": 1.0,
 }

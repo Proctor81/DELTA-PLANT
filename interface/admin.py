@@ -5,6 +5,7 @@ Funzionalità: cambio password, log di sistema, statistiche DB,
 configurazione, backup, reset Academy.
 """
 
+import json
 import logging
 import shutil
 from datetime import datetime
@@ -71,6 +72,7 @@ class AdminPanel:
             print(f"  {BOLD}[5]{RESET} Backup database")
             print(f"  {BOLD}[6]{RESET} Reset progressi Academy")
             print(f"  {BOLD}[7]{RESET} {BLUE}Pubblica su GitHub{RESET}     (README, RELEASE, tag, push)")
+            print(f"  {BOLD}[8]{RESET} Scientists Telegram (autorizzazioni)")
             print(f"  {BOLD}[0]{RESET} Esci dal pannello")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -89,6 +91,8 @@ class AdminPanel:
                 self._reset_academy()
             elif scelta == "7":
                 self._publish_github()
+            elif scelta == "8":
+                self._manage_scientists()
             elif scelta == "0":
                 print(f"{DIM}Uscita dal pannello amministratore.{RESET}")
                 break
@@ -163,15 +167,16 @@ class AdminPanel:
         print(f"\n{BOLD}─── CONFIGURAZIONE SISTEMA ───{RESET}")
         try:
             from core.config import (
-                MODEL_CONFIG, SENSOR_CONFIG, CAMERA_CONFIG,
-                QUANTUM_CONFIG, API_CONFIG,
+                MODEL_CONFIG, SENSOR_CONFIG, VISION_CONFIG,
+                QUANTUM_CONFIG, API_CONFIG, TELEGRAM_CONFIG,
             )
             sections = {
                 "Modello AI":     MODEL_CONFIG,
                 "Sensori":        SENSOR_CONFIG,
-                "Camera":         CAMERA_CONFIG,
+                "Visione/Camera": VISION_CONFIG,
                 "Quantum Oracle": QUANTUM_CONFIG,
                 "API":            API_CONFIG,
+                "Telegram":       TELEGRAM_CONFIG,
             }
             for name, cfg in sections.items():
                 print(f"\n  {CYAN}{BOLD}{name}{RESET}")
@@ -230,6 +235,110 @@ class AdminPanel:
         except Exception as exc:
             print(f"{RED}✘ Errore durante la pubblicazione: {exc}{RESET}")
             logger.error("Errore GitHubPublisher.run(): %s", exc, exc_info=True)
+
+    # ── Scientists Telegram ────────────────────────────────────
+
+    def _manage_scientists(self):
+        """Gestione autorizzazioni Telegram (nicknames)."""
+        while True:
+            self._header()
+            print(f"{BOLD}─── SCIENTISTS TELEGRAM ───{RESET}")
+            scientists = self._load_scientists()
+            if scientists:
+                for idx, name in enumerate(scientists, start=1):
+                    print(f"  {idx:>2}. {name}")
+            else:
+                print(f"{DIM}Nessun nickname autorizzato.{RESET}")
+
+            print(f"\n  {BOLD}[1]{RESET} Aggiungi nickname")
+            print(f"  {BOLD}[2]{RESET} Rimuovi nickname")
+            print(f"  {BOLD}[3]{RESET} Svuota lista")
+            print(f"  {BOLD}[0]{RESET} Indietro")
+
+            scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
+            if scelta == "1":
+                nickname = input("Nickname Telegram (es: @utente): ").strip()
+                self._add_scientist(nickname)
+            elif scelta == "2":
+                nickname = input("Nickname da rimuovere: ").strip()
+                self._remove_scientist(nickname)
+            elif scelta == "3":
+                confirm = input(f"{YELLOW}⚠ Svuotare la lista? [s/N]: {RESET}").strip().lower()
+                if confirm == "s":
+                    self._save_scientists([])
+                    print(f"{GREEN}✔ Lista scientists svuotata.{RESET}")
+            elif scelta == "0":
+                return
+            else:
+                print("⚠ Scelta non valida.")
+
+    @staticmethod
+    def _normalize_username(value: str) -> str:
+        raw = value.strip()
+        if not raw:
+            return ""
+        if not raw.startswith("@"):
+            raw = f"@{raw}"
+        return raw.lower()
+
+    def _scientists_path(self) -> Path:
+        try:
+            from core.config import TELEGRAM_CONFIG
+            path = TELEGRAM_CONFIG.get("authorized_usernames_file")
+            if path:
+                return Path(path)
+        except Exception:
+            pass
+        return _ROOT / "data" / "telegram_scientists.json"
+
+    def _load_scientists(self) -> list[str]:
+        path = self._scientists_path()
+        if not path.exists():
+            return ["@paolo_81_paolo"]
+        try:
+            data = path.read_text(encoding="utf-8")
+            names = []
+            for value in json.loads(data):
+                if isinstance(value, str):
+                    norm = self._normalize_username(value)
+                    if norm:
+                        names.append(norm)
+            return sorted(set(names))
+        except Exception as exc:
+            print(f"{YELLOW}⚠ Errore lettura scientists: {exc}{RESET}")
+            return []
+
+    def _save_scientists(self, names: list[str]) -> None:
+        path = self._scientists_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = sorted(set(self._normalize_username(n) for n in names if n))
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _add_scientist(self, nickname: str):
+        norm = self._normalize_username(nickname)
+        if not norm:
+            print(f"{YELLOW}⚠ Nickname non valido.{RESET}")
+            return
+        names = self._load_scientists()
+        if norm in names:
+            print(f"{DIM}Nickname già presente.{RESET}")
+            return
+        names.append(norm)
+        self._save_scientists(names)
+        print(f"{GREEN}✔ Aggiunto {norm}.{RESET}")
+
+    def _remove_scientist(self, nickname: str):
+        norm = self._normalize_username(nickname)
+        if not norm:
+            print(f"{YELLOW}⚠ Nickname non valido.{RESET}")
+            return
+        names = self._load_scientists()
+        if norm not in names:
+            print(f"{DIM}Nickname non trovato.{RESET}")
+            return
+        names = [n for n in names if n != norm]
+        self._save_scientists(names)
+        print(f"{GREEN}✔ Rimosso {norm}.{RESET}")
 
     # ── Helper ─────────────────────────────────────────────────
 

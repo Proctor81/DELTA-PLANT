@@ -911,7 +911,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
 def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf.add_page()
-    pdf._section_title("6. PARTE B (cont.) — API REST E FINE-TUNING")
+    pdf._section_title("6. PARTE B (cont.) — API REST, TELEGRAM E FINE-TUNING")
 
     pdf._subsection("6.1 API REST Flask (opzionale)")
     ac = cfg.get("API_CONFIG", {})
@@ -943,8 +943,102 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         ("GET  /model/info",       "Informazioni sul modello AI: etichette, shape input, backend"),
     ])
 
-    pdf._subsection("6.2 Fine-tuning del modello AI")
+    pdf._subsection("6.2 Bot Telegram (opzionale)")
+    tc = cfg.get("TELEGRAM_CONFIG", {})
+    tg_enabled = tc.get("enable_telegram", False)
+    token_env = tc.get("token_env", "DELTA_TELEGRAM_TOKEN")
+    api_base = tc.get("api_base_url", "http://localhost:5000")
+    auth_file = tc.get("authorized_usernames_file", "data/telegram_scientists.json")
+
+    pdf._body(
+        "DELTA integra un bot Telegram per l'utilizzo conversazionale. "
+        f"Il bot e attualmente {'ABILITATO' if tg_enabled else 'DISABILITATO'} "
+        "in core/config.py."
+    )
+    pdf._body(
+        "Il bot richiede l'API REST attiva e un token Telegram valido. "
+        f"L'API usata dal bot e: {api_base}."
+    )
+    pdf._code_block(
+        "# Imposta il token Telegram\n"
+        f"export {token_env}=\"TOKEN_BOT\"\n\n"
+        "# Avvio rapido con API + Telegram\n"
+        "python main.py --enable-api --enable-telegram"
+    )
+    pdf._body("Parametri principali di configurazione:")
+    pdf._kv_table([
+        ("enable_telegram",         str(tc.get("enable_telegram", False))),
+        ("token_env",               token_env),
+        ("api_base_url",            api_base),
+        ("authorized_usernames_file", auth_file),
+        ("authorized_usernames",    str(tc.get("authorized_usernames", []))),
+        ("authorized_users",        str(tc.get("authorized_users", []))),
+        ("request_timeout_sec",     str(tc.get("request_timeout_sec", 5))),
+        ("conversation_timeout_sec", str(tc.get("conversation_timeout_sec", 300))),
+        ("poll_interval_sec",       str(tc.get("poll_interval_sec", 1.0))),
+    ])
+    pdf._body(
+        "Gli utenti autorizzati possono essere gestiti dal Pannello Amministratore "
+        "nella sezione 'Scientists Telegram'. La lista e salvata in "
+        f"{auth_file} (nickname con @)."
+    )
+    pdf._bullet([
+        "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
+        "/export, /preflight, /finetune, /academy, /license, /health, /batch",
+        "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
+    ])
+
+    pdf._subsection("6.2.1 Ambiente DELTAPLANO (Telegram)")
+    pdf._body(
+        "DELTAPLANO e l'ambiente operativo in cui l'operatore interagisce con DELTA "
+        "attraverso la piattaforma Telegram. Consente un accesso rapido e guidato "
+        "alle funzioni principali senza utilizzare direttamente la CLI locale."
+    )
+    pdf._subsection("Funzionalita principali")
+    pdf._bullet([
+        "Diagnosi completa con foto da smartphone o immagini in input_images",
+        "Upload immagini con etichettatura foglia/fiore/frutto per fine-tuning",
+        "Report, export Excel e storico diagnosi direttamente in chat",
+        "Academy, preflight AI e dati sensori disponibili via Telegram",
+        "Interfaccia con pulsanti inline per ridurre errori di input",
+    ])
+    pdf._subsection("Installazione e attivazione")
+    pdf._body(
+        "Per abilitare DELTAPLANO e necessario configurare il bot Telegram e "
+        "fornire il token tramite variabile d'ambiente. L'API REST deve essere attiva."
+    )
+    pdf._code_block(
+        "# 1. Crea il bot con BotFather e ottieni il token\n"
+        f"# 2. Imposta il token\n"
+        f"export {token_env}=\"TOKEN_BOT\"\n\n"
+        "# 3. Avvia DELTA con API + Telegram\n"
+        "python main.py --enable-api --enable-telegram"
+    )
+    pdf._subsection("Praticita operativa")
+    pdf._body(
+        "DELTAPLANO e ideale per la raccolta dati sul campo e la reportistica rapida: "
+        "l'operatore puo avviare diagnosi, leggere report e condividere risultati "
+        "direttamente da smartphone o PC, con un flusso guidato e tracciabile."
+    )
+    pdf._subsection("Learning-by-Doing (upload + metadati)")
+    lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
+    pdf._body(
+        "Con il comando /upload l'operatore invia una foto, inserisce il nome della pianta "
+        "e seleziona la classe (foglia/fiore/frutto). "
+        "L'immagine viene salvata in input_images e nel dataset di training dedicato, "
+        "mentre i metadati vengono registrati in JSON per ogni immagine."
+    )
+    pdf._code_block(
+        f"# Cartella learning-by-doing\n"
+        f"{lbd_dir}/\n"
+        f"  images/   # copie immagini per training\n"
+        f"  records/  # metadati JSON per immagine"
+    )
+
+    pdf._subsection("6.3 Fine-tuning del modello AI")
     fc = cfg.get("FINETUNING_CONFIG", {})
+    ffc = cfg.get("FINETUNING_FLOWER_CONFIG", {})
+    frc = cfg.get("FINETUNING_FRUIT_CONFIG", {})
     pdf._body(
         "Il fine-tuning permette di addestrare il modello con immagini raccolte "
         "direttamente dalla propria installazione, migliorando l'accuratezza "
@@ -960,10 +1054,21 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
             ("Directory dataset",   fc.get("dataset_dir", "?")),
             ("Modello output",      fc.get("model_save_path", "?")),
         ])
+    if ffc:
+        pdf._kv_table([
+            ("[Fiore] Directory dataset",   ffc.get("dataset_dir", "?")),
+            ("[Fiore] Modello output",      ffc.get("model_save_path", "?")),
+        ])
+    if frc:
+        pdf._kv_table([
+            ("[Frutto] Directory dataset",  frc.get("dataset_dir", "?")),
+            ("[Frutto] Modello output",     frc.get("model_save_path", "?")),
+        ])
     pdf._body("Procedura fine-tuning:")
     pdf._bullet([
         "Raccogliere almeno 10 immagini per classe (cartelle nel dataset_dir)",
-        "Dal menu CLI selezionare [2] Fine-tuning modello AI",
+        "Da Telegram usare /finetune e scegliere foglia/fiore/frutto",
+        "Dal menu CLI selezionare [2] Fine-tuning modello AI (foglia)",
         "Attendere il completamento — progresso visualizzato a schermo",
         "Il nuovo modello viene salvato automaticamente e caricato al prossimo avvio",
     ])
@@ -2979,6 +3084,7 @@ def _add_security(pdf: ManualePDF):
         "  [5] Backup database\n"
         "  [6] Reset progressi Academy\n"
         "  [7] Pubblica su GitHub     <- README, RELEASE, tag, push\n"
+        "  [8] Scientists Telegram (autorizzazioni)\n"
         "  [0] Esci dal pannello",
         label="PANNELLO AMMINISTRATORE",
     )
@@ -2995,7 +3101,7 @@ def _add_security(pdf: ManualePDF):
          "SQLite (delta.db): diagnosi, campioni fine-tuning, log, ecc."),
         ("[4] Configurazione sistema",
          "Visualizza i parametri di configurazione attivi: modello AI, "
-         "sensori, camera, quantum oracle e API REST."),
+         "sensori, visione/camera, quantum oracle, API REST e Telegram."),
         ("[5] Backup database",
          "Crea una copia del database delta.db nella cartella exports/ "
          "con timestamp. Formato: delta_backup_YYYYMMDD_HHMMSS.db"),
@@ -3007,6 +3113,9 @@ def _add_security(pdf: ManualePDF):
          "Raccoglie metadati dal software, genera README.md e RELEASE.md aggiornati, "
          "crea un tag git con versione incrementale e fa push su origin/main. "
          "Vedi sezione 15.6 per i dettagli."),
+        ("[8] Scientists Telegram",
+         "Gestisce i nickname Telegram autorizzati a usare il bot (lista "
+         "in data/telegram_scientists.json)."),
     ])
 
     pdf._subsection("15.4 Cambio Password")
@@ -3527,7 +3636,7 @@ def main():
         ("3. Hardware — Modello AI e visione",       10),
         ("4. Software — Installazione",              11),
         ("5. Software — Utilizzo del sistema",       12),
-        ("6. Software — API REST e Fine-tuning",     13),
+        ("6. Software — API REST, Telegram e Fine-tuning",     13),
         ("7. Database e persistenza",                14),
         ("8. Architettura software — Moduli",        15),
         ("9. Risoluzione problemi",                  16),

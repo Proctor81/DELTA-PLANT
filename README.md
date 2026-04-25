@@ -40,6 +40,8 @@
 | **DELTA Academy** | Formazione interattiva con quiz, simulazioni e badge |
 | **Pannello Amministratore** | Protetto PBKDF2-SHA256 — backup, statistiche, pubblicazione GitHub |
 | **API REST opzionale** | Flask — 7 endpoint per integrazione esterna |
+| **Bot Telegram (DELTAPLANO)** | Frontend completo: diagnosi, report, export, Academy, upload immagini |
+| **Learning-by-Doing** | Upload da Telegram con etichettatura e dataset per fine-tuning |
 | **Export Excel** | `.xlsx` aggiornato automaticamente ad ogni diagnosi |
 | **Installazione automatica** | Script Bash + systemd per avvio al boot |
 | **Privacy dati** | Tutte le diagnosi e i dati operativi rimangono esclusivamente in locale |
@@ -56,7 +58,7 @@ main.py ──► DeltaAgent
               ├── diagnosis/      (regole esperte + Quantum Oracle)
               ├── recommendations/(agronomy engine)
               ├── data/           (SQLite + Excel export)
-              └── interface/      (CLI + API REST + Admin Panel)
+              └── interface/      (CLI + API REST + Admin Panel + Telegram)
 ```
 
 ---
@@ -153,13 +155,13 @@ DELTA-2.0/
 ├── core/                    # Agent, config, auth
 ├── data/                    # Database SQLite + Excel export + logger
 ├── diagnosis/               # Regole esperte + engine
-├── interface/               # CLI, API REST, Admin Panel, Academy
+├── interface/               # CLI, API REST, Admin Panel, Academy, Telegram
 ├── models/                  # plant_disease_model.tflite + labels.txt
 ├── recommendations/         # Agronomy engine
 ├── sensors/                 # Lettura I2C + anomaly detection
 ├── vision/                  # Camera + segmentazione + organ detector
 ├── Manuale/                 # Generatore PDF manuale utente
-└── datasets/                # Dataset training + captures
+└── datasets/                # Dataset training + captures + learning_by_doing
 ```
 
 ---
@@ -181,6 +183,36 @@ Raspberry Pi 5 + AI HAT 2+ (opzionale, per accelerazione NPU)
 - `scikit-learn>=1.3.0`
 - `ai-edge-litert==1.2.0`
 - `flask>=3.0.0`
+- `python-telegram-bot[job-queue]>=20.7`
+- `requests>=2.31.0`
+
+---
+
+## 💬 Bot Telegram (opzionale)
+
+1. Crea il bot con **BotFather** e salva il token.
+2. Esporta il token:
+
+```bash
+export DELTA_TELEGRAM_TOKEN="TOKEN_BOT"
+```
+
+3. Abilita il bot in `core/config.py` (TELEGRAM_CONFIG) o avvia con:
+
+```bash
+python main.py --enable-api --enable-telegram
+```
+
+Comandi principali (DELTAPLANO):
+- `/menu`, `/diagnosi`, `/upload`, `/images`, `/report`, `/dettaglio <id>`, `/sensori`,
+  `/export`, `/preflight`, `/finetune`, `/academy`, `/license`, `/health`, `/batch`
+
+Upload learning-by-doing:
+- `/upload` richiede **nome pianta** e permette etichettatura **foglia/fiore/frutto**
+- Salva in `input_images/` + dataset training dedicati + metadati JSON in `datasets/learning_by_doing/`
+- Dataset dedicati: `datasets/training` (foglia), `datasets/training_flower`, `datasets/training_fruit`
+
+> ⚠️ Per sicurezza, imposta `authorized_users` o `authorized_usernames` con gli utenti consentiti.
 
 ---
 
