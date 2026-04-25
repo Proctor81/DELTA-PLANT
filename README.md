@@ -239,6 +239,13 @@ python Manuale/genera_manuale.py
 
 ---
 
+## 🧪 Test
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
 ## 📄 Licenza
 
 Software proprietario — Copyright © 2026 Paolo Ciccolella. All rights reserved.  
