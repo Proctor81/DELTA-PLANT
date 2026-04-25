@@ -178,7 +178,9 @@ async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboard
         await update.message.reply_text(text, reply_markup=reply_markup)
         return
     if update.callback_query:
-        await update.callback_query.answer()
+        # Non richiamare answer() qui: ogni handler che genera una callback_query
+        # deve già aver chiamato query.answer() prima di invocare _send(),
+        # altrimenti si ottiene un doppio answer che causa "query id is invalid".
         await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
 
 
@@ -1683,8 +1685,15 @@ def run_telegram_bot(agent=None):
 
     async def _error_handler(update, context) -> None:
         nonlocal _conflict_handled
-        from telegram.error import Conflict, NetworkError, TimedOut
+        from telegram.error import BadRequest, Conflict, NetworkError, TimedOut
         err = context.error
+        # Query callback scadute (>60 s) o già risposte: non è un errore critico
+        if isinstance(err, BadRequest) and (
+            "query is too old" in str(err).lower()
+            or "query id is invalid" in str(err).lower()
+        ):
+            logger.debug("Bot Telegram: callback query scaduta o già risposta (ignorata): %s", err)
+            return
         if isinstance(err, Conflict):
             if _conflict_handled:
                 return
