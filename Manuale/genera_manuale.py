@@ -1022,6 +1022,29 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "# 4. (PC/sviluppo) Avvio manuale con API + Telegram\n"
         "python main.py --enable-api --enable-telegram"
     )
+    pdf._subsection("Verifica operativa al boot (Raspberry Pi)")
+    pdf._body(
+        "Dopo l'installazione del servizio, DELTA e DELTAPLANO devono risultare "
+        "attivi automaticamente a ogni riavvio. Se il servizio risulta abilitato "
+        "(enabled) ma non attivo (inactive), controllare immediatamente i log "
+        "del servizio e lo stato della rete."
+    )
+    pdf._code_block(
+        "# Stato del servizio DELTA\n"
+        "systemctl is-enabled delta   # atteso: enabled\n"
+        "systemctl is-active delta    # atteso: active\n\n"
+        "# Riavvio manuale del servizio\n"
+        "sudo systemctl restart delta\n\n"
+        "# Log in tempo reale (diagnostica Telegram/API/CLI)\n"
+        "journalctl -u delta -f"
+    )
+    pdf._info_box(
+        "CHECK RAPIDO DELTAPLANO",
+        "Con token valido in .env e rete disponibile, il bot Telegram risponde "
+        "automaticamente dopo il boot del Raspberry Pi. In caso di mancata risposta "
+        "verificare: token, stato del servizio delta e connettivita internet.",
+        color=GREEN,
+    )
     pdf._subsection("Praticita operativa")
     pdf._body(
         "DELTAPLANO e ideale per la raccolta dati sul campo e la reportistica rapida: "
@@ -1242,6 +1265,17 @@ def _add_troubleshooting(pdf: ManualePDF):
                 "Eseguire: python Manuale/genera_manuale.py",
                 "Verificare che fpdf2 sia installato: pip install fpdf2",
                 "Verificare che core/config.py non abbia errori di sintassi",
+            ]
+        ),
+        (
+            "Bot Telegram non risponde dopo il riavvio",
+            [
+                "Controllare servizio: systemctl is-enabled delta e systemctl is-active delta",
+                "Se inactive: sudo systemctl restart delta",
+                "Controllare i log: journalctl -u delta -n 50 --no-pager",
+                "Verificare token in .env (DELTA_TELEGRAM_TOKEN valorizzato e non placeholder)",
+                "Verificare connettivita di rete al boot (network-online target)",
+                "Confermare che TELEGRAM_CONFIG['enable_telegram'] sia True in core/config.py",
             ]
         ),
     ]
