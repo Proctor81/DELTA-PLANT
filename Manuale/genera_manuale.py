@@ -960,7 +960,10 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         f"L'API usata dal bot e: {api_base}."
     )
     pdf._code_block(
-        "# Imposta il token Telegram\n"
+        "# Metodo consigliato: file .env nella directory di progetto\n"
+        "cp .env.example .env\n"
+        f"# Modifica .env e inserisci: {token_env}=<token>\n\n"
+        "# Oppure variabile d'ambiente (sesssione corrente)\n"
         f"export {token_env}=\"TOKEN_BOT\"\n\n"
         "# Avvio rapido con API + Telegram\n"
         "python main.py --enable-api --enable-telegram"
@@ -1005,13 +1008,18 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._subsection("Installazione e attivazione")
     pdf._body(
         "Per abilitare DELTAPLANO e necessario configurare il bot Telegram e "
-        "fornire il token tramite variabile d'ambiente. L'API REST deve essere attiva."
+        "fornire il token nel file .env. L'API REST deve essere attiva. "
+        "Su Raspberry Pi il servizio systemd gestisce l'avvio automatico del bot "
+        "ad ogni accensione del dispositivo."
     )
     pdf._code_block(
-        "# 1. Crea il bot con BotFather e ottieni il token\n"
-        f"# 2. Imposta il token\n"
-        f"export {token_env}=\"TOKEN_BOT\"\n\n"
-        "# 3. Avvia DELTA con API + Telegram\n"
+        "# 1. Crea il bot con @BotFather su Telegram\n"
+        "# 2. Copia il file template e inserisci il token\n"
+        "cp .env.example .env\n"
+        f"#    Imposta: {token_env}=<token_da_BotFather>\n\n"
+        "# 3. (Raspberry Pi) Installa l'autostart\n"
+        "sudo bash install_service.sh\n\n"
+        "# 4. (PC/sviluppo) Avvio manuale con API + Telegram\n"
         "python main.py --enable-api --enable-telegram"
     )
     pdf._subsection("Praticita operativa")
@@ -2731,8 +2739,12 @@ def _add_raspberry_install(pdf: ManualePDF):
          "pip install -r requirements.txt (include ai-edge-litert==1.2.0) + librerie Adafruit."),
         ("Step 7 — Generazione manuale",
          "Genera automaticamente il PDF del Manuale Utente aggiornato."),
+        ("Step 6b — File .env",
+         "Crea automaticamente .env da .env.example se assente. "
+         "Configurare DELTA_TELEGRAM_TOKEN per il bot @DELTAPLANO_bot."),
         ("Step 8 — Servizio systemd",
-         "Crea e abilita il servizio delta.service per avvio automatico al boot."),
+         "Crea e abilita il servizio delta.service (con network-online.target) "
+         "per avvio automatico al boot. Alternativa rapida: install_service.sh."),
         ("Step 9 — Comando rapido",
          "Installa il comando 'delta' in /usr/local/bin per avvio rapido da terminale."),
     ])
@@ -2759,12 +2771,51 @@ def _add_raspberry_install(pdf: ManualePDF):
         "Generazione del Manuale PDF aggiornato",
     ])
 
-    pdf._subsection("17.5 Gestione del servizio systemd")
+    pdf._subsection("17.5 Installazione autostart (install_service.sh)")
+    pdf._body(
+        "Lo script install_service.sh e la procedura consigliata per configurare "
+        "l'avvio automatico di DELTA (e del bot @DELTAPLANO_bot) ad ogni "
+        "accensione del Raspberry Pi, senza dover reinstallare l'intero sistema."
+    )
+    pdf._code_block(
+        "# Dalla directory del progetto\n"
+        "cd ~/DELTA\n\n"
+        "# Installazione servizio (richiede sudo)\n"
+        "sudo bash install_service.sh\n\n"
+        "# Rimozione autostart\n"
+        "sudo bash install_service.sh --remove",
+        label="AUTOSTART",
+    )
+    pdf._body(
+        "Lo script esegue automaticamente: verifica del file .env e del token "
+        "Telegram, abilitazione di network-online.target (rete disponibile prima "
+        "del bot), scrittura del file /etc/systemd/system/delta.service "
+        "con i percorsi reali, enable + start del servizio."
+    )
+    pdf._subsection("17.6 Configurazione token Telegram")
+    pdf._body(
+        "Il bot @DELTAPLANO_bot richiede un token valido da @BotFather. "
+        "Il token va inserito nel file .env nella directory di progetto:"
+    )
+    pdf._code_block(
+        "# Crea il file .env dal template\n"
+        "cp .env.example .env\n\n"
+        "# Modifica con il tuo editor preferito\n"
+        "nano .env\n"
+        "# Riga da impostare:\n"
+        "DELTA_TELEGRAM_TOKEN=<token_da_BotFather>\n\n"
+        "# Riavvia il servizio per applicare\n"
+        "sudo systemctl restart delta",
+        label="TOKEN TELEGRAM",
+    )
+    pdf._subsection("17.7 Gestione del servizio systemd")
     pdf._code_block(
         "# Avvia DELTA come servizio\n"
         "sudo systemctl start delta\n\n"
         "# Ferma il servizio\n"
         "sudo systemctl stop delta\n\n"
+        "# Riavvio (es. dopo modifica .env)\n"
+        "sudo systemctl restart delta\n\n"
         "# Stato del servizio\n"
         "sudo systemctl status delta\n\n"
         "# Log in tempo reale\n"

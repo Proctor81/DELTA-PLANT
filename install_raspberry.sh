@@ -181,6 +181,18 @@ sudo -u "$DELTA_USER" "$VENV_PIP" install "${ADAFRUIT_PKGS[@]}" -q 2>/dev/null |
 sudo -u "$DELTA_USER" "$VENV_PIP" install fpdf2 -q
 ok "Dipendenze Python installate."
 
+# ─── 6b. Configurazione file .env ─────────────────────────────────────────────
+ENV_FILE="${DELTA_DIR}/.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+    if [[ -f "${DELTA_DIR}/.env.example" ]]; then
+        cp "${DELTA_DIR}/.env.example" "$ENV_FILE"
+        chown "${DELTA_USER}:${DELTA_USER}" "$ENV_FILE"
+        chmod 600 "$ENV_FILE"
+        ok "File .env creato da .env.example."
+        warn "Ricordati di impostare DELTA_TELEGRAM_TOKEN in: ${ENV_FILE}"
+    fi
+fi
+
 # ─── 7. Generazione manuale PDF ──────────────────────────────────────────────
 header "7/9  Generazione Manuale Utente PDF"
 cd "${DELTA_DIR}"
@@ -192,11 +204,21 @@ sudo -u "$DELTA_USER" "$VENV_PYTHON" Manuale/genera_manuale.py && \
 header "8/9  Configurazione servizio systemd"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-cat > "$SERVICE_FILE" <<EOF
+# Usa il template delta.service incluso nel progetto e sostituisce i placeholder
+if [[ -f "${DELTA_DIR}/delta.service" ]]; then
+    sed \
+        -e "s|DELTA_DIR|${DELTA_DIR}|g" \
+        -e "s|DELTA_USER|${DELTA_USER}|g" \
+        "${DELTA_DIR}/delta.service" > "$SERVICE_FILE"
+    info "Template delta.service applicato."
+else
+    # Fallback: generazione inline
+    cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=DELTA AI Agent - Diagnosi Piante
+Description=DELTA AI Agent — Diagnosi Piante & Bot Telegram @DELTAPLANO_bot
 Documentation=file://${DELTA_DIR}/Manuale/DELTA_Manuale_Utente.pdf
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -204,19 +226,29 @@ User=${DELTA_USER}
 WorkingDirectory=${DELTA_DIR}
 ExecStart=${VENV_DIR}/bin/python ${DELTA_DIR}/main.py
 Restart=on-failure
-RestartSec=10
+RestartSec=15
 StandardOutput=journal
 StandardError=journal
 Environment=PYTHONUNBUFFERED=1
 Environment=DELTA_HOME=${DELTA_DIR}
+Nice=10
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
+
+# Abilita wait-online per garantire rete prima dell'avvio del bot Telegram
+if systemctl list-unit-files | grep -q "NetworkManager-wait-online"; then
+    systemctl enable NetworkManager-wait-online.service 2>/dev/null || true
+elif systemctl list-unit-files | grep -q "systemd-networkd-wait-online"; then
+    systemctl enable systemd-networkd-wait-online.service 2>/dev/null || true
+fi
 
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}.service"
-ok "Servizio systemd '${SERVICE_NAME}' installato e abilitato all'avvio."
+ok "Servizio systemd '${SERVICE_NAME}' installato e abilitato all'avvio (con attesa rete)."
 
 # ─── 9. Script di avvio rapido ────────────────────────────────────────────────
 header "9/9  Creazione script di avvio rapido"
@@ -251,4 +283,8 @@ echo "  Copiare qui le immagini JPG/PNG da analizzare"
 echo ""
 echo -e "${YELLOW}${BOLD}NOTA: Riavviare il sistema per attivare I2C, SPI e Camera.${RESET}"
 echo -e "  sudo reboot"
+echo ""
+echo -e "${BOLD}Token Telegram (@DELTAPLANO_bot):${RESET}"
+echo "  Imposta il token in: ${DELTA_DIR}/.env"
+echo "  DELTA_TELEGRAM_TOKEN=<token da @BotFather>"
 echo ""

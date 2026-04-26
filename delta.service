@@ -1,0 +1,43 @@
+# ============================================================
+# DELTA AI Agent — Unità systemd
+# ============================================================
+# Installazione rapida (da eseguire come root):
+#
+#   sudo cp delta.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now delta
+#
+# In alternativa usa: sudo bash install_service.sh
+# ============================================================
+
+[Unit]
+Description=DELTA AI Agent — Diagnosi Piante & Bot Telegram @DELTAPLANO_bot
+Documentation=file:///DELTA_DIR/Manuale/DELTA_Manuale_Utente.pdf
+# Attende che la rete (con connettività reale) sia disponibile
+# prima di avviare il bot Telegram.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# L'utente viene sostituito da install_service.sh
+User=DELTA_USER
+WorkingDirectory=DELTA_DIR
+# Avvio tramite il Python del venv — gestisce autonomamente il reload del venv
+ExecStart=DELTA_DIR/.venv/bin/python DELTA_DIR/main.py
+# Riavvio automatico in caso di crash (es. errore di rete, timeout Telegram)
+Restart=on-failure
+RestartSec=15
+# Log su journal (leggi con: journalctl -u delta -f)
+StandardOutput=journal
+StandardError=journal
+# Variabili d'ambiente
+Environment=PYTHONUNBUFFERED=1
+Environment=DELTA_HOME=DELTA_DIR
+# Limita l'impatto sulle risorse di sistema
+Nice=10
+# Timeout arresto pulito (shutdown SIGTERM → attesa → SIGKILL)
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
