@@ -73,6 +73,7 @@ class AdminPanel:
             print(f"  {BOLD}[6]{RESET} Reset progressi Academy")
             print(f"  {BOLD}[7]{RESET} {BLUE}Pubblica su GitHub{RESET}     (README, RELEASE, tag, push)")
             print(f"  {BOLD}[8]{RESET} Scientists Telegram (autorizzazioni)")
+            print(f"  {BOLD}[9]{RESET} {YELLOW}Programmazione orario avvio/uscita{RESET} (cron)")
             print(f"  {BOLD}[0]{RESET} Esci dal pannello")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -93,6 +94,8 @@ class AdminPanel:
                 self._publish_github()
             elif scelta == "8":
                 self._manage_scientists()
+            elif scelta == "9":
+                self._schedule_manager()
             elif scelta == "0":
                 print(f"{DIM}Uscita dal pannello amministratore.{RESET}")
                 break
@@ -339,6 +342,191 @@ class AdminPanel:
         names = [n for n in names if n != norm]
         self._save_scientists(names)
         print(f"{GREEN}✔ Rimosso {norm}.{RESET}")
+
+    # ── Programmazione orario (cron) ────────────────────────────
+
+    _CRON_TAG_START = "# DELTA_SCHEDULE_START"
+    _CRON_TAG_STOP  = "# DELTA_SCHEDULE_STOP"
+
+    def _schedule_manager(self):
+        """Gestione programmazione orario avvio/uscita DELTA tramite crontab."""
+        import subprocess
+        import shutil
+
+        if not shutil.which("crontab"):
+            print(f"\n{RED}✘ 'crontab' non trovato nel sistema. Necessario su Raspberry Pi.{RESET}")
+            input(f"{DIM}Premere Invio per tornare...{RESET}")
+            return
+
+        while True:
+            self._header()
+            print(f"{BOLD}─── PROGRAMMAZIONE ORARIO AVVIO/USCITA ───{RESET}")
+
+            start_entry, stop_entry = self._cron_read_delta_entries()
+
+            print(f"\n  {CYAN}Avvio  DELTA:{RESET} ", end="")
+            if start_entry:
+                print(f"{GREEN}{self._cron_entry_to_human(start_entry)}{RESET}")
+            else:
+                print(f"{DIM}non programmato{RESET}")
+
+            print(f"  {CYAN}Uscita DELTA:{RESET} ", end="")
+            if stop_entry:
+                print(f"{GREEN}{self._cron_entry_to_human(stop_entry)}{RESET}")
+            else:
+                print(f"{DIM}non programmata{RESET}")
+
+            print(f"\n  {BOLD}[1]{RESET} Imposta orario di avvio")
+            print(f"  {BOLD}[2]{RESET} Imposta orario di uscita")
+            print(f"  {BOLD}[3]{RESET} Rimuovi programmazione avvio")
+            print(f"  {BOLD}[4]{RESET} Rimuovi programmazione uscita")
+            print(f"  {BOLD}[5]{RESET} Rimuovi tutta la programmazione")
+            print(f"  {BOLD}[0]{RESET} Indietro")
+
+            scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
+
+            if scelta == "1":
+                orario = self._ask_time("Orario di avvio DELTA")
+                if orario:
+                    self._cron_set_entry("start", orario)
+                    print(f"{GREEN}✔ Avvio programmato alle {orario}.{RESET}")
+                    logger.info("Cron avvio DELTA impostato: %s", orario)
+            elif scelta == "2":
+                orario = self._ask_time("Orario di uscita DELTA")
+                if orario:
+                    self._cron_set_entry("stop", orario)
+                    print(f"{GREEN}✔ Uscita programmata alle {orario}.{RESET}")
+                    logger.info("Cron uscita DELTA impostato: %s", orario)
+            elif scelta == "3":
+                self._cron_remove_entry("start")
+                print(f"{GREEN}✔ Programmazione avvio rimossa.{RESET}")
+                logger.info("Cron avvio DELTA rimosso.")
+            elif scelta == "4":
+                self._cron_remove_entry("stop")
+                print(f"{GREEN}✔ Programmazione uscita rimossa.{RESET}")
+                logger.info("Cron uscita DELTA rimosso.")
+            elif scelta == "5":
+                confirm = input(
+                    f"{YELLOW}⚠ Rimuovere tutta la programmazione DELTA? [s/N]: {RESET}"
+                ).strip().lower()
+                if confirm == "s":
+                    self._cron_remove_entry("start")
+                    self._cron_remove_entry("stop")
+                    print(f"{GREEN}✔ Programmazione rimossa completamente.{RESET}")
+                    logger.info("Cron DELTA rimosso completamente.")
+            elif scelta == "0":
+                return
+            else:
+                print("⚠ Scelta non valida.")
+
+    @staticmethod
+    def _ask_time(label: str) -> str | None:
+        """Chiede un orario HH:MM all'utente, restituisce None se non valido."""
+        raw = input(f"{BOLD}{label} (HH:MM, 24h): {RESET}").strip()
+        parts = raw.split(":")
+        if len(parts) != 2:
+            print(f"{RED}✘ Formato non valido. Usare HH:MM (es: 07:30).{RESET}")
+            return None
+        try:
+            hh, mm = int(parts[0]), int(parts[1])
+            if not (0 <= hh <= 23 and 0 <= mm <= 59):
+                raise ValueError
+        except ValueError:
+            print(f"{RED}✘ Orario fuori range (0-23 ore, 0-59 minuti).{RESET}")
+            return None
+        return f"{hh:02d}:{mm:02d}"
+
+    @staticmethod
+    def _cron_entry_to_human(line: str) -> str:
+        """Converte una riga cron in testo leggibile (es: 07:30 ogni giorno)."""
+        parts = line.split()
+        if len(parts) < 5:
+            return line
+        mm, hh = parts[0], parts[1]
+        try:
+            return f"{int(hh):02d}:{int(mm):02d} ogni giorno"
+        except ValueError:
+            return line
+
+    def _cron_read_raw(self) -> list[str]:
+        """Legge il crontab corrente dell'utente."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["crontab", "-l"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                return result.stdout.splitlines()
+            # returncode 1 = nessun crontab, non è un errore
+            return []
+        except Exception as exc:
+            logger.warning("Errore lettura crontab: %s", exc)
+            return []
+
+    def _cron_write_raw(self, lines: list[str]) -> bool:
+        """Scrive il crontab dell'utente."""
+        import subprocess
+        content = "\n".join(lines)
+        if content and not content.endswith("\n"):
+            content += "\n"
+        try:
+            proc = subprocess.run(
+                ["crontab", "-"],
+                input=content, capture_output=True, text=True, timeout=5
+            )
+            return proc.returncode == 0
+        except Exception as exc:
+            logger.error("Errore scrittura crontab: %s", exc)
+            return False
+
+    def _cron_read_delta_entries(self) -> tuple[str | None, str | None]:
+        """Restituisce (riga_start, riga_stop) o None se non presenti."""
+        lines = self._cron_read_raw()
+        start = stop = None
+        for i, line in enumerate(lines):
+            if line.strip() == self._CRON_TAG_START and i + 1 < len(lines):
+                start = lines[i + 1].strip()
+            elif line.strip() == self._CRON_TAG_STOP and i + 1 < len(lines):
+                stop = lines[i + 1].strip()
+        return start, stop
+
+    def _cron_remove_entry(self, kind: str) -> None:
+        """Rimuove la entry DELTA (start o stop) dal crontab."""
+        tag = self._CRON_TAG_START if kind == "start" else self._CRON_TAG_STOP
+        lines = self._cron_read_raw()
+        cleaned: list[str] = []
+        skip_next = False
+        for line in lines:
+            if skip_next:
+                skip_next = False
+                continue
+            if line.strip() == tag:
+                skip_next = True
+                continue
+            cleaned.append(line)
+        self._cron_write_raw(cleaned)
+
+    def _cron_set_entry(self, kind: str, orario: str) -> None:
+        """Aggiunge o aggiorna la entry DELTA (start o stop) nel crontab."""
+        hh, mm = orario.split(":")
+        tag = self._CRON_TAG_START if kind == "start" else self._CRON_TAG_STOP
+        python_bin = str(_ROOT / ".venv" / "bin" / "python")
+        main_py    = str(_ROOT / "main.py")
+
+        if kind == "start":
+            cmd = f"{mm} {hh} * * * cd {_ROOT!s} && {python_bin} {main_py}"
+        else:
+            # Termina DELTA cercando il processo per percorso main.py
+            cmd = f"{mm} {hh} * * * pkill -f '{main_py}'"
+
+        # Rimuovi eventuale entry precedente dello stesso tipo
+        self._cron_remove_entry(kind)
+
+        # Aggiungi la nuova entry con tag identificativo
+        lines = self._cron_read_raw()
+        lines.extend([tag, cmd])
+        self._cron_write_raw(lines)
 
     # ── Helper ─────────────────────────────────────────────────
 

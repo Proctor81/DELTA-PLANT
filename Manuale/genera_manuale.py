@@ -3086,6 +3086,7 @@ def _add_security(pdf: ManualePDF):
         "  [6] Reset progressi Academy\n"
         "  [7] Pubblica su GitHub     <- README, RELEASE, tag, push\n"
         "  [8] Scientists Telegram (autorizzazioni)\n"
+        "  [9] Programmazione orario avvio/uscita (cron)\n"
         "  [0] Esci dal pannello",
         label="PANNELLO AMMINISTRATORE",
     )
@@ -3117,6 +3118,15 @@ def _add_security(pdf: ManualePDF):
         ("[8] Scientists Telegram",
          "Gestisce i nickname Telegram autorizzati a usare il bot (lista "
          "in data/telegram_scientists.json)."),
+        ("[9] Programmazione orario avvio/uscita",
+         "Permette di programmare l'orario automatico di avvio e di uscita "
+         "di DELTA sulla shell del Raspberry Pi 5 tramite crontab. "
+         "E possibile impostare, modificare e rimuovere separatamente l'orario "
+         "di avvio (esegue main.py) e l'orario di uscita (pkill). "
+         "Gli orari si inseriscono in formato 24h (HH:MM). "
+         "Le entry vengono salvate nel crontab dell'utente con tag identificativi "
+         "DELTA_SCHEDULE_START e DELTA_SCHEDULE_STOP, senza interferire con "
+         "altri job cron esistenti."),
     ])
 
     pdf._subsection("15.4 Cambio Password")
