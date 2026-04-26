@@ -142,6 +142,22 @@ python main.py --preflight-only
 delta
 ```
 
+### Autostart su Raspberry Pi (systemd)
+
+Dopo `install_raspberry.sh`, DELTA si avvia automaticamente al boot. Per verificare:
+
+```bash
+sudo systemctl status delta
+sudo journalctl -u delta -f  # Monitoraggio in tempo reale
+```
+
+**In caso di problemi:**
+```bash
+sudo bash diagnose_autostart.sh              # Diagnostica completa
+sudo bash fix_autostart.sh --hard-reset      # Recovery totale
+# Consulta: AUTOSTART_TROUBLESHOOTING.md
+```
+
 ---
 
 ##  Struttura del progetto

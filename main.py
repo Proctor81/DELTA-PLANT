@@ -111,6 +111,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Abilita temporaneamente il bot Telegram (richiede token)",
     )
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Modalità daemon: disabilita CLI interattiva anche se stdin è disponibile",
+    )
     return parser
 
 
@@ -191,7 +196,7 @@ def main():
     run_telegram_bot(agent)
 
     # ── Interfaccia CLI ──────────────────────────────────────
-    if sys.stdin.isatty():
+    if sys.stdin.isatty() and not args.daemon:
         cli = CLI(agent)
         try:
             cli.run()
@@ -203,7 +208,10 @@ def main():
             agent.shutdown()
             logger.info("═══ DELTA AI AGENT SPENTO ═══")
     else:
-        logger.info("STDIN non interattivo: CLI disabilitata. Processo in attesa.")
+        if args.daemon:
+            logger.info("Flag --daemon attivo: CLI disabilitata. Processo in attesa.")
+        else:
+            logger.info("STDIN non interattivo: CLI disabilitata. Processo in attesa.")
         try:
             while True:
                 time.sleep(1)

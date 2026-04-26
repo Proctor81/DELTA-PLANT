@@ -1,0 +1,31 @@
+🤖 DELTA Autostart Fix v2.0.5+
+
+✅ PROBLEMA RISOLTO: Bot @DELTAPLANO_bot ora si avvia automaticamente
+
+📋 INSTALLAZIONE RAPIDA:
+  cd ~/DELTA\ 2.0
+  sudo bash quick_install_autostart.sh
+
+🔧 COMANDI PRINCIPALI:
+  sudo bash diagnose_autostart.sh          # Test completo
+  sudo bash fix_autostart.sh               # Recovery rapido
+  sudo systemctl status delta              # Stato servizio
+  sudo journalctl -u delta -f              # Log in tempo reale
+
+📖 DOCUMENTAZIONE:
+  - AUTOSTART_FIX_SUMMARY.md       ← INIZIA QUI!
+  - AUTOSTART_TROUBLESHOOTING.md   ← Problemi comuni
+  - CHANGELOG_2.0.5_AUTOSTART.md   ← Dettagli tecnici
+
+✨ COSA È STATO FATTO:
+  1. delta.service: aggiunto --enable-api --daemon
+  2. diagnose_autostart.sh: diagnostica automatica
+  3. fix_autostart.sh: recovery rapido
+  4. Documentazione completa
+
+🚀 VERIFICA:
+  1. Riavvia Raspberry Pi
+  2. Apri Telegram e invia msg a @DELTAPLANO_bot
+  3. Bot dovrebbe rispondere immediatamente
+
+❓ PROBLEMI? → leggi AUTOSTART_TROUBLESHOOTING.md

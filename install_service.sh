@@ -148,6 +148,25 @@ else
     warn "  journalctl -u delta -n 50 --no-pager"
 fi
 
+# ─── Info di supporto ──────────────────────────────────────────────────────────
+header "Comandi utili per troubleshooting"
+echo ""
+echo -e "${BOLD}Monitoraggio:${RESET}"
+echo "  sudo journalctl -u delta -f              # Log in tempo reale"
+echo ""
+echo -e "${BOLD}Diagnostica e repair:${RESET}"
+echo "  sudo bash ${DELTA_DIR}/diagnose_autostart.sh    # Test completo (9 verifiche)"
+echo "  sudo bash ${DELTA_DIR}/fix_autostart.sh         # Recovery rapido"
+echo "  sudo bash ${DELTA_DIR}/fix_autostart.sh --hard-reset  # Reset totale"
+echo ""
+echo -e "${BOLD}Documentazione:${RESET}"
+echo "  less ${DELTA_DIR}/AUTOSTART_TROUBLESHOOTING.md  # Guida troubleshooting"
+echo "  less ${DELTA_DIR}/CHANGELOG_2.0.5_AUTOSTART.md  # Dettagli dei fix"
+echo ""
+
+ok "Installazione completata!"
+
+
 echo ""
 echo -e "${BOLD}Comandi utili:${RESET}"
 echo "  sudo systemctl status delta        # Stato servizio"
