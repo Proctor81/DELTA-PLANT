@@ -174,14 +174,22 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
 
 
 async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
+    # parse_mode è opzionale e passato come keyword argument
+    import inspect
+    frame = inspect.currentframe()
+    args, _, _, values = inspect.getargvalues(frame)
+    parse_mode = values.get('parse_mode', None)
+    reply_args = {"reply_markup": reply_markup}
+    if parse_mode is not None:
+        reply_args["parse_mode"] = parse_mode
     if update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+        await update.message.reply_text(text, **reply_args)
         return
     if update.callback_query:
         # Non richiamare answer() qui: ogni handler che genera una callback_query
         # deve già aver chiamato query.answer() prima di invocare _send(),
         # altrimenti si ottiene un doppio answer che causa "query id is invalid".
-        await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
+        await update.callback_query.message.reply_text(text, **reply_args)
 
 
 def _get_agent(context: ContextTypes.DEFAULT_TYPE):
@@ -420,19 +428,123 @@ def _parse_float(value: str) -> Optional[float]:
 
 
 def _format_diagnosis(record: Dict[str, Any]) -> str:
+    pass
+def _format_diagnosis_full(record: Dict[str, Any]) -> str:
     dx = record.get("diagnosis", {})
     ai = record.get("ai_result", {})
-    summary = dx.get("summary", "N/D")
+    recs = record.get("recommendations", [])
+    organ_results = record.get("organ_results", {})
+    organ_analyses = dx.get("organ_analyses", {})
+    quantum_risk = dx.get("quantum_risk", {})
+    sensor = record.get("sensor_snapshot", {})
+    anomalies = sensor.get("_anomalies", [])
+
+    def fmt(val, unit=None, ndash="N/D"):
+        if val is None:
+            return ndash
+        if isinstance(val, float):
+            return f"{val:.2f}{unit or ''}"
+        return str(val)
+
+    # Stato generale
     status = dx.get("plant_status", "N/D")
     risk = dx.get("overall_risk", "N/D")
-    ai_class = dx.get("ai_class") or ai.get("class", "N/D")
-    return (
-        "Diagnosi completata ✅\n"
-        f"Stato: {status}\n"
-        f"Rischio: {risk}\n"
-        f"Classe AI: {ai_class}\n"
-        f"{summary}"
-    )
+    risk_emoji = {
+        "basso": "🟢", "medio": "🟡", "alto": "🔴", "critico": "🟣"
+    }.get(str(risk).lower(), "❓")
+    ai_class = ai.get("class", "N/D")
+    ai_conf = ai.get("confidence", 0)
+    ai_sim = ai.get("simulated", False)
+
+    msg = [
+        "<b>🩺 RISULTATO DIAGNOSI DELTA</b>",
+        "<b>──────────────</b>",
+        f"<b>Stato pianta:</b>  {status}",
+        f"<b>Rischio:</b>       {risk_emoji} {risk.upper()}",
+        "",
+        f"<b>Analisi foglia:</b>",
+        f"  Classe AI:    {ai_class} ({ai_conf*100:.1f}%)" + (" [SIM]" if ai_sim else ""),
+    ]
+
+    # Analisi fiore
+    if "fiore" in organ_analyses:
+        fa = organ_analyses["fiore"]
+        msg.append("")
+        msg.append("<b>Analisi fiore:</b>")
+        msg.append(f"  Classe AI:    {fa.get('class', 'N/A')} ({fa.get('confidence', 0)*100:.1f}%)" + (" [SIM]" if fa.get("simulated") else ""))
+    elif organ_results.get("fiore", {}).get("detected"):
+        msg.append("")
+        msg.append("<b>Analisi fiore:</b>  Rilevato — analisi AI non disponibile")
+
+    # Analisi frutto
+    if "frutto" in organ_analyses:
+        fra = organ_analyses["frutto"]
+        msg.append("")
+        msg.append("<b>Analisi frutto:</b>")
+        msg.append(f"  Classe AI:    {fra.get('class', 'N/A')} ({fra.get('confidence', 0)*100:.1f}%)" + (" [SIM]" if fra.get("simulated") else ""))
+    elif organ_results.get("frutto", {}).get("detected"):
+        msg.append("")
+        msg.append("<b>Analisi frutto:</b>  Rilevato — analisi AI non disponibile")
+
+    # Oracolo Quantistico
+    if quantum_risk:
+        qrs   = quantum_risk.get("quantum_risk_score", 0.0)
+        qlvl  = quantum_risk.get("risk_level", "nessuno")
+        qdom  = quantum_risk.get("dominant_description", "N/A")
+        qgain = quantum_risk.get("amplification_gain", 1.0)
+        qitr  = quantum_risk.get("grover_iterations", 0)
+        qemoji = {
+            "nessuno": "⚪", "basso": "🟢", "medio": "🟡", "alto": "🔴", "critico": "🟣"
+        }.get(str(qlvl).lower(), "❓")
+        msg.append("")
+        msg.append("<b>Oracolo Quantistico di Grover:</b>")
+        msg.append(f"  QRS:           {qemoji} {qrs:.4f} [{qlvl.upper()}]")
+        msg.append(f"  Evento dom.:   {qdom}")
+        msg.append(f"  Amplific.:     {qgain:.1f}x  |  Iterazioni Grover: {qitr}")
+
+    # Spiegazione
+    msg.append("")
+    msg.append("<b>Diagnosi:</b>")
+    msg.append(dx.get("explanation", "N/A"))
+
+    # Raccomandazioni
+    if recs:
+        msg.append("")
+        msg.append("<b>Raccomandazioni:</b>")
+        for i, rec in enumerate(recs, 1):
+            cat = rec.get("category", "?").upper()
+            priority = rec.get("priority", "?")
+            msg.append(f"  <b>[{i}] [{cat}]</b> (Priorità: {priority})")
+            msg.append(f"      Problema: {rec.get('problem','')}")
+            msg.append(f"      Azione:   {rec.get('action','')}")
+
+    # Snapshot sensori
+    if sensor:
+        msg.append("")
+        msg.append("<b>Dati sensori:</b>")
+        fields = [
+            ("temperature_c",  "Temperatura",    "°C"),
+            ("humidity_pct",   "Umidità",         "%"),
+            ("pressure_hpa",   "Pressione",       "hPa"),
+            ("light_lux",      "Luminosità",      "lux"),
+            ("co2_ppm",        "CO₂",             "ppm"),
+            ("ph",             "pH",              ""),
+            ("ec_ms_cm",       "EC",              "mS/cm"),
+        ]
+        for key, label, unit in fields:
+            val = sensor.get(key)
+            val_str = fmt(val, unit)
+            msg.append(f"  {label:15s}: {val_str}")
+        source = sensor.get("source", "?")
+        ts = sensor.get("timestamp", "?")
+        msg.append(f"  Fonte: {source} | Timestamp: {ts}")
+        if anomalies:
+            msg.append(f"  ⚠️ Anomalie: {len(anomalies)}")
+            for a in anomalies:
+                msg.append(f"    • {a}")
+
+    msg.append("\n<code>──────────────</code>")
+    return "\n".join(msg)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -726,7 +838,7 @@ async def _run_diagnosis(
         await _send(update, "Errore durante la diagnosi.")
         return
 
-    await _send(update, _format_diagnosis(record))
+    await _send(update, _format_diagnosis_full(record), parse_mode="HTML")
     if record.get("diagnosis", {}).get("needs_human_review") and image_path:
         await _prompt_label_review(update, context, Path(image_path))
 
@@ -1602,10 +1714,9 @@ def run_telegram_bot(agent=None):
         ],
         states={
             STATE_DIAG_IMAGE_SOURCE: [
-                CallbackQueryHandler(
-                    choose_diag_image_source,
-                    pattern=f"^({DIAG_IMAGE_UPLOAD}|{DIAG_IMAGE_LAST}|{DIAG_IMAGE_CAMERA})$",
-                )
+                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_UPLOAD}$"),
+                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_LAST}$"),
+                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_CAMERA}$"),
             ],
             STATE_DIAG_WAIT_PHOTO: [
                 MessageHandler(filters.PHOTO | filters.Document.IMAGE, receive_diag_photo),
@@ -1668,6 +1779,11 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("academy", academy_start))
     application.add_handler(CommandHandler("license", license_text))
     application.add_handler(CommandHandler("batch", batch_analyze))
+    # ── ConversationHandler per Diagnosi e Upload PRIMA dei callback globali ──
+    # Questo assicura che i loro entry_point abbiano priorità
+    application.add_handler(diagnosis_handler)
+    application.add_handler(upload_handler)
+    # ── Callback globali dopo i ConversationHandler ──
     application.add_handler(
         CallbackQueryHandler(menu_callback, pattern=r"^CMD_")
     )
@@ -1677,8 +1793,6 @@ def run_telegram_bot(agent=None):
     application.add_handler(CallbackQueryHandler(finetune_callback, pattern=r"^FINETUNE_RUN_"))
     application.add_handler(CallbackQueryHandler(finetune_load_callback, pattern=r"^FINETUNE_LOAD_LEAF$"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
-    application.add_handler(diagnosis_handler)
-    application.add_handler(upload_handler)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
 
     _conflict_handled = False
