@@ -397,6 +397,41 @@ class ManualePDF(FPDF):
         self.multi_cell(190, 5.5, f"   {text}", fill=True)
         self.ln(4)
 
+
+# ─────────────────────────────────────────────────────────────
+# EXECUTIVE SUMMARY — DIVULGATIVA
+# ─────────────────────────────────────────────────────────────
+def _add_executive_summary(pdf: 'ManualePDF'):
+    pdf.add_page()
+    pdf._section_title("EXECUTIVE SUMMARY — Cos'è DELTA e perché è importante")
+    pdf._body(
+        "DELTA è un sistema innovativo che porta l'intelligenza artificiale direttamente nei campi, nelle serre e nei laboratori, aiutando agricoltori, studenti e ricercatori a monitorare la salute delle piante in modo semplice, rapido e preciso."
+    )
+    pdf._body(
+        "Grazie a una combinazione di sensori ambientali, visione artificiale e modelli di deep learning, DELTA è in grado di riconoscere malattie, carenze e stress delle piante in tempo reale, fornendo diagnosi e consigli pratici per intervenire subito e migliorare la produttività."
+    )
+    pdf._body(
+        "Il cuore di DELTA è un piccolo computer Raspberry Pi 5, dotato di una fotocamera e di un acceleratore AI (AI HAT 2+), che analizza immagini di foglie, fiori e frutti, misura parametri come temperatura, umidità, luce, CO₂, pH ed EC, e integra tutte queste informazioni per valutare lo stato della pianta."
+    )
+    pdf._body(
+        "DELTA non si limita a rilevare problemi: grazie all'Oracolo Quantistico di Grover, valuta il rischio complessivo considerando tutte le possibili interazioni tra fattori ambientali e sintomi, offrendo una visione avanzata e predittiva della salute delle colture."
+    )
+    pdf._body(
+        "Il sistema è pensato per essere accessibile a tutti: l'interfaccia è semplice, il manuale è ricco di esempi e spiegazioni, e la DELTA Academy permette di imparare giocando, con simulazioni, quiz e badge. DELTA è già usato in scuole, orti urbani, aziende agricole e progetti di ricerca per avvicinare giovani e adulti all'agricoltura digitale e sostenibile."
+    )
+    pdf._info_box(
+        "PERCHÉ DELTA È UTILE",
+        "• Aiuta a prevenire malattie e perdite di raccolto, intervenendo prima che i problemi diventino gravi.\n"
+        "• Riduce l'uso di prodotti chimici, grazie a diagnosi mirate e raccomandazioni personalizzate.\n"
+        "• Favorisce l'apprendimento attivo e la formazione di nuove competenze digitali in agricoltura.\n"
+        "• Promuove la sostenibilità e l'innovazione, rendendo la tecnologia accessibile anche a chi non è esperto."
+    )
+    pdf._info_box(
+        "PER IL MONDO EDUCATION",
+        "DELTA è uno strumento ideale per scuole, università e laboratori didattici: permette di sperimentare l'intelligenza artificiale applicata all'agricoltura, raccogliere dati reali, imparare a programmare e a interpretare i risultati, stimolando curiosità e spirito scientifico."
+    )
+
+
     def _warning_box(self, text: str):
         self._info_box("[!] ATTENZIONE", text, color=RED)
 
@@ -461,47 +496,47 @@ def _add_intro(pdf: ManualePDF):
         "(componenti, collegamento, configurazione fisica); la Parte B descrive il software "
         "(installazione, avvio, utilizzo delle funzioni e interpretazione degli output)."
     )
-    pdf._info_box(
-        "AGGIORNAMENTO AUTOMATICO — v2.0",
-        "Questo PDF è generato automaticamente dallo script Manuale/genera_manuale.py "
-        "che legge il codice sorgente del progetto. Per aggiornarlo dopo modifiche:\n"
-        "  python Manuale/genera_manuale.py",
-        color=GREEN,
-    )
-
-
-def _add_hardware_appendix(pdf: ManualePDF):
-    pdf.add_page()
-    pdf._section_title("APPENDICE HARDWARE — ASSEMBLAGGIO E SCHEMA ELETTRICO")
-
-    pdf._subsection("A.1 Procedura rapida di assemblaggio")
-    pdf._body(
-        "Seguire questa sequenza per montare il sistema DALTA su Raspberry Pi 5. "
-        "L'obiettivo è un cablaggio ordinato, alimentazione stabile e sensori protetti."
-    )
-    pdf._bullet([
-        "Montare Raspberry Pi 5 su una base isolante e fissare l'alimentatore USB-C.",
-        "Installare l'AI HAT 2+ nello slot M.2 o nel vano dedicato secondo le istruzioni del produttore.",
-        "Collegare il cavo FFC dell'AI HAT 2+ al connettore CSI/AI HAT sulla Raspberry Pi.",
-        "Fissare la Pi Camera Module 3 e inserire il flat cable nel connettore CSI con contatti metallici verso il basso.",
-        "Posizionare i sensori BME680, VEML7700 e SCD41 vicino alla zona di campionamento ambientale.",
-        "Collegare l'ADS1115 all'I2C e poi i fili di segnale del pH e dell'EC ai canali A0 e A1.",
-        "Usare cavi Dupont corti e ordinati per evitare rumore e interferenze sui segnali analogici."
-    ])
-
-    pdf._subsection("A.2 Collegamenti elettrici principali")
-    pdf._body(
-        "Il sistema utilizza un bus I2C condiviso per i sensori digitali e un ADC per i sensori analogici. "
-        "Assicurarsi che tutti i dispositivi condividano lo stesso riferimento di massa (GND)."
-    )
-    pdf._kv_table([
-        ("BME680", "I2C SDA → GPIO 2 (Pin 3), I2C SCL → GPIO 3 (Pin 5), VCC → 3.3V, GND → GND"),
-        ("VEML7700", "I2C SDA → GPIO 2 (Pin 3), I2C SCL → GPIO 3 (Pin 5), VCC → 3.3V, GND → GND"),
-        ("SCD41", "I2C SDA → GPIO 2 (Pin 3), I2C SCL → GPIO 3 (Pin 5), VCC → 3.3V, GND → GND"),
-        ("ADS1115", "I2C SDA → GPIO 2 (Pin 3), I2C SCL → GPIO 3 (Pin 5), VCC → 3.3V, GND → GND, CANALI A0/A1 → pH/EC"),
-        ("Pi Camera Module 3", "Flat cable nel connettore CSI, bloccare lo sportello del connettore"),
-        ("AI HAT 2+", "Installazione M.2 + cavo FFC per alimentazione e comunicazione NPU"),
-    ])
+    pdf = ManualePDF()
+    pdf.cover_page()
+    _add_executive_summary(pdf)
+    toc_entries = []
+    # Sezioni principali
+    _add_intro(pdf)
+    toc_entries.append(("1. INTRODUZIONE", pdf.page_no()))
+    cfg = _load_config()
+    _add_hardware_appendix(pdf)
+    toc_entries.append(("APPENDICE HARDWARE", pdf.page_no()))
+    _add_hardware(pdf, cfg)
+    toc_entries.append(("2. PARTE A — HARDWARE", pdf.page_no()))
+    _add_ai(pdf, cfg)
+    toc_entries.append(("3. PARTE A (cont.) — MODELLO AI E VISIONE", pdf.page_no()))
+    reqs = _load_requirements()
+    _add_software_install(pdf, reqs)
+    toc_entries.append(("4. PARTE B — SOFTWARE: INSTALLAZIONE", pdf.page_no()))
+    _add_software_uso(pdf, cfg)
+    toc_entries.append(("5. PARTE B (cont.) — UTILIZZO DEL SOFTWARE", pdf.page_no()))
+    _add_software_api(pdf, cfg)
+    toc_entries.append(("6. PARTE B (cont.) — API REST, TELEGRAM E FINE-TUNING", pdf.page_no()))
+    _add_database(pdf, cfg)
+    toc_entries.append(("7. DATABASE E PERSISTENZA", pdf.page_no()))
+    modules = _collect_modules()
+    _add_modules(pdf, modules)
+    toc_entries.append(("8. ARCHITETTURA SOFTWARE — MODULI", pdf.page_no()))
+    _add_troubleshooting(pdf)
+    toc_entries.append(("9. RISOLUZIONE PROBLEMI", pdf.page_no()))
+    _add_update_guide(pdf)
+    toc_entries.append(("10. AGGIORNAMENTO DEL MANUALE", pdf.page_no()))
+    _add_academy(pdf)
+    toc_entries.append(("11. DELTA ACADEMY — FORMAZIONE OPERATORE", pdf.page_no()))
+    _add_organ_analysis(pdf)
+    toc_entries.append(("12. ANALISI MULTI-ORGANO — FOGLIA, FIORE E FRUTTO", pdf.page_no()))
+    _add_quantum_oracle(pdf)
+    toc_entries.append(("13. ORACOLO QUANTISTICO DI GROVER — QUANTIFICAZIONE DEL RISCHIO", pdf.page_no()))
+    # Scientific paper opzionale
+    # _add_scientific_paper(pdf)
+    # Indice (dopo copertina e executive summary)
+    pdf.toc_page(toc_entries)
+    pdf.output(str(OUTPUT_PDF))
 
     pdf._subsection("A.3 Schema elettrico descrittivo")
     pdf._body(
@@ -3202,7 +3237,11 @@ def _add_security(pdf: ManualePDF):
          "Vedi sezione 15.6 per i dettagli."),
         ("[8] Scientists Telegram",
          "Gestisce i nickname Telegram autorizzati a usare il bot (lista "
-         "in data/telegram_scientists.json)."),
+         "in data/telegram_scientists.json).\n"
+         "\nNovità 2026:\n"
+         "- Log automatico degli accessi negati (file logs/telegram_denied.log).\n"
+         "- Dal pannello admin puoi vedere gli accessi negati e aggiungere rapidamente utenti bloccati alla whitelist.\n"
+         "- La normalizzazione avanzata dei nickname permette di tollerare piccole variazioni (underscore, punti, trattini, spazi e maiuscole vengono ignorati)."),
         ("[9] Programmazione orario avvio/uscita",
          "Permette di programmare l'orario automatico di avvio e di uscita "
          "di DELTA sulla shell del Raspberry Pi 5 tramite crontab. "
