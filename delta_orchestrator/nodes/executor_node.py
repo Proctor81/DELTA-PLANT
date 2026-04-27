@@ -38,16 +38,25 @@ class ExecutorNode(BaseNode):
                     raise Exception("Ollama non disponibile")
             except Exception as e:
                 logger.warning("Ollama non disponibile, uso HuggingFace", error=str(e))
-                # Configura qui il tuo modello HuggingFace e token
                 import os
-                hf_model = "Qwen/Qwen3-Coder-480B-A35B-Instruct"  # Modello richiesto dall'utente
-                hf_token = os.environ.get("HF_API_TOKEN")  # Esporta la variabile HF_API_TOKEN nel sistema
-                hf_adapter = HuggingFaceAdapter(model_name=hf_model, api_token=hf_token)
-                try:
-                    llm_response = await hf_adapter.generate(user_message)
-                    state["final_answer"] = llm_response.strip()
-                except Exception as e2:
-                    logger.error("Errore HuggingFace LLM", error=str(e2))
+                hf_token = os.environ.get("HF_API_TOKEN")
+                # Primo tentativo: modello T5-base (ampio supporto HuggingFace Inference API)
+                hf_models = [
+                    "google/flan-t5-base",
+                    "tiiuae/falcon-7b-instruct",
+                    "bigscience/bloomz-560m"
+                ]
+                for hf_model in hf_models:
+                    hf_adapter = HuggingFaceAdapter(model_name=hf_model, api_token=hf_token)
+                    try:
+                        llm_response = await hf_adapter.generate(user_message)
+                        if llm_response and not str(llm_response).lower().startswith("[huggingface error"):
+                            state["final_answer"] = llm_response.strip()
+                            break
+                    except Exception as e2:
+                        logger.warning(f"Errore HuggingFace LLM con modello {hf_model}", error=str(e2))
+                        continue
+                else:
                     state["final_answer"] = "[Errore LLM: impossibile generare una risposta]"
         else:
             diagnosis = state["tool_results"].get("tflite_diagnosis", {})
