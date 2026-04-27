@@ -42,9 +42,7 @@ class ExecutorNode(BaseNode):
                 hf_token = os.environ.get("HF_API_TOKEN")
                 # Primo tentativo: modello T5-base (ampio supporto HuggingFace Inference API)
                 hf_models = [
-                    "google/flan-t5-base",
-                    "tiiuae/falcon-7b-instruct",
-                    "bigscience/bloomz-560m"
+                    "openai/gpt-oss-120b:fastest"
                 ]
                 for hf_model in hf_models:
                     hf_adapter = HuggingFaceAdapter(model_name=hf_model, api_token=hf_token)
