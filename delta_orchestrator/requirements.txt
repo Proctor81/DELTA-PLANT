@@ -1,0 +1,9 @@
+# Requirements per DELTA Orchestrator
+fastapi
+uvicorn[standard]
+structlog
+pydantic>=2.0
+httpx
+langgraph
+langchain-core
+redis>=5.0

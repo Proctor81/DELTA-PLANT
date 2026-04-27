@@ -48,7 +48,39 @@ try:
 except ImportError:
     TELEGRAM_AVAILABLE = False
 
+# --- INTEGRAZIONE DELTA_ORCHESTRATOR ---
+try:
+    from delta_orchestrator.integration.delta_bridge import orchestrate_task
+    DELTA_ORCHESTRATOR_AVAILABLE = True
+except ImportError:
+    DELTA_ORCHESTRATOR_AVAILABLE = False
+# ----------------------------------------
+
 logger = logging.getLogger("delta.interface.telegram")
+logger = logging.getLogger("delta.interface.telegram")
+
+# ──────────────────────────────────────────────────────────────
+# Handler per chat libera (domanda/risposta non strutturata)
+async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
+    if not await _guard(update):
+        return
+    if not update.message or not update.message.text:
+        return
+    user_text = update.message.text.strip()
+    agent = _get_agent(context)
+    if not agent or not DELTA_ORCHESTRATOR_AVAILABLE:
+        await _send(update, "Orchestrator non disponibile.")
+        return
+    try:
+        # orchestrate_task può essere adattato per domande libere
+        response = await asyncio.to_thread(orchestrate_task, user_text)
+        if not response:
+            await _send(update, "Nessuna risposta dall'orchestrator.")
+        else:
+            await _send(update, str(response))
+    except Exception as exc:
+        logger.error("Errore chat libera: %s", exc, exc_info=True)
+        await _send(update, "Errore durante l'elaborazione della domanda.")
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -122,7 +154,10 @@ def _normalize_username(value: str) -> str:
         return ""
     if not raw.startswith("@"):
         raw = f"@{raw}"
-    return raw.lower()
+    # Rende il confronto più robusto: rimuove punti, underscore, trattini, spazi e converte in minuscolo
+    norm = raw.lower()
+    norm = norm.replace("_", "").replace("-", "").replace(".", "").replace(" ", "")
+    return norm
 
 
 def _load_allowed_usernames() -> Set[str]:
@@ -173,7 +208,7 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
+async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None, parse_mode: str = None):
     # parse_mode è opzionale e passato come keyword argument
     import inspect
     frame = inspect.currentframe()
@@ -392,6 +427,14 @@ async def _guard(update: Update) -> bool:
     username = _normalize_username(user.username) if user and user.username else ""
     if not _is_authorized(user_id, username):
         await _send(update, "Accesso non autorizzato.")
+        # Log accesso negato
+        try:
+            log_path = Path(__file__).resolve().parent.parent / "logs" / "telegram_denied.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat()} | ID: {user_id} | USERNAME: {username}\n")
+        except Exception as exc:
+            logger.warning(f"Impossibile loggare accesso negato: {exc}")
         return False
     return True
 
@@ -1031,7 +1074,7 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
         agent = _get_agent(context)
         if not agent:
             await _send(update, "Errore sistema: agent non disponibile.")
-            return ConversationHandler.END
+            return
         from ai.fine_tuning import FineTuner
         target_cfg = _finetune_target_by_organ(organ or _resolve_organ(label))
         tuner = FineTuner(
@@ -1143,6 +1186,22 @@ async def batch_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _send(update, "Nessuna immagine da analizzare.")
         return
 
+    # --- INTEGRAZIONE DELTA_ORCHESTRATOR ---
+    if DELTA_ORCHESTRATOR_AVAILABLE:
+        ok = 0
+        fail = 0
+        for img_path in images_list:
+            try:
+                record = await orchestrate_task("Diagnosi pianta", {"image_path": str(img_path)})
+                if record.get("confidence", 0) > 0:
+                    ok += 1
+                else:
+                    fail += 1
+            except Exception:
+                fail += 1
+        await _send(update, f"Analisi completata (orchestrator). OK: {ok}, Errori: {fail}.")
+        return
+    # --- FINE INTEGRAZIONE DELTA_ORCHESTRATOR ---
     await _send(update, f"Avvio analisi sequenziale di {len(images_list)} immagini...")
 
     def _run_batch():
@@ -1794,6 +1853,8 @@ def run_telegram_bot(agent=None):
     application.add_handler(CallbackQueryHandler(finetune_load_callback, pattern=r"^FINETUNE_LOAD_LEAF$"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
+    # Handler globale per chat libera (gruppo alto per non interferire con i flussi guidati)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
 
     _conflict_handled = False
 

@@ -256,6 +256,8 @@ class AdminPanel:
             print(f"\n  {BOLD}[1]{RESET} Aggiungi nickname")
             print(f"  {BOLD}[2]{RESET} Rimuovi nickname")
             print(f"  {BOLD}[3]{RESET} Svuota lista")
+            print(f"  {BOLD}[4]{RESET} Mostra accessi negati recenti")
+            print(f"  {BOLD}[5]{RESET} Aggiungi utenti bloccati recenti")
             print(f"  {BOLD}[0]{RESET} Indietro")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -270,10 +272,63 @@ class AdminPanel:
                 if confirm == "s":
                     self._save_scientists([])
                     print(f"{GREEN}✔ Lista scientists svuotata.{RESET}")
+            elif scelta == "4":
+                self._show_denied_log()
+            elif scelta == "5":
+                self._add_denied_users()
             elif scelta == "0":
                 return
             else:
                 print("⚠ Scelta non valida.")
+
+    def _show_denied_log(self, max_lines: int = 20):
+        """Mostra ultimi accessi negati dal log."""
+        log_path = _ROOT / "logs" / "telegram_denied.log"
+        if not log_path.exists():
+            print(f"{DIM}Nessun accesso negato registrato.{RESET}")
+            return
+        try:
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+            print(f"\n{BOLD}Ultimi accessi negati:{RESET}")
+            for line in lines[-max_lines:]:
+                print(f"  {line}")
+        except Exception as exc:
+            print(f"{YELLOW}⚠ Errore lettura denied log: {exc}{RESET}")
+
+    def _add_denied_users(self):
+        """Permette di aggiungere rapidamente utenti bloccati dal log agli autorizzati."""
+        log_path = _ROOT / "logs" / "telegram_denied.log"
+        if not log_path.exists():
+            print(f"{DIM}Nessun accesso negato registrato.{RESET}")
+            return
+        try:
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+            denied = []
+            for line in lines[-30:]:
+                # Cerca USERNAME: @nome
+                if "USERNAME:" in line:
+                    username = line.split("USERNAME:", 1)[-1].strip()
+                    if username and username != "None":
+                        denied.append(username)
+            denied = sorted(set(denied))
+            if not denied:
+                print(f"{DIM}Nessun username trovato nel log.{RESET}")
+                return
+            print(f"\n{BOLD}Utenti bloccati trovati:{RESET}")
+            for idx, name in enumerate(denied, 1):
+                print(f"  {idx:>2}. {name}")
+            to_add = input(f"\n{BOLD}Aggiungi tutti questi utenti agli autorizzati? [s/N]: {RESET}").strip().lower()
+            if to_add == "s":
+                names = self._load_scientists()
+                for name in denied:
+                    if name not in names:
+                        names.append(name)
+                self._save_scientists(names)
+                print(f"{GREEN}✔ Utenti aggiunti.{RESET}")
+            else:
+                print("Operazione annullata.")
+        except Exception as exc:
+            print(f"{YELLOW}⚠ Errore aggiunta denied users: {exc}{RESET}")
 
     @staticmethod
     def _normalize_username(value: str) -> str:

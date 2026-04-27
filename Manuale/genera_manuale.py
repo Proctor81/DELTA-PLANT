@@ -830,6 +830,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
     pdf._body(
         "All'avvio viene mostrato il menu interattivo. Le opzioni disponibili sono:"
     )
+
     pdf._kv_table([
         ("[1] Avvia diagnosi pianta",      "Acquisisce immagine + dati sensori → diagnosi completa"),
         ("[2] Fine-tuning modello AI",     "Riaddestra il modello con nuovi campioni raccolti"),
@@ -839,7 +840,21 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("[6] DELTA Academy",              "Modulo di formazione interattiva per l'operatore"),
         ("[7] Pannello Amministratore",    "Funzioni avanzate protette da password"),
         ("[8] Cartella immagini input",    "Visualizza e gestisce la cartella input_images/ (no-camera)"),
+        ("[C] Chat domanda/risposta libera", "Interagisci liberamente con l'orchestrator DELTA: scrivi una domanda o comando, ricevi risposta immediata. Scrivi 'exit' per tornare al menu."),
         ("[0] Esci",                       "Spegne il sistema in modo sicuro"),
+    ])
+
+    pdf._subsection("Guida all'uso: Chat domanda/risposta libera (CLI)")
+    pdf._body(
+        "Selezionando l'opzione [C] dal menu CLI, si accede alla modalità chat libera con l'orchestrator DELTA. "
+        "L'utente può scrivere qualsiasi domanda, comando o richiesta di spiegazione. "
+        "Il sistema risponde in tempo reale sfruttando il motore di orchestrazione integrato. "
+        "Per uscire dalla chat e tornare al menu principale, digitare 'exit' o 'esci'."
+    )
+    pdf._bullet([
+        "Esempi: 'Qual è lo stato attuale della pianta?', 'Mostrami le ultime diagnosi', 'Spiega il rischio attuale', 'Come si fa il fine-tuning?'",
+        "La chat libera è utile per domande rapide, troubleshooting e interazione naturale con il sistema.",
+        "La funzione è disponibile solo se l'orchestrator DELTA è correttamente installato e attivo.",
     ])
 
     pdf._subsection("5.3 Raccolta dati sensori")
@@ -1020,10 +1035,24 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "nella sezione 'Scientists Telegram'. La lista e salvata in "
         f"{auth_file} (nickname con @)."
     )
+
     pdf._bullet([
         "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
         "/export, /preflight, /finetune, /academy, /license, /health, /batch",
+        "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio', 'Come si fa il fine-tuning?') e ricevere risposta dall'orchestrator DELTA.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
+    ])
+
+    pdf._subsection("Guida all'uso: Chat libera in DELTAPLANO (Telegram)")
+    pdf._body(
+        "Oltre ai comandi strutturati, il bot DELTAPLANO permette di interagire liberamente in chat: l'operatore può scrivere una domanda o richiesta direttamente nella conversazione Telegram. "
+        "Il sistema DELTA risponde in modo contestuale sfruttando l'orchestrator AI. "
+        "Questa modalità è ideale per domande rapide, richieste di spiegazione o troubleshooting senza dover seguire un flusso guidato."
+    )
+    pdf._bullet([
+        "Esempi: 'Qual è la situazione attuale?', 'Spiega la diagnosi', 'Mostra le ultime raccomandazioni', 'Come si aggiorna il modello?'",
+        "La chat libera è disponibile solo se l'orchestrator DELTA è attivo e il bot Telegram è correttamente configurato.",
+        "Per tornare ai comandi guidati, usa /menu o i pulsanti inline.",
     ])
 
     pdf._subsection("6.2.1 Ambiente DELTAPLANO (Telegram)")

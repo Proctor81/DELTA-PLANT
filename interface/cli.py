@@ -56,6 +56,7 @@ class CLI:
             print(f"  [7] {BOLD}Pannello Amministratore{RESET}  🔐")
             print(f"  [8] Apri cartella immagini input  📂")
             print(f"  [9] Preflight AI (modello + labels + immagine test)")
+            print(f"  [C] {BOLD}Chat domanda/risposta libera{RESET} 💬")
             print(f"  [L] {BOLD}Licenza Software DELTA 2.0{RESET}  ©")
             print("  [0] Esci")
 
@@ -79,6 +80,8 @@ class CLI:
                 self._show_input_folder_info()
             elif scelta == "9":
                 self._run_preflight_ai()
+            elif scelta == "C":
+                self._run_free_chat()
             elif scelta == "L":
                 self._show_license()
             elif scelta == "0":
@@ -86,6 +89,34 @@ class CLI:
                 break
             else:
                 print(f"{SYMBOL_WARN} Scelta non valida.")
+
+    def _run_free_chat(self):
+        """Modalità chat domanda/risposta libera con l'orchestrator DELTA."""
+        print(f"\n{BOLD}─── CHAT LIBERA CON DELTA ORCHESTRATOR ───{RESET}")
+        print(f"Digita una domanda o un comando. Scrivi 'exit' per tornare al menu.")
+        try:
+            from delta_orchestrator.integration.delta_bridge import orchestrate_task
+            from delta_orchestrator.state.schema import DeltaOrchestratorState
+        except ImportError:
+            print(f"{SYMBOL_ERR} Orchestrator non disponibile o non installato.")
+            return
+        state = DeltaOrchestratorState()
+        while True:
+            domanda = input(f"{BOLD}Tu:{RESET} ").strip()
+            if domanda.lower() in ("exit", "esci", "q", "quit"):
+                print(f"{DIM}Uscita dalla chat libera.{RESET}")
+                break
+            if not domanda:
+                continue
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop() if asyncio.get_event_loop().is_running() else asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(orchestrate_task(domanda, state))
+                risposta = result.get("final_answer") or str(result)
+                print(f"{BOLD}DELTA:{RESET} {risposta}")
+            except Exception as exc:
+                print(f"{SYMBOL_ERR} Errore nella chat: {exc}")
 
     # ─────────────────────────────────────────────
     # LICENZA SOFTWARE

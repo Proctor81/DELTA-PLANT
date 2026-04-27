@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  orchestrator:
+    build: .
+    image: delta_orchestrator:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DELTA_ORCH_MODE=edge
+      - DELTA_ORCH_SQLITE_PATH=/app/data/delta_orchestrator.db
+    volumes:
+      - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]

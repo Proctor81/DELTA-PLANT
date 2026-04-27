@@ -253,7 +253,7 @@ DATABASE_CONFIG = {
 # LOGGING
 # ─────────────────────────────────────────────
 LOGGING_CONFIG = {
-    "level": "INFO",
+    "level": "DEBUG",
     "log_file": str(LOGS_DIR / "delta.log"),
     "max_bytes": 10 * 1024 * 1024,    # 10 MB
     "backup_count": 5,
