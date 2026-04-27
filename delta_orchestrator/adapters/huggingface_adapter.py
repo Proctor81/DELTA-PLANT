@@ -40,4 +40,4 @@ class HuggingFaceAdapter(BaseLLMAdapter):
             return False
 
     def get_info(self) -> Dict[str, Any]:
-        return {"model": self.model_name, "endpoint": self.endpoint, "api_token": bool(self.api_token)}}
+        return {"model": self.model_name, "endpoint": self.endpoint, "api_token": bool(self.api_token)}
