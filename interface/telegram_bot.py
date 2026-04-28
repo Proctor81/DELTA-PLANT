@@ -73,14 +73,28 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         return
     try:
         # orchestrate_task può essere adattato per domande libere
-        response = await asyncio.to_thread(orchestrate_task, user_text)
+        response = await orchestrate_task(user_text, {
+            "delta_context": {},
+            "messages": [],
+            "current_model": "ollama/llama3.2",
+            "tool_results": {},
+            "confidence": 0.0,
+            "iteration_count": 0,
+            "max_iterations": 5,
+            "errors": [],
+            "final_answer": None
+        })
         if not response:
             await _send(update, "Nessuna risposta dall'orchestrator.")
         else:
-            await _send(update, str(response))
+            # Invia solo la risposta effettiva se presente
+            answer = response.get("final_answer") if isinstance(response, dict) else None
+            await _send(update, answer or str(response))
     except Exception as exc:
-        logger.error("Errore chat libera: %s", exc, exc_info=True)
-        await _send(update, "Errore durante l'elaborazione della domanda.")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Errore chat libera: {exc}\nTraceback: {tb}")
+        await _send(update, f"Errore durante l'elaborazione della domanda. Dettagli: {exc}")
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -1192,7 +1206,17 @@ async def batch_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fail = 0
         for img_path in images_list:
             try:
-                record = await orchestrate_task("Diagnosi pianta", {"image_path": str(img_path)})
+                record = await orchestrate_task("Diagnosi pianta", {
+                    "delta_context": {"image_path": str(img_path)},
+                    "messages": [],
+                    "current_model": "ollama/llama3.2",
+                    "tool_results": {},
+                    "confidence": 0.0,
+                    "iteration_count": 0,
+                    "max_iterations": 5,
+                    "errors": [],
+                    "final_answer": None
+                })
                 if record.get("confidence", 0) > 0:
                     ok += 1
                 else:
@@ -1854,7 +1878,8 @@ def run_telegram_bot(agent=None):
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
     # Handler globale per chat libera (gruppo alto per non interferire con i flussi guidati)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
+    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
+    application.add_handler(CommandHandler("chat", free_chat_handler))
 
     _conflict_handled = False
 

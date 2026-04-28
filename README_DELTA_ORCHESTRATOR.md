@@ -48,8 +48,29 @@ print(result)
 ```
 
 ## Prossimi passi consigliati
-- Integrare delta_context_tool con sensors/, ai/, diagnosis/ reali
-- Estendere i tool e i nodi per nuovi casi d'uso
-- Abilitare Redis per checkpointing distribuito in cloud
-- Aggiungere test di integrazione e validazione edge/cloud
-- Aggiornare la documentazione principale di DELTA 2.0
+
+# TinyLlama locale & fallback LLM
+
+## Pipeline LLM locale (TinyLlama)
+La pipeline DELTA ora supporta TinyLlama locale tramite llama.cpp (modello GGUF). Il bot Telegram e la CLI usano TinyLlama come LLM principale, con fallback automatico su Ollama e HuggingFace solo se TinyLlama fallisce.
+
+**Requisiti:**
+- Modello GGUF valido in `models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf`
+- Binario `llama.cpp` compilato in `llama.cpp/build/bin/llama-cli`
+- Python wrapper funzionante: `llm/llama_cpp_wrapper.py`
+
+**Comportamento:**
+- DELTAPLANO_bot risponde tramite TinyLlama locale.
+- Se TinyLlama fallisce, fallback su Ollama (se attivo) o HuggingFace (se configurato).
+- Log dettagliato degli errori Telegram: in caso di errore, il messaggio Telegram mostra il traceback Python per facilitare la diagnosi.
+
+**Note:**
+- Se ricevi "Errore durante l'elaborazione della domanda. Dettagli: ...", copia qui il traceback per la diagnosi.
+- Se la cartella `llama.cpp` è un repository git annidato, segui le istruzioni nel prompt per usare submodule o gitignore.
+
+## Comandi utili
+```
+git add .
+git commit -m "Patch: integrazione TinyLlama locale, fallback LLM, logging errori Telegram dettagliato"
+git push
+```

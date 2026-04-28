@@ -72,6 +72,10 @@ from core.agent import DeltaAgent
 from interface.cli import CLI
 from interface.api import run_api
 from interface.telegram_bot import run_telegram_bot
+from bot.deltaplano_bot import DELTAPLANOBot
+
+# Percorso modello LLM TinyLlama GGUF
+LLM_MODEL_PATH = "models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf"
 from core.config import API_CONFIG, MODEL_CONFIG, TELEGRAM_CONFIG
 from core.auth import initialize_password
 from ai.preflight_validator import validate_model_artifacts, PreflightGateError
@@ -194,6 +198,15 @@ def main():
 
     # ── Avvio bot Telegram (opzionale) ───────────────────────
     run_telegram_bot(agent)
+
+    # ── Avvio nuovo bot Telegram LLM/Vision (opzionale, demo) ─
+    if TELEGRAM_CONFIG.get("enable_telegram", False):
+        try:
+            deltachat_bot = DELTAPLANOBot(LLM_MODEL_PATH)
+            print("[DELTAPLANO_bot] Avviato (LLM/Vision hybrid)")
+            # TODO: Avvio polling/handler Telegram reale
+        except Exception as exc:
+            logger.error(f"Errore avvio DELTAPLANO_bot: {exc}")
 
     # ── Interfaccia CLI ──────────────────────────────────────
     if sys.stdin.isatty() and not args.daemon:
