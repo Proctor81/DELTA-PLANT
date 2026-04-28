@@ -21,32 +21,32 @@ class ExecutorNode(BaseNode):
         # Esempio: chiama delta_context_tool
         tool = registry.get("delta_context_tool")
         state["tool_results"] = tool(state.get("delta_context", {}))
-        # Usa TinyLlama LLM locale come principale, fallback su Ollama e HuggingFace
+        # Usa Ollama come principale, fallback su TinyLlama e HuggingFace
         user_message = None
         if isinstance(state.get("messages"), list) and state["messages"]:
             user_message = state["messages"][-1].get("content")
         if user_message:
             llm_response = None
+            import os
+            ollama_endpoint = os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434")
+            ollama = OllamaAdapter(endpoint=ollama_endpoint)
             try:
-                tinyllama = TinyLlamaAdapter()
-                llm_response = await tinyllama.generate(user_message)
-                if llm_response and not llm_response.startswith("[TinyLlama error"):
+                llm_response = await ollama.generate(user_message)
+                if llm_response and not llm_response.startswith("[Ollama error"):
                     state["final_answer"] = llm_response.strip()
                 else:
-                    raise Exception("TinyLlama non disponibile")
+                    raise Exception("Ollama non disponibile")
             except Exception as e:
-                logger.warning("TinyLlama non disponibile, uso Ollama", error=str(e))
-                import os
-                ollama_endpoint = os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434")
-                ollama = OllamaAdapter(endpoint=ollama_endpoint)
+                logger.warning("Ollama non disponibile, uso TinyLlama", error=str(e))
                 try:
-                    llm_response = await ollama.generate(user_message)
-                    if llm_response and not llm_response.startswith("[Ollama error"):
+                    tinyllama = TinyLlamaAdapter()
+                    llm_response = await tinyllama.generate(user_message)
+                    if llm_response and not llm_response.startswith("[TinyLlama error"):
                         state["final_answer"] = llm_response.strip()
                     else:
-                        raise Exception("Ollama non disponibile")
+                        raise Exception("TinyLlama non disponibile")
                 except Exception as e2:
-                    logger.warning("Ollama non disponibile, uso HuggingFace", error=str(e2))
+                    logger.warning("TinyLlama non disponibile, uso HuggingFace", error=str(e2))
                     hf_token = os.environ.get("HF_API_TOKEN")
                     hf_models = [
                         "openai/gpt-oss-120b:fastest"
