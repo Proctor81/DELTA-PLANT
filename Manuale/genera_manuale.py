@@ -1303,6 +1303,18 @@ def _add_troubleshooting(pdf: ManualePDF):
             ]
         ),
         (
+            "Il file plant_disease_model.tflite ha magic bytes GGUF (637 MB)",
+            [
+                "Sintomo: errore 'Model provided has model identifier \\'' all'avvio — visione in modalità simulata.",
+                "Causa: il file models/plant_disease_model.tflite e in realta un modello GGUF (llama.cpp) rinominato per errore.",
+                "Verifica: python3 -c \"with open('models/plant_disease_model.tflite','rb') as f: print(f.read(4))\" — se stampa b'GGUF' e il problema.",
+                "Fix 1 — Rinomina il GGUF: mv models/plant_disease_model.tflite models/plant_disease_model.gguf",
+                "Fix 2 — Converti il Keras reale: python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization int8 --representative-data datasets/training",
+                "Fix 3 (alternativa rapida) — Usa il modello dipladenia: echo 'DELTA_ACTIVE_MODEL=dipladenia' >> .env",
+                "Riavvia DELTA dopo il fix. Log atteso: '[INFO] delta.tflite.runner: Modello caricato con backend=ai_edge_litert'",
+            ]
+        ),
+        (
             "La chat LLM (llama-cli) cattura il terminale all'avvio",
             [
                 "Sintomo: all'avvio di DELTA compare 'Loading model...' e il logo llama.cpp prima di poter usare il menu.",
@@ -3745,6 +3757,123 @@ def _add_license_appendix(pdf: "ManualePDF"):
     pdf.cell(0, 6, "END OF LICENSE", align="C")
 
 
+def _add_hf_llm_chat(pdf: ManualePDF):
+    """Sezione 14b: HuggingFace LLM — Chat AI con Llama 3 e pulsante 'Chiedi a DELTA'."""
+    pdf.add_page()
+    pdf._section_title("14b. CHAT AI — HUGGINGFACE LLM E PULSANTE «CHIEDI A DELTA»")
+
+    pdf._body(
+        "DELTA 2.0.5 integra un motore di chat AI basato su modelli linguistici di grandi "
+        "dimensioni (LLM) via HuggingFace Inference API. L'utente può conversare liberamente "
+        "con un esperto agronomico virtuale basato su Llama 3.1 8B Instruct, sia dal bot "
+        "Telegram sia dalla CLI locale, senza bisogno di eseguire il modello in locale."
+    )
+
+    pdf._subsection("14b.1 Architettura")
+    pdf._kv_table([
+        ("Modello primario",       "meta-llama/Llama-3.1-8B-Instruct (HuggingFace InferenceClient)"),
+        ("Fallback locale",        "TinyLlama-1.1B-Chat via llama.cpp (se HF non disponibile)"),
+        ("Fallback finale",        "Risposta di cortesia statica (garantisce sempre una risposta)"),
+        ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
+        ("Motore di chat",         "chat/chat_engine.py — ChatEngine"),
+        ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o 🗑 Reset)"),
+        ("System prompt",         "Esperto agronomico italiano: diagnosi piante, sensori DELTA, consigli"),
+        ("Token HuggingFace",     "DELTA_HF_TOKEN nel file .env — verificato all'avvio"),
+        ("Validazione token",     "HfApi.whoami() — log: 'Token HF valido — utente: <username>'"),
+    ])
+
+    pdf._subsection("14b.2 Configurazione token HuggingFace")
+    pdf._body(
+        "Per usare il modello Llama-3.1-8B-Instruct è necessario un token HuggingFace "
+        "con accesso al modello abilitato (richiesta accettazione termini su hf.co/meta-llama). "
+        "Il token va inserito nel file .env:"
+    )
+    pdf._code_block(
+        "# Nel file .env nella directory del progetto\n"
+        "DELTA_HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\n"
+        "# Il sistema valida il token all'avvio:\n"
+        "# [INFO] delta.huggingface_llm: Token HF valido — utente: TuoNomeHF\n\n"
+        "# Se il token non è valido o assente, ChatEngine torna al fallback locale.",
+        label=".env — TOKEN HF",
+    )
+    pdf._body("Priorità modelli HuggingFace (tentati in ordine):")
+    pdf._bullet([
+        "meta-llama/Llama-3.1-8B-Instruct  ← modello principale",
+        "mistralai/Mistral-7B-Instruct-v0.3",
+        "microsoft/DialoGPT-medium",
+        "distilbert/distilgpt2",
+    ])
+    pdf._info_box(
+        "ACCESSO AL MODELLO LLAMA",
+        "meta-llama/Llama-3.1-8B-Instruct richiede accettazione dei termini Meta su HuggingFace. "
+        "Visitare: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct "
+        "e accettare la licenza con l'account collegato al token. "
+        "Senza accesso il sistema passa automaticamente al modello successivo nella lista.",
+        color=BLUE_MID,
+    )
+
+    pdf._subsection("14b.3 Pulsante [BLU] Chiedi a DELTA — Telegram")
+    pdf._body(
+        "Il pulsante [BLU] Chiedi a DELTA e il primo pulsante del menu principale "
+        "Telegram (riga intera, posizione prominente). Avvia una sessione di chat "
+        "interattiva con il modello LLM nel contesto del bot @DELTAPLANO_bot."
+    )
+    pdf._kv_table([
+        ("Entry point",             "Callback CMD_CHAT -> ConversationHandler STATE_CHAT_WAITING"),
+        ("Comando alternativo",     "/chat -- attiva la stessa sessione di chat"),
+        ("Stato ConversationHandler", "STATE_CHAT_WAITING = 21 (nuovo, fuori dal range standard)"),
+        ("Priorita handler",        "Registrato PRIMA dei callback globali -- non intercettato dal menu"),
+        ("Risposta visiva",         "Typing action (bot 'sta scrivendo') durante elaborazione LLM"),
+        ("Pulsanti in chat",        "[ROSSO] Termina chat | [RESET] Reset (azzerano la conversazione)"),
+        ("Uscita",                  "[ROSSO] Termina chat, /chiudi, o callback CHAT_EXIT"),
+        ("Persistenza memoria",     "Conversazione mantenuta per sessione utente (fino a reset/exit)"),
+    ])
+    pdf._code_block(
+        "# Flusso chat Telegram\n"
+        "Utente: [preme il pulsante Chiedi a DELTA]\n"
+        "Bot:    Ciao! Sono DELTA... [mostra stato HF LLM]\n"
+        "Utente: Come si cura l'oidio del pomodoro?\n"
+        "Bot:    [typing...] L'oidio del pomodoro e causato da Erysiphe spp...\n"
+        "Utente: [preme Reset]\n"
+        "Bot:    Conversazione azzerata. Posso aiutarti con qualcos'altro?\n"
+        "Utente: [preme Termina chat]\n"
+        "Bot:    Chat terminata. Torna al menu con /menu",
+        label="FLUSSO CHAT TELEGRAM",
+    )
+
+    pdf._subsection("14b.4 Chat libera CLI (opzione [C])")
+    pdf._body(
+        "Dalla CLI del sistema (menu principale, opzione [C]) è disponibile la stessa "
+        "modalità chat direttamente dal terminale, utile per debug e uso senza Telegram."
+    )
+    pdf._bullet([
+        "Selezionare [C] dal menu CLI per avviare la chat",
+        "Digitare qualsiasi domanda in italiano o inglese",
+        "Il sistema usa HF LLM se disponibile, altrimenti fallback TinyLlama",
+        "Digitare '/exit' per tornare al menu principale",
+    ])
+
+    pdf._subsection("14b.5 Preflight AI — verifica LLM")
+    pdf._body(
+        "Il preflight di sistema (python main.py --preflight-only) verifica anche "
+        "lo stato dell'LLM cloud:"
+    )
+    pdf._bullet([
+        "Token HF presente in .env (OK/KO)",
+        "Token HF valido (HfApi.whoami()) (OK/KO)",
+        "Modello HF raggiungibile (ping InferenceClient) (OK/KO)",
+        "Se tutti KO: ChatEngine opera in fallback TinyLlama locale",
+    ])
+    pdf._info_box(
+        "FUNZIONAMENTO OFFLINE",
+        "Se il Raspberry Pi non ha accesso a internet, il sistema torna automaticamente "
+        "al modello TinyLlama locale (llama.cpp). Il bot Telegram risponde lo stesso, "
+        "con risposte più semplici. Per abilitare l'LLM cloud assicurarsi che "
+        "il Pi abbia accesso a api-inference.huggingface.co sulla porta 443.",
+        color=GREEN,
+    )
+
+
 def main():
     print("DELTA — Generazione Manuale PDF...")
 
@@ -3779,14 +3908,15 @@ def main():
         ("11. DELTA Academy — Formazione operatore", 18),
         ("12. Analisi multi-organo — Foglia/Fiore/Frutto", 20),
         ("13. Oracolo Quantistico di Grover",        23),
-        ("15. Sicurezza e Pannello Amministratore",   27),
-        ("16. Input immagini da cartella — No-Camera", 30),
-        ("17. Installazione automatica Raspberry Pi 5", 32),
-        ("18. MLOps — Addestramento e Miglioramento Continuo", 35),
-        ("19. Modello Pre-addestrato — Download automatico",    38),
-        ("20. GitHub Publisher — Pubblicazione automatica",     41),
-        ("Appendice Hardware — Assemblaggio e Schema elettrico", 44),
-        ("Appendice Licenza — DELTA 2.0 SOFTWARE LICENSE",       47),
+        ("14b. Chat AI — HuggingFace LLM e «Chiedi a DELTA»", 26),
+        ("15. Sicurezza e Pannello Amministratore",   28),
+        ("16. Input immagini da cartella — No-Camera", 31),
+        ("17. Installazione automatica Raspberry Pi 5", 33),
+        ("18. MLOps — Addestramento e Miglioramento Continuo", 36),
+        ("19. Modello Pre-addestrato — Download automatico",    39),
+        ("20. GitHub Publisher — Pubblicazione automatica",     42),
+        ("Appendice Hardware — Assemblaggio e Schema elettrico", 45),
+        ("Appendice Licenza — DELTA 2.0 SOFTWARE LICENSE",       48),
     ]
     pdf.toc_page(toc_entries)
 
@@ -3805,6 +3935,7 @@ def main():
     _add_academy(pdf)
     _add_organ_analysis(pdf)
     _add_quantum_oracle(pdf)
+    _add_hf_llm_chat(pdf)
     _add_security(pdf)
     _add_image_input_folder(pdf, cfg)
     _add_raspberry_install(pdf)
