@@ -59,6 +59,11 @@ ai-edge-litert==1.2.0
 # ── API opzionale ────────────────────────────────────────────
 flask>=3.0.0
 
+# ── HuggingFace Inference API (LLM cloud per chat intelligente) ──────────────
+# Richiede token HF_API_TOKEN nel file .env
+# Modello preferito: mistralai/Mistral-7B-Instruct-v0.3
+huggingface_hub>=0.27.0
+
 # ── Telegram bot (opzionale) ─────────────────────────────────
 python-telegram-bot[job-queue]>=20.7
 requests>=2.31.0

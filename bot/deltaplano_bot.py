@@ -1,27 +1,55 @@
-# Bot Telegram integrato con router
+# Bot Telegram integrato con ChatEngine HuggingFace + Vision
 import logging
-from router.router import Router
-from memory.conversation_memory import ConversationMemory
+from chat.chat_engine import ChatEngine
+from vision.mobilenet_service import MobileNetService
 
-# TODO: Inserire token reale e setup python-telegram-bot
+logger = logging.getLogger("delta.deltaplano_bot")
+
 
 class DELTAPLANOBot:
-    def __init__(self, llm_model_path):
-        self.router = Router(llm_model_path)
-        self.memory = ConversationMemory()
-        # TODO: Inizializzazione bot Telegram
+    """
+    Bot DELTA: instrada messaggi verso ChatEngine (HF LLM + fallback TinyLlama)
+    o verso MobileNetService (vision), a seconda del contenuto.
+    """
 
-    def handle_message(self, user_id, text, image_path=None):
-        route, response = self.router.route(user_id, text, image_path)
-        logging.info(f"User: {user_id} | Input: {text} | Route: {route} | Response: {response}")
-        return response
+    def __init__(self, llm_model_path: str = ""):
+        # ChatEngine usa HuggingFace Inference API come primario,
+        # TinyLlama locale come fallback.
+        self.chat_engine = ChatEngine(llm_model_path)
+        self.vision_service = MobileNetService()
 
-    def handle_command(self, user_id, command):
+    def handle_message(self, user_id, text: str, image_path: str = None) -> str:
+        """Instrada messaggio testo/immagine e restituisce la risposta."""
+        user_id_str = str(user_id)
+        if image_path:
+            try:
+                result = self.vision_service.classify(image_path)
+                cls = result.get("class", "Sconosciuto")
+                conf = result.get("confidence", 0.0)
+                logger.info(f"Vision: {cls} ({conf:.1%}) per user {user_id_str}")
+                return f"Analisi immagine: {cls} (confidenza {conf:.1%})"
+            except Exception as exc:
+                logger.warning(f"Errore vision: {exc}")
+                return "Impossibile analizzare l'immagine."
+        try:
+            response = self.chat_engine.chat(user_id_str, text)
+            logger.info(f"Chat LLM risposta per user {user_id_str}: {response[:60]}")
+            return response
+        except Exception as exc:
+            logger.error(f"Errore chat_engine: {exc}", exc_info=True)
+            return "Errore durante l'elaborazione della richiesta."
+
+    def handle_command(self, user_id, command: str) -> str:
+        """Gestisce comandi speciali del bot."""
+        user_id_str = str(user_id)
+        logger.info(f"DELTAPLANOBot.handle_command: user_id={user_id_str}, command={command}")
         if command == "/reset":
-            self.memory.reset(user_id)
+            self.chat_engine.reset(user_id_str)
             return "Memoria conversazione resettata."
         elif command == "/status":
-            # TODO: Stato LLM + MobileNet
-            return "LLM: OK\nMobileNet: OK"
+            status = self.chat_engine.get_status()
+            hf = "\u2705" if status.get("hf_token_valid") else "\u274c"
+            model = status.get("hf_active_model", "N/D")
+            return f"LLM HuggingFace: {hf} ({model})\nMobileNet: \u2705"
         else:
             return "Comando non riconosciuto."

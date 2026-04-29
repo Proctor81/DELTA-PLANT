@@ -8,8 +8,13 @@ import sys
 import os
 
 # ── Auto-rilancio con venv se si sta usando il Python di sistema ─
-_VENV_PYTHON = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python")
-if os.path.isfile(_VENV_PYTHON) and os.path.abspath(sys.executable) != os.path.abspath(_VENV_PYTHON):
+# Usa python3.12 (symlink robusto) se disponibile, altrimenti python
+_DELTA_ROOT = os.path.dirname(os.path.abspath(__file__))
+_VENV_PYTHON = os.path.join(_DELTA_ROOT, ".venv", "bin", "python3.12")
+if not os.path.isfile(_VENV_PYTHON):
+    _VENV_PYTHON = os.path.join(_DELTA_ROOT, ".venv", "bin", "python")
+# Confronta il percorso reale (risolve symlink) per evitare loop di rilancio
+if os.path.isfile(_VENV_PYTHON) and os.path.realpath(sys.executable) != os.path.realpath(_VENV_PYTHON):
     import subprocess
     sys.exit(subprocess.call([_VENV_PYTHON] + sys.argv))
 
@@ -210,6 +215,8 @@ def main():
 
     # ── Interfaccia CLI ──────────────────────────────────────
     if sys.stdin.isatty() and not args.daemon:
+        print("[DEBUG] Avvio CLI interattiva (menu principale)")
+        logger.info("Avvio CLI interattiva (menu principale)")
         cli = CLI(agent)
         try:
             cli.run()
@@ -222,8 +229,10 @@ def main():
             logger.info("═══ DELTA AI AGENT SPENTO ═══")
     else:
         if args.daemon:
+            print("[DEBUG] Modalità daemon: CLI disabilitata. Processo in attesa.")
             logger.info("Flag --daemon attivo: CLI disabilitata. Processo in attesa.")
         else:
+            print("[DEBUG] STDIN non interattivo: CLI disabilitata. Processo in attesa.")
             logger.info("STDIN non interattivo: CLI disabilitata. Processo in attesa.")
         try:
             while True:

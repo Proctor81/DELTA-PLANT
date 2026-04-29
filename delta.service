@@ -23,11 +23,12 @@ Type=simple
 # L'utente viene sostituito da install_service.sh
 User=DELTA_USER
 WorkingDirectory=DELTA_DIR
-# Avvio tramite il Python del venv — gestisce autonomamente il reload del venv
+# Avvio tramite python3.12 del venv — il symlink 'python' punta a python3.12
+# ma su alcuni sistemi (es. migrazione da macOS) il symlink diretto python3.12 è più robusto.
 # --enable-api: abilita API REST (richiesta dal bot Telegram)
 # --enable-telegram: abilita bot Telegram (@DELTAPLANO_bot)
 # --daemon: disabilita interfaccia CLI interattiva in ambiente non-tty
-ExecStart=DELTA_DIR/.venv/bin/python DELTA_DIR/main.py --enable-api --enable-telegram --daemon
+ExecStart=DELTA_DIR/.venv/bin/python3.12 DELTA_DIR/main.py --enable-api --enable-telegram --daemon
 # CRITICO: disabilita stdin per evitare EOFError in ambiente non interattivo
 StandardInput=null
 # Riavvio automatico in caso di crash (es. errore di rete, timeout Telegram)
@@ -39,6 +40,10 @@ StandardError=journal
 # Variabili d'ambiente
 Environment=PYTHONUNBUFFERED=1
 Environment=DELTA_HOME=DELTA_DIR
+# Carica variabili da .env (HF token, Telegram token, ecc.)
+# main.py le carica anch'esso autonomamente, ma EnvironmentFile garantisce
+# che siano disponibili anche per processi figli.
+EnvironmentFile=-DELTA_DIR/.env
 # Limita l'impatto sulle risorse di sistema
 Nice=10
 # Timeout arresto pulito (shutdown SIGTERM → attesa → SIGKILL)

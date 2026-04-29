@@ -62,39 +62,45 @@ logger = logging.getLogger("delta.interface.telegram")
 # ──────────────────────────────────────────────────────────────
 # Handler per chat libera (domanda/risposta non strutturata)
 async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
+    import logging
+    from logging import FileHandler
+    logger = logging.getLogger("deltaplano.chat")
+    if not logger.handlers:
+        fh = FileHandler("logs/deltaplano_chat.log", encoding="utf-8")
+        fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(fh)
+        logger.setLevel(logging.INFO)
     if not await _guard(update):
+        logger.debug("free_chat_handler: accesso negato")
         return
     if not update.message or not update.message.text:
+        logger.debug("free_chat_handler: messaggio vuoto o non testuale")
         return
     user_text = update.message.text.strip()
-    agent = _get_agent(context)
-    if not agent or not DELTA_ORCHESTRATOR_AVAILABLE:
-        await _send(update, "Orchestrator non disponibile.")
+    user_id = update.effective_user.id if update.effective_user else None
+    logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
+    # Se il testo è un comando, instrada a DELTAPLANOBot.handle_command
+    if user_text.startswith("/"):
+        from bot.deltaplano_bot import DELTAPLANOBot
+        deltachat_bot = context.application.bot_data.get("deltaplano_bot")
+        if not deltachat_bot:
+            deltachat_bot = DELTAPLANOBot("models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf")
+            context.application.bot_data["deltaplano_bot"] = deltachat_bot
+        logger.info(f"Instrado comando a DELTAPLANOBot: {user_text}")
+        response = deltachat_bot.handle_command(user_id, user_text)
+        logger.info(f"Risposta DELTAPLANOBot: {response}")
+        await _send(update, response)
         return
-    try:
-        # orchestrate_task può essere adattato per domande libere
-        response = await orchestrate_task(user_text, {
-            "delta_context": {},
-            "messages": [],
-            "current_model": "ollama/llama3.2",
-            "tool_results": {},
-            "confidence": 0.0,
-            "iteration_count": 0,
-            "max_iterations": 5,
-            "errors": [],
-            "final_answer": None
-        })
-        if not response:
-            await _send(update, "Nessuna risposta dall'orchestrator.")
-        else:
-            # Invia solo la risposta effettiva se presente
-            answer = response.get("final_answer") if isinstance(response, dict) else None
-            await _send(update, answer or str(response))
-    except Exception as exc:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error(f"Errore chat libera: {exc}\nTraceback: {tb}")
-        await _send(update, f"Errore durante l'elaborazione della domanda. Dettagli: {exc}")
+    # Altrimenti, instrada a DELTAPLANOBot.handle_message
+    from bot.deltaplano_bot import DELTAPLANOBot
+    deltachat_bot = context.application.bot_data.get("deltaplano_bot")
+    if not deltachat_bot:
+        deltachat_bot = DELTAPLANOBot("models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf")
+        context.application.bot_data["deltaplano_bot"] = deltachat_bot
+    logger.info(f"Instrado messaggio a DELTAPLANOBot: {user_text}")
+    response = deltachat_bot.handle_message(user_id, user_text)
+    logger.info(f"Risposta DELTAPLANOBot: {response}")
+    await _send(update, response)
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -118,7 +124,8 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     STATE_ACADEMY_SIM_ACTION,
     STATE_ACADEMY_QUIZ,
     STATE_PRECHECK_IMAGE,
- ) = range(21)
+    STATE_CHAT_WAITING,
+ ) = range(22)
 
 CMD_DIAGNOSE = "CMD_DIAGNOSE"
 CMD_UPLOAD = "CMD_UPLOAD"
@@ -132,6 +139,8 @@ CMD_FINETUNE = "CMD_FINETUNE"
 CMD_ACADEMY = "CMD_ACADEMY"
 CMD_LICENSE = "CMD_LICENSE"
 CMD_BATCH = "CMD_BATCH"
+CMD_CHAT = "CMD_CHAT"
+CHAT_EXIT = "CHAT_EXIT"
 
 DIAG_IMAGE_UPLOAD = "DIAG_IMAGE_UPLOAD"
 DIAG_IMAGE_LAST = "DIAG_IMAGE_LAST"
@@ -196,6 +205,12 @@ def _load_allowed_usernames() -> Set[str]:
 
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
+        [
+            # Pulsante primario "Chiedi a DELTA" — chat intelligente HF LLM
+            # Telegram non supporta colori CSS, ma il posizionamento in prima riga
+            # e l'emoji distintiva lo rendono immediatamente visibile.
+            InlineKeyboardButton("🔵 💬 Chiedi a DELTA", callback_data=CMD_CHAT),
+        ],
         [
             InlineKeyboardButton("🆕 Diagnosi", callback_data=CMD_DIAGNOSE),
             InlineKeyboardButton("📷 Carica foto", callback_data=CMD_UPLOAD),
@@ -604,6 +619,124 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
     return "\n".join(msg)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CHAT INTELLIGENTE — "Chiedi a DELTA" (HuggingFace LLM via InferenceAPI)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _chat_exit_keyboard() -> InlineKeyboardMarkup:
+    """Tastiera con solo il pulsante di uscita dalla chat."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔴 Termina chat", callback_data=CHAT_EXIT)],
+        [InlineKeyboardButton("🗑 Reset conversazione", callback_data="CHAT_RESET")],
+    ])
+
+
+def _get_chat_engine(context: ContextTypes.DEFAULT_TYPE):
+    """Restituisce il ChatEngine condiviso (lazy-init, one per bot)."""
+    engine = context.application.bot_data.get("chat_engine")
+    if engine is None:
+        from chat.chat_engine import ChatEngine
+        engine = ChatEngine()
+        context.application.bot_data["chat_engine"] = engine
+        logger.info("ChatEngine inizializzato (HF LLM + TinyLlama fallback)")
+    return engine
+
+
+async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Avvia la sessione di chat intelligente."""
+    if not await _guard(update):
+        return ConversationHandler.END
+
+    engine = _get_chat_engine(context)
+    status = engine.get_status()
+    hf_ok = status.get("hf_token_valid", False)
+    model_name = status.get("hf_active_model", "TinyLlama locale")
+
+    if hf_ok:
+        intro = (
+            "🔵 *Chat intelligente DELTA attiva*\n\n"
+            f"Modello: `{model_name}`\n\n"
+            "Puoi chiedermi qualsiasi cosa su malattie delle piante, "
+            "trattamenti, agronomia o interpretazione delle diagnosi.\n\n"
+            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare la chat._"
+        )
+    else:
+        intro = (
+            "🟡 *Chat DELTA attiva* _(modalità locale — TinyLlama)_\n\n"
+            "Il token HuggingFace non è configurato o non è valido.\n"
+            "La chat usa il modello locale (risposte più semplici).\n\n"
+            "Per abilitare la chat cloud: aggiorna `HF_API_TOKEN` in `.env`\n\n"
+            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare._"
+        )
+
+    await _send(update, intro, reply_markup=_chat_exit_keyboard(), parse_mode="Markdown")
+    return STATE_CHAT_WAITING
+
+
+async def chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Riceve un messaggio dell'utente e risponde con l'LLM."""
+    if not await _guard(update):
+        return ConversationHandler.END
+    if not update.message or not update.message.text:
+        return STATE_CHAT_WAITING
+
+    user_text = update.message.text.strip()
+    if not user_text:
+        return STATE_CHAT_WAITING
+
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+
+    # Indicatore di digitazione
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    engine = _get_chat_engine(context)
+
+    def _ask():
+        return engine.chat(user_id, user_text)
+
+    try:
+        response = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        logger.error("Errore chat LLM: %s", exc, exc_info=True)
+        response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
+
+    await _send_long(update, response, reply_markup=_chat_exit_keyboard())
+    return STATE_CHAT_WAITING
+
+
+async def chat_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Azzera la memoria conversazionale dell'utente corrente."""
+    if not await _guard(update):
+        return STATE_CHAT_WAITING
+    query = update.callback_query
+    if query:
+        await query.answer("Conversazione resettata ✓")
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    engine = _get_chat_engine(context)
+    engine.reset(user_id)
+    await _send(update, "🗑 Memoria conversazione azzerata. Scrivi il tuo prossimo messaggio.", reply_markup=_chat_exit_keyboard())
+    return STATE_CHAT_WAITING
+
+
+async def chat_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Termina la sessione di chat e torna al menu principale."""
+    if not await _guard(update):
+        return ConversationHandler.END
+    query = update.callback_query
+    if query:
+        await query.answer("Chat terminata")
+    await _send(update, "Chat terminata. Usa /menu per tornare al menu principale.", reply_markup=_menu_keyboard())
+    return ConversationHandler.END
+
+
+async def chat_command_chiudi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Gestisce /chiudi dentro la chat conversation."""
+    return await chat_exit(update, context)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
@@ -613,6 +746,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "consultare report e leggere i dati sensori.\n"
         "Usa /menu per vedere le azioni disponibili."
     )
+    await _send(update, intro, reply_markup=_menu_keyboard())
     await _send(update, intro, reply_markup=_menu_keyboard())
 
 
@@ -1786,8 +1920,12 @@ def run_telegram_bot(agent=None):
     if not TELEGRAM_CONFIG.get("authorized_users") and not _load_allowed_usernames():
         logger.warning("Lista autorizzazioni vuota: accesso aperto al bot.")
 
+    # Forza la creazione della cartella logs/ se non esiste
+    import os
+    os.makedirs("logs", exist_ok=True)
     application = Application.builder().token(token).build()
     application.bot_data["agent"] = agent
+    logger.info("[DEBUG] run_telegram_bot: Application e bot_data inizializzati")
 
     diagnosis_handler = ConversationHandler(
         entry_points=[
@@ -1849,6 +1987,7 @@ def run_telegram_bot(agent=None):
         allow_reentry=True,
     )
 
+    logger.info("[DEBUG] run_telegram_bot: Registrazione handler Telegram in corso...")
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu))
     application.add_handler(CommandHandler("report", report))
@@ -1862,10 +2001,35 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("academy", academy_start))
     application.add_handler(CommandHandler("license", license_text))
     application.add_handler(CommandHandler("batch", batch_analyze))
-    # ── ConversationHandler per Diagnosi e Upload PRIMA dei callback globali ──
+    # ── ConversationHandler per Diagnosi, Upload e Chat PRIMA dei callback globali ──
     # Questo assicura che i loro entry_point abbiano priorità
     application.add_handler(diagnosis_handler)
     application.add_handler(upload_handler)
+
+    # ── Chat intelligente "Chiedi a DELTA" ──────────────────────────────────────
+    chat_conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("chat", chat_start),
+            CallbackQueryHandler(chat_start, pattern=f"^{CMD_CHAT}$"),
+        ],
+        states={
+            STATE_CHAT_WAITING: [
+                # Messaggi di testo: risposta LLM
+                MessageHandler(filters.TEXT & ~filters.COMMAND, chat_message),
+                # Callback bottoni integrati nella chat
+                CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"),
+                CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("chiudi", chat_command_chiudi),
+            CommandHandler("annulla", cancel),
+            CommandHandler("menu", menu),
+        ],
+        conversation_timeout=TELEGRAM_CONFIG.get("chat_timeout_sec", 600),
+        allow_reentry=True,
+    )
+    application.add_handler(chat_conv_handler)
     # ── Callback globali dopo i ConversationHandler ──
     application.add_handler(
         CallbackQueryHandler(menu_callback, pattern=r"^CMD_")
@@ -1877,9 +2041,14 @@ def run_telegram_bot(agent=None):
     application.add_handler(CallbackQueryHandler(finetune_load_callback, pattern=r"^FINETUNE_LOAD_LEAF$"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
-    # Handler globale per chat libera (gruppo alto per non interferire con i flussi guidati)
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
-    application.add_handler(CommandHandler("chat", free_chat_handler))
+    # Handler globale per chat libera:
+    # 1. /chat è gestito dal chat_conv_handler (ConversationHandler sopra)
+    # 2. CHAT_EXIT / CHAT_RESET fuori conversazione (ignore silenzioso)
+    application.add_handler(CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"))
+    application.add_handler(CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"))
+    # 3. Messaggi di testo non comando: attiva la chat libera SOLO se non in conversazione guidata
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
+    logger.info("[DEBUG] run_telegram_bot: Handler per chat libera registrato (group=99)")
 
     _conflict_handled = False
 
@@ -1922,6 +2091,7 @@ def run_telegram_bot(agent=None):
     application.add_error_handler(_error_handler)
 
     def _serve():
+        logger.info("[DEBUG] run_telegram_bot: Avvio polling Telegram...")
         application.run_polling(
             poll_interval=TELEGRAM_CONFIG.get("poll_interval_sec", 1.0),
             allowed_updates=Update.ALL_TYPES,

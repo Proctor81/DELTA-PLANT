@@ -38,6 +38,36 @@ MODEL_CONFIG = {
     "use_edge_tpu": True,              # Raspberry Pi AI HAT 2+
 }
 
+# ─────────────────────────────────────────────
+# REGISTRO MODELLI SPECIALIZZATI
+# ─────────────────────────────────────────────
+# Ogni entry può essere passata a ModelLoader per sostituire il modello di default.
+# Usare la chiave come identificatore (es. "dipladenia", "generale").
+MODELS_REGISTRY: dict = {
+    "generale": {
+        "model_path":   str(MODELS_DIR / "plant_disease_model.tflite"),
+        "labels_path":  str(MODELS_DIR / "labels.txt"),
+        "description":  "Classificatore generale malattie piante (PlantVillage)",
+        "input_size":   (224, 224),
+        "num_classes":  7,
+    },
+    "dipladenia": {
+        "model_path":   str(MODELS_DIR / "dipladenia" / "dipladenia_model.tflite"),
+        "labels_path":  str(MODELS_DIR / "dipladenia" / "labels.txt"),
+        "description":  "Classificatore specializzato Dipladenia/Mandevilla (3 classi)",
+        "input_size":   (224, 224),
+        "num_classes":  3,
+        "classes": [
+            "Dipladenia_Malata",
+            "Dipladenia_Parassiti",
+            "Dipladenia_Sano",
+        ],
+    },
+}
+
+# Modello attivo di default — modificabile a runtime o da .env (DELTA_ACTIVE_MODEL)
+ACTIVE_MODEL = os.environ.get("DELTA_ACTIVE_MODEL", "generale")
+
 # Etichette classi predefinite (PlantVillage-like) — foglie
 DEFAULT_LABELS = [
     "Sano",

@@ -35,7 +35,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DELTA_DIR="$SCRIPT_DIR"
 DELTA_USER="${SUDO_USER:-pi}"
-VENV_PYTHON="${DELTA_DIR}/.venv/bin/python"
+# Usa python3.12 (symlink robusto) se disponibile, altrimenti python (generico)
+VENV_PYTHON="${DELTA_DIR}/.venv/bin/python3.12"
+if [[ ! -f "$VENV_PYTHON" ]]; then
+    VENV_PYTHON="${DELTA_DIR}/.venv/bin/python"
+fi
 SERVICE_NAME="delta"
 SERVICE_DST="/etc/systemd/system/${SERVICE_NAME}.service"
 SERVICE_SRC="${DELTA_DIR}/delta.service"

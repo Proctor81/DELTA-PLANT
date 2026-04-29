@@ -38,6 +38,9 @@ datasets/training/
 datasets/training_flower/
 datasets/training_fruit/
 datasets/learning_by_doing/
+# Dataset Dipladenia — immagini di addestramento (non in repo, troppo grande)
+"datasets/DIPLADENIA FIORE/"
+datasets/DIPLADENIA*/
 
 # Immagini caricate via Telegram
 input_images/
@@ -47,3 +50,6 @@ data/auth.json
 .venv312/
 models/plant_disease_model.tflite
 models/*.gguf
+# Modello Keras (troppo grande per GitHub: 21MB)
+models/dipladenia/*.keras
+# Solo il TFLite (2.7MB) viene committato
