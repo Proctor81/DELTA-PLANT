@@ -14,7 +14,6 @@ class LlamaCppWrapper:
         Se stream=True, restituisce un generatore di token.
         """
         import subprocess
-        import shlex
         llama_bin = "./llama.cpp/build/bin/llama-cli"
         cmd = [
             llama_bin,
@@ -22,23 +21,34 @@ class LlamaCppWrapper:
             "-n", str(self.max_tokens),
             "-p", prompt,
             "--ctx-size", str(self.context_window),
+            "-no-cnv",              # disabilita modalità conversazione/interattiva
+            "--single-turn",        # esci dopo una singola generazione (non entra in loop)
+            "--log-disable",        # sopprime banner e messaggi di log su stderr
+            "--no-display-prompt",  # non ristampa il prompt sull'output
         ]
-        # Per output token-by-token
-        if stream:
-            cmd.append("--interactive")
+        proc = None
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            buffer = []
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,  # sopprime banner/stderr
+                stdin=subprocess.DEVNULL,   # impedisce che llama-cli erediti stdin del terminale
+                text=True,
+                start_new_session=True,     # stacca dal terminale di controllo (impedisce scrittura su /dev/tty)
+            )
             for line in proc.stdout:
-                # Filtra banner e prompt
-                if line.strip() == "" or line.startswith("build") or line.startswith("model") or line.startswith("> "):
+                stripped = line.strip()
+                # Filtra linee vuote, banner e prompt interattivi
+                if not stripped or stripped.startswith("build") or stripped.startswith("model") or stripped == ">":
                     continue
-                # Output token-by-token
-                yield line.strip()
+                yield stripped
             proc.stdout.close()
             proc.wait(timeout=self.timeout)
         except Exception as e:
             yield f"[ERRORE llama.cpp] {e}"
+        finally:
+            if proc is not None and proc.poll() is None:
+                proc.kill()
 
 if __name__ == "__main__":
     model_path = "models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf"

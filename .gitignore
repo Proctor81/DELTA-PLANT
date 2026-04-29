@@ -46,3 +46,4 @@ input_images/
 data/auth.json
 .venv312/
 models/plant_disease_model.tflite
+models/*.gguf

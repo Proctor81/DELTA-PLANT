@@ -45,6 +45,11 @@ class CLI:
         """Loop principale del menu interattivo."""
         self._print_banner()
 
+        # PROTEZIONE: la chat NON deve mai partire senza scelta esplicita 'C'.
+        # Se la chat parte subito, controllare che non ci siano chiamate a _run_free_chat() fuori da questo blocco!
+        # Debug: se _run_free_chat viene chiamata fuori da qui, solleva eccezione.
+        self._chat_started = False
+
         while True:
             print(f"\n{BOLD}═══ MENU PRINCIPALE ═══{RESET}")
             print("  [1] Avvia diagnosi pianta")
@@ -81,7 +86,10 @@ class CLI:
             elif scelta == "9":
                 self._run_preflight_ai()
             elif scelta == "C":
+                # Avvia la chat SOLO se l'utente sceglie 'C'
+                self._chat_started = True
                 self._run_free_chat()
+                self._chat_started = False
             elif scelta == "L":
                 self._show_license()
             elif scelta == "0":
@@ -92,8 +100,12 @@ class CLI:
 
     def _run_free_chat(self):
         """Modalità chat domanda/risposta libera con l'orchestrator DELTA."""
+        # Protezione: questa funzione deve essere chiamata SOLO dal menu principale!
+        if not getattr(self, '_chat_started', False):
+            raise RuntimeError("_run_free_chat() chiamata fuori dal menu principale! Protezione attiva.")
+        print("[DEBUG] Avvio modalità chat libera (_run_free_chat)")
         print(f"\n{BOLD}─── CHAT LIBERA CON DELTA ORCHESTRATOR ───{RESET}")
-        print(f"Digita una domanda o un comando. Scrivi 'exit' per tornare al menu.")
+        print(f"Digita una domanda o un comando. Scrivi '/exit' per tornare al menu.")
         try:
             from delta_orchestrator.integration.delta_bridge import orchestrate_task
             from delta_orchestrator.state.schema import DeltaOrchestratorState
@@ -103,7 +115,7 @@ class CLI:
         state = DeltaOrchestratorState()
         while True:
             domanda = input(f"{BOLD}Tu:{RESET} ").strip()
-            if domanda.lower() in ("exit", "esci", "q", "quit"):
+            if domanda.lower() == "/exit":
                 print(f"{DIM}Uscita dalla chat libera.{RESET}")
                 break
             if not domanda:

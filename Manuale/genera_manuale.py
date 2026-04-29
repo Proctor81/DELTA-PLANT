@@ -155,7 +155,27 @@ AMBER      = (180, 105,   0)
 AMBER_LIGHT= (255, 246, 212)
 
 
+
 class ManualePDF(FPDF):
+    def _warning_box(self, text: str):
+        self._info_box("[!] ATTENZIONE", text, color=RED)
+
+    def _code_block(self, code: str, label: str = "TERMINALE"):
+        # Header bar
+        self.set_fill_color(55, 62, 72)
+        self.set_text_color(195, 195, 195)
+        self.set_font(self._FONT, "B", 7.5)
+        self.set_x(10)
+        self.cell(190, 6, f"   > {label}", fill=True)
+        self.ln()
+        # Corpo codice
+        self.set_fill_color(28, 32, 42)
+        self.set_text_color(170, 215, 155)
+        self.set_font(self._FONT, "", 8.5)
+        self.set_x(10)
+        self.multi_cell(190, 5.2, code, fill=True)
+        self.set_text_color(*GRAY_DARK)
+        self.ln(4)
 
     def __init__(self):
         super().__init__()
@@ -466,6 +486,8 @@ def _add_intro(pdf: ManualePDF):
         "Combina sensori ambientali, visione artificiale e modelli di deep learning per "
         "fornire diagnosi fitosanitarie in tempo reale direttamente su Raspberry Pi 5."
     )
+    cfg = _load_config()
+    _add_license_appendix(pdf)
     pdf._body(
         "DELTA 2.0 introduce l'analisi simultanea di foglie, fiori e frutti, "
         "l'Oracolo Quantistico di Grover per la quantificazione del rischio composito, "
@@ -496,69 +518,6 @@ def _add_intro(pdf: ManualePDF):
         "(componenti, collegamento, configurazione fisica); la Parte B descrive il software "
         "(installazione, avvio, utilizzo delle funzioni e interpretazione degli output)."
     )
-    pdf = ManualePDF()
-    pdf.cover_page()
-    _add_executive_summary(pdf)
-    toc_entries = []
-    # Sezioni principali
-    _add_intro(pdf)
-    toc_entries.append(("1. INTRODUZIONE", pdf.page_no()))
-    cfg = _load_config()
-    _add_hardware_appendix(pdf)
-    toc_entries.append(("APPENDICE HARDWARE", pdf.page_no()))
-    _add_hardware(pdf, cfg)
-    toc_entries.append(("2. PARTE A — HARDWARE", pdf.page_no()))
-    _add_ai(pdf, cfg)
-    toc_entries.append(("3. PARTE A (cont.) — MODELLO AI E VISIONE", pdf.page_no()))
-    reqs = _load_requirements()
-    _add_software_install(pdf, reqs)
-    toc_entries.append(("4. PARTE B — SOFTWARE: INSTALLAZIONE", pdf.page_no()))
-    _add_software_uso(pdf, cfg)
-    toc_entries.append(("5. PARTE B (cont.) — UTILIZZO DEL SOFTWARE", pdf.page_no()))
-    _add_software_api(pdf, cfg)
-    toc_entries.append(("6. PARTE B (cont.) — API REST, TELEGRAM E FINE-TUNING", pdf.page_no()))
-    _add_database(pdf, cfg)
-    toc_entries.append(("7. DATABASE E PERSISTENZA", pdf.page_no()))
-    modules = _collect_modules()
-    _add_modules(pdf, modules)
-    toc_entries.append(("8. ARCHITETTURA SOFTWARE — MODULI", pdf.page_no()))
-    _add_troubleshooting(pdf)
-    toc_entries.append(("9. RISOLUZIONE PROBLEMI", pdf.page_no()))
-    _add_update_guide(pdf)
-    toc_entries.append(("10. AGGIORNAMENTO DEL MANUALE", pdf.page_no()))
-    _add_academy(pdf)
-    toc_entries.append(("11. DELTA ACADEMY — FORMAZIONE OPERATORE", pdf.page_no()))
-    _add_organ_analysis(pdf)
-    toc_entries.append(("12. ANALISI MULTI-ORGANO — FOGLIA, FIORE E FRUTTO", pdf.page_no()))
-    _add_quantum_oracle(pdf)
-    toc_entries.append(("13. ORACOLO QUANTISTICO DI GROVER — QUANTIFICAZIONE DEL RISCHIO", pdf.page_no()))
-    # Scientific paper opzionale
-    # _add_scientific_paper(pdf)
-    # Indice (dopo copertina e executive summary)
-    pdf.toc_page(toc_entries)
-    pdf.output(str(OUTPUT_PDF))
-
-    pdf._subsection("A.3 Schema elettrico descrittivo")
-    pdf._body(
-        "Il Raspberry Pi 5 alimenta i sensori digitali I2C a 3.3V. L'ADS1115 legge i segnali analogici "
-        "dal sensore pH e dalla cella EC e li converte in digitale tramite lo stesso bus I2C. "
-        "La Pi Camera Module 3 è collegata al connettore CSI per la visione ai e l'AI HAT 2+ è montato "
-        "sullo slot M.2 con il cavo FFC adeguatamente fissato."
-    )
-    pdf._bullet([
-        "I sensori digitali BME680, VEML7700 e SCD41 condividono SDA, SCL e GND sul bus I2C.",
-        "L'ADS1115 riceve alimentazione 3.3V e comunica su I2C, mentre i suoi ingressi A0/A1 leggono pH/EC.",
-        "L'elettrodo pH e la cella EC non devono essere alimentati direttamente con tensioni elevate: leggono variazioni di potenziale.",
-        "Tenere separati i cavi di alimentazione da quelli di segnale lungo il percorso fino al Pi per ridurre disturbi." 
-    ])
-
-    pdf._subsection("A.4 Avvertenze di sicurezza e buone pratiche")
-    pdf._bullet([
-        "Usare un alimentatore originale Raspberry Pi USB-C 5V/5A per garantire stabilità durante l'inferenza AI.",
-        "Verificare sempre il corretto orientamento dei connettori CSI e M.2 prima di inserire i cavi.",
-        "Evitare di bagnare le connessioni elettroniche: proteggere il Raspberry Pi e l'AI HAT da condensa e umidità.",
-        "Collegare tutti i dispositivi alla stessa massa per evitare loop di terra e misure errate." 
-    ])
 
 
 def _add_hardware(pdf: ManualePDF, cfg: dict):
@@ -840,7 +799,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("[6] DELTA Academy",              "Modulo di formazione interattiva per l'operatore"),
         ("[7] Pannello Amministratore",    "Funzioni avanzate protette da password"),
         ("[8] Cartella immagini input",    "Visualizza e gestisce la cartella input_images/ (no-camera)"),
-        ("[C] Chat domanda/risposta libera", "Interagisci liberamente con l'orchestrator DELTA: scrivi una domanda o comando, ricevi risposta immediata. Scrivi 'exit' per tornare al menu."),
+        ("[C] Chat domanda/risposta libera", "Interagisci liberamente con l'orchestrator DELTA: scrivi una domanda o comando, ricevi risposta immediata. Digita '/exit' per tornare al menu."),
         ("[0] Esci",                       "Spegne il sistema in modo sicuro"),
     ])
 
@@ -849,12 +808,13 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Selezionando l'opzione [C] dal menu CLI, si accede alla modalità chat libera con l'orchestrator DELTA. "
         "L'utente può scrivere qualsiasi domanda, comando o richiesta di spiegazione. "
         "Il sistema risponde in tempo reale sfruttando il motore di orchestrazione integrato. "
-        "Per uscire dalla chat e tornare al menu principale, digitare 'exit' o 'esci'."
+        "Per uscire dalla chat e tornare al menu principale, digitare '/exit'."
     )
     pdf._bullet([
         "Esempi: 'Qual è lo stato attuale della pianta?', 'Mostrami le ultime diagnosi', 'Spiega il rischio attuale', 'Come si fa il fine-tuning?'",
         "La chat libera è utile per domande rapide, troubleshooting e interazione naturale con il sistema.",
         "La funzione è disponibile solo se l'orchestrator DELTA è correttamente installato e attivo.",
+        "Digitare '/exit' per uscire dalla chat e tornare al menu principale.",
     ])
 
     pdf._subsection("5.3 Raccolta dati sensori")
@@ -1340,6 +1300,17 @@ def _add_troubleshooting(pdf: ManualePDF):
                 "Verificare token in .env (DELTA_TELEGRAM_TOKEN valorizzato e non placeholder)",
                 "Verificare connettivita di rete al boot (network-online target)",
                 "Confermare che TELEGRAM_CONFIG['enable_telegram'] sia True in core/config.py",
+            ]
+        ),
+        (
+            "La chat LLM (llama-cli) cattura il terminale all'avvio",
+            [
+                "Sintomo: all'avvio di DELTA compare 'Loading model...' e il logo llama.cpp prima di poter usare il menu.",
+                "Causa: il subprocess llama-cli ereditava stdin del terminale — risolto in llm/llama_cpp_wrapper.py.",
+                "Fix applicato: stdin=subprocess.DEVNULL, start_new_session=True, -no-cnv, --single-turn.",
+                "Se il problema persiste: verificare che llm/llama_cpp_wrapper.py contenga start_new_session=True nel Popen.",
+                "Verifica rapida: pgrep -a llama-cli — non deve apparire nulla senza aver selezionato [C] dal menu.",
+                "Per uscire dalla chat libera CLI digitare '/exit' (non 'exit' o 'esci').",
             ]
         ),
     ]
@@ -3840,7 +3811,6 @@ def main():
     _add_mlops_operatore(pdf)
     _add_pretrained_model(pdf)
     _add_github_publisher(pdf)
-    _add_hardware_appendix(pdf)
     _add_electrical_rendering(pdf)
     _add_license_appendix(pdf)
 
