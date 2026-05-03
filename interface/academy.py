@@ -847,7 +847,7 @@ class DeltaAcademy:
             "1) Qualita dati: immagini nitide, luce stabile, etichetta corretta.",
             "2) Bilanciamento classi: evitare classi con pochi campioni.",
             "3) Training Keras: monitorare val_accuracy e overfitting.",
-            "4) Conversione TFLite INT8: usare representative dataset realistico.",
+            "4) Conversione TFLite float16 (default) o INT8 con representative dataset.",
             "5) Preflight: validare modello + labels + immagine test prima del deploy.",
             "6) Monitoraggio in campo: raccogliere casi a bassa confidenza per retraining.",
         ]
@@ -909,7 +909,8 @@ class DeltaAcademy:
         print(f"\n{BOLD}Esito Lab:{RESET} {score}/3 corrette | +{gained} punti")
         print("Comandi operativi da ricordare:")
         print("  python ai/train_keras_classifier.py --dataset datasets/training --output models")
-        print("  python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization int8 --representative-data datasets/training")
+        print("  python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model_39classes.tflite --quantization float16")
+        print("  # opzionale INT8: --quantization int8 --representative-data datasets/training")
         print("  python main.py --preflight-only --validation-image models/validation_sample.jpg")
 
         self._check_badges()

@@ -107,7 +107,14 @@ def _collect_model_info() -> Dict[str, Any]:
         "tflite_ok":    False,
         "input_shape":  None,
     }
-    labels_path = _ROOT / "models" / "labels.txt"
+    labels_path = _ROOT / "models" / "labels_33classes_correct.txt"
+    tflite_path = _ROOT / "models" / "plant_disease_model_39classes.tflite"
+    try:
+        from core.config import MODEL_CONFIG  # type: ignore
+        labels_path = Path(MODEL_CONFIG.get("labels_path", labels_path))
+        tflite_path = Path(MODEL_CONFIG.get("model_path", tflite_path))
+    except Exception:
+        pass
     if labels_path.exists():
         info["labels"] = [
             l.strip() for l in labels_path.read_text(encoding="utf-8").splitlines()
@@ -115,7 +122,6 @@ def _collect_model_info() -> Dict[str, Any]:
         ]
         info["n_classes"] = len(info["labels"])
 
-    tflite_path = _ROOT / "models" / "plant_disease_model.tflite"
     if tflite_path.exists():
         info["model_size_kb"] = tflite_path.stat().st_size // 1024
         info["tflite_ok"] = True
@@ -246,7 +252,7 @@ def _generate_readme(
     badges = (
         f"![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)\n"
         f"![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red?logo=raspberry-pi)\n"
-        f"![AI](https://img.shields.io/badge/AI-TFLite%20INT8-orange)\n"
+        f"![AI](https://img.shields.io/badge/AI-TFLite%20float16-orange)\n"
         f"![License](https://img.shields.io/badge/License-Proprietary-lightgrey)\n"
         f"![Version](https://img.shields.io/badge/Version-{version}-green)\n"
     )
@@ -288,8 +294,8 @@ def _generate_readme(
 
 | Funzionalità | Descrizione |
 |---|---|
-| **Analisi multi-organo** | Foglie, fiori e frutti rilevati simultaneamente via HSV multi-range |
-| **{n_classes} classi diagnostiche** | Modello TFLite INT8 — input `{shape_str}` px — {size_kb} KB |
+| **Analisi fogliare (default)** | Architettura v3.0 leaf-only (fiore/frutto opzionali via config) |
+| **{n_classes} classi diagnostiche** | Modello TFLite float16 — input `{shape_str}` px — {size_kb} KB |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | {cfg.get('n_qubits', 4)} qubit, {cfg.get('grover_iterations', 3)} iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
 | **7 sensori ambientali** | Temperatura, Umidità, Pressione, Luce, CO₂, pH, EC via I2C |
@@ -321,7 +327,7 @@ main.py ──► DeltaAgent
 
 | Parametro | Valore |
 |---|---|
-| Formato | TensorFlow Lite INT8 (quantizzato) |
+| Formato | TensorFlow Lite float16 (input float32) |
 | Dimensione | {size_kb} KB |
 | Input shape | `{shape_str}` |
 | Soglia confidenza | {int(cfg.get('confidence_threshold', 0.65) * 100)}% |
@@ -404,7 +410,7 @@ DELTA-PLANT/
 ├── data/                    # Database SQLite + Excel export + logger
 ├── diagnosis/               # Regole esperte + engine
 ├── interface/               # CLI, API REST, Admin Panel, Academy
-├── models/                  # plant_disease_model.tflite + labels.txt
+├── models/                  # plant_disease_model_39classes.tflite + labels_33classes_correct.txt
 ├── recommendations/         # Agronomy engine
 ├── sensors/                 # Lettura I2C + anomaly detection
 ├── vision/                  # Camera + segmentazione + organ detector

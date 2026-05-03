@@ -3,9 +3,9 @@ Esecuzione inferenza TFLite su immagini di piante in modalità produzione.
 
 Uso:
     python ai/tflite_inference_runner.py \
-        --model models/plant_disease_model.tflite \
+    --model models/plant_disease_model_39classes.tflite \
         --image input_images/sample.jpg \
-        --labels models/labels.txt
+    --labels models/labels_33classes_correct.txt
 """
 
 from __future__ import annotations

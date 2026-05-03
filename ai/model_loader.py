@@ -1,6 +1,6 @@
 """
 DELTA - ai/model_loader.py
-Caricamento e gestione del modello TFLite quantizzato INT8.
+Caricamento e gestione del modello TFLite (float16/INT8).
 Supporta Raspberry Pi AI HAT 2+ (Edge TPU / NPU) con fallback su CPU.
 """
 

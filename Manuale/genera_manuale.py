@@ -881,7 +881,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("5.5a Modalità simulazione — comportamento senza modello")
     pdf._body(
-        "Quando il file models/plant_disease_model.tflite non è presente o il modello "
+        "Quando il file models/plant_disease_model_39classes.tflite non è presente o il modello "
         "non è caricabile (es. runtime TensorFlow/TFLite assente), il sistema opera "
         "in modalità simulazione senza bloccare l'avvio."
     )
@@ -903,7 +903,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "QUANDO INSTALLARE IL MODELLO REALE",
         "La modalità simulazione è adatta a sviluppo, formazione (DELTA Academy) e test. "
         "Per diagnosi fitosanitarie operative è necessario copiare il file "
-        "plant_disease_model.tflite nella cartella models/. "
+        "plant_disease_model_39classes.tflite nella cartella models/. "
         "Con runtime AI assente l'avvio resta disponibile in modalità degradata, ma "
         "il preflight AI continuerà a fallire finché non si installa ai-edge-litert==1.2.0 "
         "(RPi5 aarch64) o tensorflow (desktop/x86).",
@@ -1315,13 +1315,13 @@ def _add_troubleshooting(pdf: ManualePDF):
             ]
         ),
         (
-            "Il file plant_disease_model.tflite ha magic bytes GGUF (637 MB)",
+            "Il file plant_disease_model_39classes.tflite ha magic bytes GGUF (637 MB)",
             [
                 "Sintomo: errore 'Model provided has model identifier \\'' all'avvio — visione in modalità simulata.",
-                "Causa: il file models/plant_disease_model.tflite e in realta un modello GGUF (llama.cpp) rinominato per errore.",
-                "Verifica: python3 -c \"with open('models/plant_disease_model.tflite','rb') as f: print(f.read(4))\" — se stampa b'GGUF' e il problema.",
-                "Fix 1 — Rinomina il GGUF: mv models/plant_disease_model.tflite models/plant_disease_model.gguf",
-                "Fix 2 — Converti il Keras reale: python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization float16",
+                "Causa: il file models/plant_disease_model_39classes.tflite e in realta un modello GGUF (llama.cpp) rinominato per errore.",
+                "Verifica: python3 -c \"with open('models/plant_disease_model_39classes.tflite','rb') as f: print(f.read(4))\" — se stampa b'GGUF' e il problema.",
+                "Fix 1 — Rinomina il GGUF: mv models/plant_disease_model_39classes.tflite models/plant_disease_model.gguf",
+                "Fix 2 — Converti il Keras reale: python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model_39classes.tflite --quantization float16",
                 "Fix 3 (alternativa rapida) — Usa il modello dipladenia: echo 'DELTA_ACTIVE_MODEL=dipladenia' >> .env",
                 "Riavvia DELTA dopo il fix. Log atteso: '[INFO] delta.tflite.runner: Modello caricato con backend=ai_edge_litert'",
             ]
@@ -2980,7 +2980,7 @@ def _add_mlops_operatore(pdf: ManualePDF):
          "superi la soglia minima di confidenza su un'immagine di test. "
          "Il sistema blocca il deploy se la soglia non e soddisfatta."),
         ("Fase 5 — Deploy",
-         "Copiare plant_disease_model.tflite in models/ sul dispositivo target. "
+         "Copiare plant_disease_model_39classes.tflite in models/ sul dispositivo target. "
          "Riavviare DELTA. Il nuovo modello viene caricato automaticamente all'avvio."),
     ])
 
@@ -3060,7 +3060,7 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._body("Output generati al termine dell'addestramento:")
     pdf._bullet([
         "models/plant_disease_model.keras — modello Keras completo",
-        "models/labels.txt — lista classi (una per riga, in ordine indice)",
+        "models/labels_33classes_correct.txt — lista classi (una per riga, in ordine indice)",
         "models/training_metadata.json — metriche training, epoche, accuracy, data",
     ])
 
@@ -3075,12 +3075,12 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "# Conversione standard float16 (raccomandato per DELTA v3.0)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
-        "  --output models/plant_disease_model.tflite \\\n"
+        "  --output models/plant_disease_model_39classes.tflite \\\n"
         "  --quantization float16\n\n"
         "# Conversione INT8 (opzionale, richiede dati rappresentativi)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
-        "  --output models/plant_disease_model_int8.tflite \\\n"
+        "  --output models/plant_disease_model_39classes_int8.tflite \\\n"
         "  --quantization int8 \\\n"
         "  --representative-data datasets/training\n\n"
         "# Conversione senza quantizzazione (FP32 — massima precisione, piu lento)\n"
@@ -3145,7 +3145,7 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "# 3. Converti in TFLite float16 (default DELTA v3.0)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
-        "  --output models/plant_disease_model.tflite \\\n"
+        "  --output models/plant_disease_model_39classes.tflite \\\n"
         "  --quantization float16\n\n"
         "# 4. Valida il modello (gate di deploy)\n"
         "python main.py --preflight-only\n\n"
@@ -3368,7 +3368,7 @@ def _add_github_publisher(pdf: ManualePDF):
          "Branch corrente, URL repository, ultimo tag git, conteggio commit, "
          "changelog dei commit dall'ultimo tag fino a HEAD."),
         ("Modello AI (TFLite)",
-         "Classi diagnostiche da models/labels.txt, dimensione file .tflite in KB, "
+         "Classi diagnostiche da models/labels_33classes_correct.txt, dimensione file .tflite in KB, "
          "shape di input (es. 224x224x3), stato operativo del modello."),
         ("Database SQLite (delta.db)",
          "Totale diagnosi archiviate, diagnosi reali (non simulate), "
@@ -3558,16 +3558,17 @@ def _add_github_publisher(pdf: ManualePDF):
 
 
 def _add_pretrained_model(pdf: ManualePDF):
-    """Sezione 19: Modello pre-addestrato PlantVillage — download automatico."""
+    """Sezione 19: Pipeline alternativa legacy (7 classi) — download automatico."""
     pdf.add_page()
-    pdf._section_title("19. MODELLO PRE-ADDESTRATO — DOWNLOAD AUTOMATICO")
+    pdf._section_title("19. PIPELINE ALTERNATIVA LEGACY (7 CLASSI) — DOWNLOAD AUTOMATICO")
 
     pdf._body(
         "In assenza di un dataset proprietario, DELTA include lo script "
         "ai/download_pretrained_model.py che scarica automaticamente il dataset "
         "PlantVillage tramite TensorFlow Datasets, addestra un modello MobileNetV2 "
         "con transfer learning sulle classi DELTA, e converte il risultato in "
-        "TFLite INT8 pronto per il deploy. Non e richiesto un account Kaggle."
+        "TFLite INT8 pronto per il deploy. Non e richiesto un account Kaggle. "
+        "Questa pipeline e separata dal modello principale v3.0 leaf-only a 33 classi."
     )
 
     pdf._subsection("19.1 Prerequisiti")

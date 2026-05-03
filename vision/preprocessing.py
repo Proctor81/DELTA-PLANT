@@ -18,7 +18,7 @@ class Preprocessor:
     """
     Prepara le immagini per l'inferenza sul modello TFLite:
     1. Resize alla dimensione di input del modello
-    2. Normalizzazione [0, 255] uint8 (per modelli INT8 quantizzati)
+    2. Normalizzazione MobileNetV2 in float32 range [-1, 1]
     3. Aggiunta dimensione batch (1, H, W, C)
     """
 
@@ -35,7 +35,7 @@ class Preprocessor:
             image: array numpy (H, W, 3) BGR uint8
 
         Returns:
-            array numpy (1, H, W, 3) uint8 pronto per TFLite INT8
+            array numpy (1, H, W, 3) float32 pronto per inferenza TFLite
         """
         try:
             import cv2  # type: ignore
@@ -91,6 +91,6 @@ class Preprocessor:
     def normalize_float(image: np.ndarray) -> np.ndarray:
         """
         Normalizza un'immagine uint8 [0,255] → float32 [0.0, 1.0].
-        Da usare se il modello non è quantizzato INT8.
+        Utility generica (diversa dalla normalizzazione MobileNetV2 [-1,1]).
         """
         return image.astype(np.float32) / 255.0

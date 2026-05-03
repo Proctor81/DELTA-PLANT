@@ -129,7 +129,7 @@ Use manual input when:
 6. Bot: ⏳ "Elaborando diagnosi..."
    ↓
 7. Bot: Displays diagnosis with:
-   ├─ AI Classification (38 classes)
+   ├─ AI Classification (33 classes)
    ├─ Confidence score
    ├─ Activated diagnostic rules
    ├─ Risk level (nessuno/basso/medio/alto/critico)

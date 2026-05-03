@@ -1,7 +1,7 @@
 """
 DELTA - ai/inference.py
-Esecuzione inferenza sul modello TFLite quantizzato.
-Gestisce input/output INT8, dequantizzazione e output strutturato.
+Esecuzione inferenza sul modello TFLite.
+Gestisce input/output quantizzati o float e output strutturato.
 """
 
 import logging
@@ -18,7 +18,7 @@ logger = logging.getLogger("delta.ai.inference")
 class PlantInference:
     """
     Esegue l'inferenza sul modello TFLite per classificazione malattie.
-    Gestisce automaticamente la quantizzazione INT8.
+    Gestisce automaticamente input/output quantizzati o float.
     """
 
     def __init__(self, model_loader: ModelLoader):
@@ -116,7 +116,7 @@ class PlantInference:
     def _build_result(self, probabilities: np.ndarray, labels: List[str]) -> Dict[str, Any]:
         """Costruisce il dizionario risultato dalla distribuzione di probabilità.
 
-        v3.0: If confidence < low_confidence_threshold, triggers class 39 fallback
+        v3.0: se la confidenza è bassa, attiva fallback software non classificato.
         """
         top_idx = int(np.argmax(probabilities))
         confidence = float(probabilities[top_idx])
@@ -175,7 +175,14 @@ class PlantInference:
         if not labels:
             labels = ["Sano"]
 
-        healthy_idx = labels.index("Sano") if "Sano" in labels else 0
+        healthy_idx = 0
+        if "Sano" in labels:
+            healthy_idx = labels.index("Sano")
+        else:
+            for idx, label in enumerate(labels):
+                if "healthy" in label.lower() or "sano" in label.lower():
+                    healthy_idx = idx
+                    break
         n = len(labels)
         base = 0.40 / max(n - 1, 1)
         probabilities = np.full(n, base, dtype=np.float32)

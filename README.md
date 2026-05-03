@@ -188,7 +188,7 @@ DELTA-PLANT/
 ├── data/                    # Database SQLite + Excel export + logger
 ├── diagnosis/               # Regole esperte + engine
 ├── interface/               # CLI, API REST, Admin Panel, Academy
-├── models/                  # plant_disease_model.tflite + labels.txt
+├── models/                  # plant_disease_model_39classes.tflite + labels_33classes_correct.txt
 ├── recommendations/         # Agronomy engine
 ├── sensors/                 # Lettura I2C + anomaly detection
 ├── vision/                  # Camera + segmentazione + organ detector

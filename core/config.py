@@ -37,7 +37,7 @@ MODEL_CONFIG = {
     "num_threads": 4,                  # Thread inferenza NPU/CPU
     "use_edge_tpu": True,              # Raspberry Pi AI HAT 2+
     "model_version": "v3.0-33c",      # 33-class PlantVillage MobileNetV2 (leaf-only)
-    "model_accuracy": 0.8743,          # Training accuracy
+    "model_accuracy": 0.8390,          # Benchmark top-1 (2026-05-03)
     "leaf_only_mode": True,            # v3.0: Focus on leaf diseases only
 }
 
@@ -48,11 +48,11 @@ MODEL_CONFIG = {
 # Usare la chiave come identificatore (es. "dipladenia", "generale").
 MODELS_REGISTRY: dict = {
     "generale": {
-        "model_path":   str(MODELS_DIR / "plant_disease_model.tflite"),
-        "labels_path":  str(MODELS_DIR / "labels_generale.txt"),
-        "description":  "Classificatore generale malattie piante (PlantVillage)",
+        "model_path":   str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
+        "labels_path":  str(MODELS_DIR / "labels_33classes_correct.txt"),
+        "description":  "Classificatore generale fogliare PlantVillage (33 classi)",
         "input_size":   (224, 224),
-        "num_classes":  7,
+        "num_classes":  33,
     },
     "dipladenia": {
         "model_path":   str(MODELS_DIR / "dipladenia" / "dipladenia_model.tflite"),
@@ -71,18 +71,41 @@ MODELS_REGISTRY: dict = {
 # Modello attivo di default — modificabile a runtime o da .env (DELTA_ACTIVE_MODEL)
 ACTIVE_MODEL = os.environ.get("DELTA_ACTIVE_MODEL", "generale")
 
-# Etichette classi predefinite (PlantVillage-like) — foglie
+# Etichette fogliare fallback allineate al modello 33-classi.
 DEFAULT_LABELS = [
-    "Sano",
-    "Peronospora",
-    "Oidio",
-    "Muffa_grigia",
-    "Alternaria",
-    "Ruggine",
-    "Mosaikovirus",
-    "Carenza_azoto",
-    "Carenza_ferro",
-    "Stress_idrico",
+    "Apple_Apple_scab",
+    "Apple_Black_rot",
+    "Apple_Cedar_apple_rust",
+    "Apple_healthy",
+    "Bell_pepper_Bacterial_spot",
+    "Bell_pepper_healthy",
+    "Blueberry_healthy",
+    "Cherry_Powdery_mildew",
+    "Cherry_healthy",
+    "Corn_Cercospora",
+    "Corn_Common_rust",
+    "Corn_Northern_Leaf_Blight",
+    "Corn_healthy",
+    "Grape_Black_rot",
+    "Grape_Esca",
+    "Grape_Leaf_blight",
+    "Grape_healthy",
+    "Peach_healthy",
+    "Potato_Early_blight",
+    "Potato_Late_blight",
+    "Potato_healthy",
+    "Squash_Powdery_mildew",
+    "Strawberry_Leaf_scorch",
+    "Strawberry_healthy",
+    "Tomato_Bacterial_spot",
+    "Tomato_Early_blight",
+    "Tomato_Late_blight",
+    "Tomato_Leaf_Mold",
+    "Tomato_Septoria_leaf_spot",
+    "Tomato_Target_Spot",
+    "Tomato_Yellow_Leaf_Curl",
+    "Tomato_healthy",
+    "Tomato_mosaic_virus",
 ]
 
 # Etichette patologie fiore
@@ -354,22 +377,22 @@ TELEGRAM_CONFIG = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MODELLO 38 CLASSI RICERCA (v2.0 - MobileNetV2 Transfer Learning)
+# MODELLO RICERCA 33 CLASSI (v3.0 - MobileNetV2 Leaf-Only)
 # ─────────────────────────────────────────────────────────────────────────────
 MODELS_REGISTRY_RESEARCH = {
-    "ricerca_38classi": {
+    "ricerca_33classi": {
         "model_keras":  str(MODELS_DIR / "plant_disease_model_39classes.keras"),
         "model_tflite": str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
-        "labels_path":  str(MODELS_DIR / "labels_39classes.txt"),
+        "labels_path":  str(MODELS_DIR / "labels_33classes_correct.txt"),
         "class_mapping": str(MODELS_DIR / "CLASS_MAPPING.csv"),
-        "description":  "PlantVillage 38 classi (MobileNetV2, 87.43% accuracy, RPi5 optimized)",
+        "description":  "PlantVillage 33 classi (MobileNetV2, benchmark top-1 83.9%, RPi5 optimized)",
         "dataset_path": "datasets/training_39classes",
-        "num_classes":  38,
-        "accuracy":     0.8743,
-        "validation_accuracy": 0.865,
-        "inference_time_ms": 150,
+        "num_classes":  33,
+        "accuracy":     0.839,
+        "validation_accuracy": 0.961,
+        "inference_time_ms": 180,
         "model_size_kb": 14000,
-        "tflite_size_kb": 2800,
+        "tflite_size_kb": 5000,
     },
 }
 

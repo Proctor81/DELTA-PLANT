@@ -2,12 +2,11 @@
 Conversione modello TensorFlow/Keras in TensorFlow Lite.
 Supporta quantizzazione: none, dynamic, float16, int8.
 
-Esempio (INT8 full):
+Esempio (float16 consigliato):
     python ai/convert_keras_to_tflite.py \
       --keras-model models/plant_disease_model.keras \
-      --output models/plant_disease_model.tflite \
-      --quantization int8 \
-      --representative-data datasets/training
+    --output models/plant_disease_model_39classes.tflite \
+    --quantization float16
 """
 
 from __future__ import annotations
@@ -26,12 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Conversione Keras -> TFLite")
     parser.add_argument("--keras-model", required=True, help="Path modello Keras (.keras o SavedModel)")
     parser.add_argument("--output", required=True, help="Path output .tflite")
-    parser.add_argument("--quantization", default="int8", choices=["none", "dynamic", "float16", "int8"])
+    parser.add_argument("--quantization", default="float16", choices=["none", "dynamic", "float16", "int8"])
     parser.add_argument("--representative-data", default="datasets/training", help="Dataset per quantizzazione INT8")
     parser.add_argument("--img-size", type=int, default=224, help="Dimensione immagine input")
     parser.add_argument("--num-samples", type=int, default=200, help="Campioni representative dataset")
     parser.add_argument("--allow-float-fallback", action="store_true", help="Permette fallback float se alcune ops non sono INT8")
-    parser.add_argument("--labels", default="models/labels.txt", help="Path labels.txt da validare/copiare")
+    parser.add_argument("--labels", default="models/labels_33classes_correct.txt", help="Path labels da validare/copiare")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 
@@ -123,11 +122,11 @@ def main() -> int:
     LOGGER.info("Modello TFLite salvato: %s (%.2f MB)", output_path, size_mb)
 
     if labels_path.exists() and labels_path.is_file():
-        target_labels = output_path.parent / "labels.txt"
+        target_labels = output_path.parent / "labels_33classes_correct.txt"
         target_labels.write_text(labels_path.read_text(encoding="utf-8"), encoding="utf-8")
-        LOGGER.info("labels.txt copiato in: %s", target_labels)
+        LOGGER.info("labels copiato in: %s", target_labels)
     else:
-        LOGGER.warning("labels.txt non trovato in %s (salto copia)", labels_path)
+        LOGGER.warning("file labels non trovato in %s (salto copia)", labels_path)
 
     print("\n=== CONVERSIONE COMPLETATA ===")
     print(f"Output TFLite: {output_path}")

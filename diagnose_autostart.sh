@@ -93,8 +93,8 @@ fi
 # =============================================================================
 header "TEST 3: Artefatti del modello AI"
 
-MODEL_PATH="${DELTA_DIR}/models/plant_disease_model.tflite"
-LABELS_PATH="${DELTA_DIR}/models/labels.txt"
+MODEL_PATH="${DELTA_DIR}/models/plant_disease_model_39classes.tflite"
+LABELS_PATH="${DELTA_DIR}/models/labels_33classes_correct.txt"
 VALIDATION_IMAGE="${DELTA_DIR}/models/validation_sample.jpg"
 
 [[ -f "$MODEL_PATH" ]] && ok "Modello TFLite: $MODEL_PATH" || err "MANCANTE: $MODEL_PATH"
