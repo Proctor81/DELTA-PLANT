@@ -26,16 +26,18 @@ for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEA
 # MODELLO AI
 # ─────────────────────────────────────────────
 MODEL_CONFIG = {
-    "model_path": str(MODELS_DIR / "plant_disease_model.tflite"),
-    "labels_path": str(MODELS_DIR / "labels.txt"),
+    "model_path": str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
+    "labels_path": str(MODELS_DIR / "labels_39classes.txt"),
     "validation_image_path": str(MODELS_DIR / "validation_sample.jpg"),
     "preflight_min_confidence": 0.50,  # Soglia minima preflight gate di deploy
     "input_size": (224, 224),          # WxH
-    "input_dtype": "uint8",            # INT8 quantizzato
+    "input_dtype": "float32",          # FP32 (TFLite v2.0.6 standard)
     "confidence_threshold": 0.65,      # Soglia minima confidenza
     "low_confidence_threshold": 0.50,  # Soglia active learning
     "num_threads": 4,                  # Thread inferenza NPU/CPU
     "use_edge_tpu": True,              # Raspberry Pi AI HAT 2+
+    "model_version": "v2.0.6",         # 38-class PlantVillage MobileNetV2
+    "model_accuracy": 0.8743,          # Training accuracy
 }
 
 # ─────────────────────────────────────────────
