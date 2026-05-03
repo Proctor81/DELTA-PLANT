@@ -1,0 +1,7 @@
+Sano
+Peronospora
+Oidio
+Muffa_grigia
+Alternaria
+Ruggine
+Mosaikovirus
