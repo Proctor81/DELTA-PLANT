@@ -641,9 +641,10 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("3.1 Modello di classificazione")
     pdf._body(
-        "DELTA utilizza un modello TensorFlow Lite quantizzato (INT8) ottimizzato "
-        "per inferenza sull'NPU dell'AI HAT 2+. Il modello classifica le immagini "
-        "di foglie in 10 categorie fitosanitarie."
+        "DELTA v3.0 utilizza un modello TensorFlow Lite float16 (input float32) "
+        "ottimizzato per inferenza edge su Raspberry Pi 5 (XNNPACK CPU delegate "
+        "e AI HAT quando disponibile). Il modello principale classifica le immagini "
+        "di foglie in 33 classi fitosanitarie PlantVillage."
     )
     if mc:
         pdf._kv_table([
@@ -658,7 +659,16 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
         ])
 
     pdf._subsection("3.2 Classi diagnostiche")
-    labels = cfg.get("DEFAULT_LABELS", [])
+    labels = []
+    labels_path = mc.get("labels_path") if mc else None
+    if labels_path:
+        try:
+            with open(labels_path, "r", encoding="utf-8") as f:
+                labels = [line.strip() for line in f if line.strip()]
+        except Exception:
+            labels = []
+    if not labels:
+        labels = cfg.get("DEFAULT_LABELS", [])
     if labels:
         pdf._bullet([f"{i+1}. {lbl}" for i, lbl in enumerate(labels)])
     else:
@@ -836,18 +846,17 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
     pdf._subsection("5.4 Diagnosi pianta — flusso completo v2.0")
     pdf._bullet([
         "1. Acquisizione frame dalla Pi Camera (o immagine da cartella input_images/)",
-        "2. Rilevamento multi-organo: foglia, fiore e frutto tramite HSV multi-range",
+        "2. Rilevamento organo: foglia (modalita leaf-only v3.0 attiva di default)",
         "3. Pre-processing: ridimensionamento a 224×224, normalizzazione",
         "4. Segmentazione foglia tramite filtro HSV verde (o GrabCut)",
-        "5. Inferenza AI foglia: classe (10 categorie) + confidenza",
-        "6. Inferenza AI fiore (se rilevato): classe (8 categorie) + confidenza",
-        "7. Inferenza AI frutto (se rilevato): classe (9 categorie) + confidenza",
-        "8. Lettura sensori ambientali (temperatura, umidità, luce, CO2, pH, EC)",
-        "9. Applicazione 21 regole agronomiche → attivazione regole + livello rischio",
-        "10. Oracolo Quantistico di Grover → Quantum Risk Score [0,1]",
-        "11. Generazione raccomandazioni pratiche per l'operatore",
-        "12. Salvataggio nel database SQLite e aggiornamento Excel",
-        "13. Visualizzazione risultato a schermo con codice colore rischio",
+        "5. Inferenza AI foglia: classe (33 classi) + confidenza",
+        "6. Lettura sensori ambientali (temperatura, umidita, luce, CO2, pH, EC)",
+        "7. Applicazione 21 regole agronomiche -> attivazione regole + livello rischio",
+        "8. Oracolo Quantistico di Grover -> Quantum Risk Score [0,1]",
+        "9. Generazione raccomandazioni pratiche per l'operatore",
+        "10. Salvataggio nel database SQLite e aggiornamento Excel",
+        "11. Visualizzazione risultato a schermo con codice colore rischio",
+        "12. Analisi fiore/frutto disponibile solo se leaf_only_mode=False in core/config.py",
     ])
 
     pdf._subsection("5.5 Output diagnosi — interpretazione")
@@ -1312,7 +1321,7 @@ def _add_troubleshooting(pdf: ManualePDF):
                 "Causa: il file models/plant_disease_model.tflite e in realta un modello GGUF (llama.cpp) rinominato per errore.",
                 "Verifica: python3 -c \"with open('models/plant_disease_model.tflite','rb') as f: print(f.read(4))\" — se stampa b'GGUF' e il problema.",
                 "Fix 1 — Rinomina il GGUF: mv models/plant_disease_model.tflite models/plant_disease_model.gguf",
-                "Fix 2 — Converti il Keras reale: python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization int8 --representative-data datasets/training",
+                "Fix 2 — Converti il Keras reale: python ai/convert_keras_to_tflite.py --keras-model models/plant_disease_model.keras --output models/plant_disease_model.tflite --quantization float16",
                 "Fix 3 (alternativa rapida) — Usa il modello dipladenia: echo 'DELTA_ACTIVE_MODEL=dipladenia' >> .env",
                 "Riavvia DELTA dopo il fix. Log atteso: '[INFO] delta.tflite.runner: Modello caricato con backend=ai_edge_litert'",
             ]
@@ -1846,11 +1855,12 @@ def _add_scientific_paper(pdf: ManualePDF):
          "a coverage ratio and bounding-box set; organ presence is confirmed if "
          "coverage exceeds a configurable detection threshold (default 15%)."),
         ("Layer 4 — AI Inference",
-         "TFLite INT8-quantised models are executed on the Hailo-8 NPU via the "
-         "Hailo Runtime API, achieving sub-50ms inference latency per frame. "
-         "Separate label sets are maintained for leaves (10 classes), flowers "
-         "(8 classes), and fruits (9 classes). Low-confidence predictions "
-         "(< 50%) trigger active-learning human review requests."),
+         "The primary model is a TFLite float16 network with float32 input "
+         "(MobileNetV2 preprocessing). Inference runs on Raspberry Pi 5 via "
+         "XNNPACK and can leverage the AI HAT stack when available. The default "
+         "diagnostic set is leaf-only (33 classes). Flower/fruit classifiers "
+         "remain optional and can be re-enabled via configuration. Low-confidence "
+         "predictions (< 50%) trigger active-learning human review requests."),
         ("Layer 5 — Rule-Based Diagnosis",
          "A 21-rule expert system evaluates sensor thresholds and AI outputs in "
          "combination. Rules are partitioned into: environmental (6 rules), "
@@ -2963,7 +2973,8 @@ def _add_mlops_operatore(pdf: ManualePDF):
          "con transfer learning. Il modello viene salvato in models/plant_disease_model.keras."),
         ("Fase 3 — Conversione TFLite",
          "Eseguire ai/convert_keras_to_tflite.py per convertire il modello Keras in "
-         "formato TFLite INT8 ottimizzato per edge deployment (Raspberry Pi / Hailo NPU)."),
+         "formato TFLite (float16 consigliato per il modello principale, INT8 opzionale "
+         "per scenari specifici NPU)."),
         ("Fase 4 — Preflight Validazione",
          "Eseguire python main.py --preflight-only per verificare che il modello "
          "superi la soglia minima di confidenza su un'immagine di test. "
@@ -3053,17 +3064,23 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "models/training_metadata.json — metriche training, epoche, accuracy, data",
     ])
 
-    pdf._subsection("18.4 Conversione TFLite INT8 — convert_keras_to_tflite.py")
+    pdf._subsection("18.4 Conversione TFLite (float16 / int8) — convert_keras_to_tflite.py")
     pdf._body(
         "Lo script ai/convert_keras_to_tflite.py converte il modello Keras in formato "
-        "TFLite ottimizzato per edge deployment. La quantizzazione INT8 riduce le "
-        "dimensioni del modello di ~4x e la latenza di inferenza su hardware dedicato."
+        "TFLite ottimizzato per edge deployment. In DELTA v3.0 il formato di riferimento "
+        "del modello generale e float16; la quantizzazione INT8 resta disponibile come "
+        "opzione avanzata per target specifici."
     )
     pdf._code_block(
-        "# Conversione standard INT8 (raccomandato per Raspberry Pi + AI HAT)\n"
+        "# Conversione standard float16 (raccomandato per DELTA v3.0)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
         "  --output models/plant_disease_model.tflite \\\n"
+        "  --quantization float16\n\n"
+        "# Conversione INT8 (opzionale, richiede dati rappresentativi)\n"
+        "python ai/convert_keras_to_tflite.py \\\n"
+        "  --keras-model models/plant_disease_model.keras \\\n"
+        "  --output models/plant_disease_model_int8.tflite \\\n"
         "  --quantization int8 \\\n"
         "  --representative-data datasets/training\n\n"
         "# Conversione senza quantizzazione (FP32 — massima precisione, piu lento)\n"
@@ -3076,8 +3093,8 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._kv_table([
         ("none",     "FP32 — precisione massima, dimensione maggiore, piu lento su edge"),
         ("dynamic",  "Quantizzazione dinamica — buon compromesso senza dataset calibrazione"),
-        ("float16",  "FP16 — riduzione dimensione 2x, compatibile GPU/NPU"),
-        ("int8",     "Quantizzazione intera INT8 — 4x piu piccolo, ottimale per Hailo/RPi NPU"),
+        ("float16",  "FP16 — opzione consigliata per DELTA v3.0 (modello principale)"),
+        ("int8",     "Quantizzazione intera INT8 — opzionale, utile in pipeline NPU dedicate"),
     ])
 
     pdf._subsection("18.5 Validazione Preflight — Gate di Deploy")
@@ -3125,12 +3142,11 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "# 2. Addestra il modello Keras\n"
         "python ai/train_keras_classifier.py \\\n"
         "  --dataset datasets/training --output models\n\n"
-        "# 3. Converti in TFLite INT8\n"
+        "# 3. Converti in TFLite float16 (default DELTA v3.0)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
         "  --output models/plant_disease_model.tflite \\\n"
-        "  --quantization int8 \\\n"
-        "  --representative-data datasets/training\n\n"
+        "  --quantization float16\n\n"
         "# 4. Valida il modello (gate di deploy)\n"
         "python main.py --preflight-only\n\n"
         "# 5. Avvia DELTA con il nuovo modello\n"
