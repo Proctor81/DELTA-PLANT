@@ -1,6 +1,6 @@
 """
 DELTA - Entry point principale.
-Questo file avvia il sistema DELTA AI Agent modulare.
+Questo file avvia il sistema DELTA Plant modulare.
 L'intero progetto è organizzato nella directory DELTA/ con architettura modulare.
 
 Per avviare: python main.py

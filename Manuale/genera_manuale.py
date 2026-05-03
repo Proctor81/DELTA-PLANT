@@ -201,7 +201,7 @@ class ManualePDF(FPDF):
         self.set_font(self._FONT, "B", 8)
         self.set_text_color(*WHITE)
         self.set_xy(10, 2)
-        self.cell(130, 7, "DELTA AI Agent \u2014 Manuale Utente", align="L")
+        self.cell(130, 7, "DELTA Plant \u2014 Manuale Utente", align="L")
         self.set_xy(148, 2)
         self.cell(52, 7, f"Rev. {datetime.now().strftime('%Y-%m-%d')}", align="R")
         self.set_text_color(*GRAY_DARK)
@@ -220,7 +220,7 @@ class ManualePDF(FPDF):
         self.set_x(10)
         self.cell(140, 8, "Copyright © 2026 Paolo Ciccolella. All rights reserved.", align="L")
         self.set_xy(10, self.get_y() + 4.5)
-        self.cell(95, 8, "DELTA AI Agent \u2014 Software Proprietario", align="L")
+        self.cell(95, 8, "DELTA Plant \u2014 Software Proprietario", align="L")
         self.cell(95, 8, f"Pagina {self.page_no()}", align="R")
 
     # ── Copertina ────────────────────────────────────────────
@@ -261,10 +261,13 @@ class ManualePDF(FPDF):
         self.rect(12, 112, 175, 2.5, "F")
 
         # ── Sottotitolo ──────────────────────────────────────
-        self.set_font(self._FONT, "B", 15)
+        self.set_font(self._FONT, "B", 14)
         self.set_text_color(195, 218, 250)
         self.set_xy(12, 119)
-        self.cell(0, 10, "AI Agent per l'Analisi della Salute delle Piante", align="L")
+        self.cell(0, 8, "DELTA Plant - AI & Robotics Orchestrator", align="L")
+        self.set_font(self._FONT, "B", 12)
+        self.set_xy(12, 127)
+        self.cell(0, 7, "per la Salute delle Piante", align="L")
 
         # ── Sigla estesa ─────────────────────────────────────
         self.set_font(self._FONT, "I", 9)
@@ -489,7 +492,7 @@ def _add_intro(pdf: ManualePDF):
     cfg = _load_config()
     _add_license_appendix(pdf)
     pdf._body(
-        "DELTA 2.0 introduce l'analisi simultanea di foglie, fiori e frutti, "
+        "DELTA Plant introduce l'analisi simultanea di foglie, fiori e frutti, "
         "l'Oracolo Quantistico di Grover per la quantificazione del rischio composito, "
         "la DELTA Academy per la formazione interattiva degli operatori e un sistema "
         "di autenticazione con pannello amministratore. Il sistema è progettato per "
@@ -3310,7 +3313,7 @@ def _add_github_publisher(pdf: ManualePDF):
 
     pdf._body(
         "Il modulo GitHub Publisher (interface/github_publisher.py) consente "
-        "di pubblicare automaticamente DELTA 2.0 su GitHub con un solo click "
+        "di pubblicare automaticamente DELTA Plant su GitHub con un solo click "
         "dal Pannello Amministratore. Raccoglie in autonomia i metadati tecnici "
         "dal software in esecuzione — versione, modello AI, dipendenze, changelog git — "
         "e genera un README.md e un RELEASE.md aggiornati, crea un tag git con "
@@ -3433,7 +3436,7 @@ def _add_github_publisher(pdf: ManualePDF):
     )
     pdf._code_block(
         "─── ANTEPRIMA DATI RACCOLTI ───\n"
-        "Repository:   https://github.com/Proctor81/DELTA-2.0\n"
+        "Repository:   https://github.com/Proctor81/DELTA-PLANT\n"
         "Branch:       main\n"
         "Ultimo tag:   v2.0.0  (o 'nessun tag')\n"
         "Versione sug: v2.0.1\n\n"
@@ -3660,11 +3663,13 @@ def _add_pretrained_model(pdf: ManualePDF):
 # ─────────────────────────────────────────────────────────────
 
 def _add_license_appendix(pdf: "ManualePDF"):
-    """Appendice: DELTA 2.0 SOFTWARE LICENSE."""
+    """Appendice: DELTA PLANT SOFTWARE LICENSE."""
     pdf.add_page()
-    pdf._section_title("Appendice Licenza — DELTA 2.0 SOFTWARE LICENSE")
+    pdf._section_title("Appendice Licenza — DELTA PLANT SOFTWARE LICENSE")
 
     pdf._body("Copyright \u00a9 2026 Paolo Ciccolella. All rights reserved.")
+    pdf._body("Software Release: v3.0")
+    pdf._body("(This release field must be updated at each official software release.)")
     pdf.ln(2)
 
     pdf._body(
@@ -3674,7 +3679,7 @@ def _add_license_appendix(pdf: "ManualePDF"):
         "informativo del progetto."
     )
     pdf._code_block(
-        "DELTA-2.0/\n"
+        "DELTA-PLANT/\n"
         "  LICENSE   <- testo integrale della licenza",
         label="POSIZIONE FILE LICENSE",
     )
@@ -3683,7 +3688,7 @@ def _add_license_appendix(pdf: "ManualePDF"):
     # 1
     pdf._subsection("1. Core System (Proprietary)")
     pdf._body(
-        "The DELTA 2.0 core system, including but not limited to:\n"
+        "The DELTA PLANT core system, including but not limited to:\n"
         "  \u2022 main control software\n"
         "  \u2022 sensor management system\n"
         "  \u2022 automation engine\n"
@@ -3699,7 +3704,7 @@ def _add_license_appendix(pdf: "ManualePDF"):
     # 2
     pdf._subsection("2. Modules / Extensions (Open Source Components)")
     pdf._body(
-        "Certain modules, plugins, or SDK components of DELTA 2.0 may be released "
+        "Certain modules, plugins, or SDK components of DELTA PLANT may be released "
         "under open-source licenses (such as MIT or Apache 2.0).\n\n"
         "These components are clearly marked in their respective directories.\n\n"
         "For open-source modules:\n"
@@ -3732,17 +3737,31 @@ def _add_license_appendix(pdf: "ManualePDF"):
     )
 
     # 5
-    pdf._subsection("5. Commercial Use")
+    pdf._subsection("5. Scientific Research Use")
     pdf._body(
-        "Commercial use of the DELTA 2.0 core system requires a separate written "
+        "Scientific and academic research use of the DELTA PLANT core system is allowed "
+        "only for non-commercial purposes, subject to all terms in this license.\n\n"
+        "For research use, you must:\n"
+        "  \u2022 keep all copyright and license notices intact\n"
+        "  \u2022 provide clear attribution to the author in publications and reports\n"
+        "  \u2022 use the software in compliance with applicable laws and ethical standards\n"
+        "  \u2022 avoid redistributing proprietary core code or derivative proprietary builds\n\n"
+        "Research use does NOT grant ownership or relicensing rights on the DELTA PLANT "
+        "proprietary core system."
+    )
+
+    # 6
+    pdf._subsection("6. Commercial Use")
+    pdf._body(
+        "Commercial use of the DELTA PLANT core system requires a separate written "
         "license agreement with the author.\n\n"
         "Open-source modules may be used commercially according to their respective licenses."
     )
 
-    # 6
-    pdf._subsection("6. Final Terms")
+    # 7
+    pdf._subsection("7. Final Terms")
     pdf._body(
-        "By using any part of DELTA 2.0, you agree to these terms.\n\n"
+        "By using any part of DELTA PLANT, you agree to these terms.\n\n"
         "Violation of this license may result in termination of usage rights and legal action."
     )
 
@@ -3763,7 +3782,7 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     pdf._section_title("14b. CHAT AI — HUGGINGFACE LLM E PULSANTE «CHIEDI A DELTA»")
 
     pdf._body(
-        "DELTA 2.0.5 integra un motore di chat AI basato su modelli linguistici di grandi "
+        "DELTA Plant integra un motore di chat AI basato su modelli linguistici di grandi "
         "dimensioni (LLM) via HuggingFace Inference API. L'utente può conversare liberamente "
         "con un esperto agronomico virtuale basato su Llama 3.1 8B Instruct, sia dal bot "
         "Telegram sia dalla CLI locale, senza bisogno di eseguire il modello in locale."
@@ -3884,7 +3903,7 @@ def main():
     pdf = ManualePDF()
     pdf.set_auto_page_break(auto=True, margin=16)
     pdf.set_margins(10, 14, 10)
-    pdf.set_title("DELTA AI Agent — Manuale Utente")
+    pdf.set_title("DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante — Manuale Utente")
     pdf.set_author("DELTA Project")
     pdf.set_subject("Manuale hardware e software del sistema DELTA per Raspberry Pi")
     pdf.set_creator("genera_manuale.py — generato automaticamente")
@@ -3916,7 +3935,7 @@ def main():
         ("19. Modello Pre-addestrato — Download automatico",    39),
         ("20. GitHub Publisher — Pubblicazione automatica",     42),
         ("Appendice Hardware — Assemblaggio e Schema elettrico", 45),
-        ("Appendice Licenza — DELTA 2.0 SOFTWARE LICENSE",       48),
+        ("Appendice Licenza — DELTA PLANT SOFTWARE LICENSE",      48),
     ]
     pdf.toc_page(toc_entries)
 

@@ -62,7 +62,7 @@ class CLI:
             print(f"  [8] Apri cartella immagini input  📂")
             print(f"  [9] Preflight AI (modello + labels + immagine test)")
             print(f"  [C] {BOLD}Chat domanda/risposta libera{RESET} 💬")
-            print(f"  [L] {BOLD}Licenza Software DELTA 2.0{RESET}  ©")
+            print(f"  [L] {BOLD}Licenza Software DELTA Plant{RESET}  ©")
             print("  [0] Esci")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip().upper()
@@ -136,18 +136,20 @@ class CLI:
 
     @staticmethod
     def _show_license():
-        """Mostra la licenza software DELTA 2.0."""
+        """Mostra la licenza software DELTA PLANT."""
         print(f"""
 {BOLD}{'═' * 62}
-  DELTA 2.0 SOFTWARE LICENSE
+    DELTA PLANT SOFTWARE LICENSE
 {'═' * 62}{RESET}
 
 {BOLD}Copyright © 2026 Paolo Ciccolella. All rights reserved.{RESET}
+{BOLD}Software Release: v3.0{RESET}
+{DIM}(This release field must be updated at each official software release.){RESET}
 
 {'─' * 62}
 {BOLD}1. CORE SYSTEM (PROPRIETARY){RESET}
 
-The DELTA 2.0 core system, including but not limited to:
+The DELTA PLANT core system, including but not limited to:
   - main control software
   - sensor management system
   - automation engine
@@ -165,7 +167,7 @@ Any unauthorized use of the core system is strictly prohibited.
 {'─' * 62}
 {BOLD}2. MODULES / EXTENSIONS (OPEN SOURCE COMPONENTS){RESET}
 
-Certain modules, plugins, or SDK components of DELTA 2.0 may be
+Certain modules, plugins, or SDK components of DELTA PLANT may be
 released under open-source licenses (such as MIT or Apache 2.0).
 
 These components are clearly marked in their respective directories.
@@ -199,18 +201,34 @@ The author is not responsible for:
   - misuse of the system
 
 {'─' * 62}
-{BOLD}5. COMMERCIAL USE{RESET}
+{BOLD}5. SCIENTIFIC RESEARCH USE{RESET}
 
-Commercial use of the DELTA 2.0 core system requires a separate
+Scientific and academic research use of the DELTA PLANT core system
+is allowed only for non-commercial purposes, subject to all terms in
+this license.
+
+For research use, you must:
+    - keep all copyright and license notices intact
+    - provide clear attribution to the author in publications and reports
+    - use the software in compliance with applicable laws and ethical standards
+    - avoid redistributing proprietary core code or derivative proprietary builds
+
+Research use does NOT grant ownership or relicensing rights on the
+DELTA PLANT proprietary core system.
+
+{'─' * 62}
+{BOLD}6. COMMERCIAL USE{RESET}
+
+Commercial use of the DELTA PLANT core system requires a separate
 written license agreement with the author.
 
 Open-source modules may be used commercially according to their
 respective licenses.
 
 {'─' * 62}
-{BOLD}6. FINAL TERMS{RESET}
+{BOLD}7. FINAL TERMS{RESET}
 
-By using any part of DELTA 2.0, you agree to these terms.
+By using any part of DELTA PLANT, you agree to these terms.
 
 Violation of this license may result in termination of usage
 rights and legal action.
@@ -674,9 +692,9 @@ rights and legal action.
         print(f"""
 {BOLD}
 ╔══════════════════════════════════════════════════════╗
-║          D E L T A  AI  A G E N T  v2.0              ║
-║     Diagnosi Evolutiva Leaf & Terra Assessment       ║
-║          Raspberry Pi 5 + AI HAT 2+                  ║
+║         DELTA Plant - AI & Robotics Orchestrator     ║
+║            per la Salute delle Piante                ║
+║               Raspberry Pi 5 + AI HAT 2+             ║
 ╚══════════════════════════════════════════════════════╝
 {DIM}Copyright © 2026 Paolo Ciccolella. All rights reserved.{RESET}
 """)

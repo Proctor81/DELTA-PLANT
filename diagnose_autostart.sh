@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DELTA AI Agent — Diagnostica Autostart su Raspberry Pi
+# DELTA Plant — Diagnostica Autostart su Raspberry Pi
 # =============================================================================
 # Script per verificare e risolvere problemi di avvio automatico del servizio.
 # Eseguire come root per test completi.

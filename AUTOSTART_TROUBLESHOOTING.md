@@ -206,7 +206,7 @@ sudo systemctl status delta
 
 Output atteso se funziona:
 ```
-● delta.service - DELTA AI Agent — Diagnosi Piante & Bot Telegram
+● delta.service - DELTA Plant — AI & Robotics Orchestrator per la Salute delle Piante
      Loaded: loaded (/etc/systemd/system/delta.service; enabled; vendor preset: disabled)
      Active: active (running) since ...
 ```

@@ -96,12 +96,16 @@ class PlantInference:
         out_scale, out_zero = out_quant[0], out_quant[1]
 
         if out_scale != 0:
-            probabilities = (raw_output.astype(np.float32) - out_zero) * out_scale
+            vector = (raw_output.astype(np.float32) - out_zero) * out_scale
         else:
-            probabilities = raw_output.astype(np.float32)
+            vector = raw_output.astype(np.float32)
 
-        # Softmax se non già normalizzato
-        probabilities = self._softmax(probabilities[0])
+        vector = vector[0]
+        # Non applicare softmax una seconda volta se il modello ha già output normalizzato.
+        if float(np.min(vector)) >= 0.0 and abs(float(np.sum(vector)) - 1.0) < 0.05:
+            probabilities = vector.astype(np.float32)
+        else:
+            probabilities = self._softmax(vector)
 
         return self._build_result(probabilities, labels)
 
@@ -110,9 +114,28 @@ class PlantInference:
     # ─────────────────────────────────────────────
 
     def _build_result(self, probabilities: np.ndarray, labels: List[str]) -> Dict[str, Any]:
-        """Costruisce il dizionario risultato dalla distribuzione di probabilità."""
+        """Costruisce il dizionario risultato dalla distribuzione di probabilità.
+
+        v3.0: If confidence < low_confidence_threshold, triggers class 39 fallback
+        """
         top_idx = int(np.argmax(probabilities))
         confidence = float(probabilities[top_idx])
+
+        # Usa la soglia configurata per il fallback di bassa confidenza.
+        low_conf_threshold = float(MODEL_CONFIG.get("low_confidence_threshold", 0.50))
+        if confidence < low_conf_threshold:
+            # Classe sintetica: non è un indice reale del modello.
+            return {
+                "class": "Classe_NonClassificato",
+                "confidence": confidence,
+                "class_index": -1,
+                "top3": [],
+                "above_threshold": False,
+                "simulated": False,
+                "fallback": True,  # NEW: v3.0 flag
+                "requires_chat": True,  # Suggest chat with AI
+                "requires_agronomy": True,  # Suggest expert
+            }
 
         # Top-3 predizioni
         top3_indices = np.argsort(probabilities)[::-1][:3]
@@ -131,6 +154,7 @@ class PlantInference:
             "top3": top3,
             "above_threshold": confidence >= self._conf_threshold,
             "simulated": False,
+            "fallback": False,  # Normal classification
         }
 
     def _resolve_labels(self, label_set: Optional[str]) -> List[str]:

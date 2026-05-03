@@ -1,7 +1,7 @@
 """
 DELTA - interface/github_publisher.py
 ======================================
-Pubblicazione automatica di DELTA 2.0 su GitHub con un solo click.
+Pubblicazione automatica di DELTA Plant su GitHub con un solo click.
 
 Raccoglie automaticamente dal software:
   - Versione, descrizione e feature dal codice sorgente
@@ -83,7 +83,7 @@ def _collect_git_info() -> Dict[str, Any]:
     info["repo_url"] = url
     # Owner e nome repo
     parts = url.rstrip("/").split("/")
-    info["repo_name"] = parts[-1] if parts else "DELTA-2.0"
+    info["repo_name"] = parts[-1] if parts else "DELTA-PLANT"
     info["owner"]     = parts[-2] if len(parts) >= 2 else "Proctor81"
     return info
 
@@ -233,9 +233,9 @@ def _generate_readme(
     Non include dati operativi locali (diagnosi, statistiche DB):
     rimangono esclusivamente sull'installazione locale.
     """
-    repo_url  = git.get("repo_url",  "https://github.com/Proctor81/DELTA-2.0")
+    repo_url  = git.get("repo_url",  "https://github.com/Proctor81/DELTA-PLANT")
     owner     = git.get("owner",     "Proctor81")
-    repo_name = git.get("repo_name", "DELTA-2.0")
+    repo_name = git.get("repo_name", "DELTA-PLANT")
     now       = datetime.now().strftime("%d/%m/%Y %H:%M")
     labels    = model.get("labels", [])
     n_classes = model.get("n_classes", len(labels))
@@ -259,7 +259,7 @@ def _generate_readme(
     # Dipendenze
     reqs_md = "\n".join(f"- `{r}`" for r in reqs) or "- *(requirements.txt non trovato)*"
 
-    readme = f"""# 🌿 DELTA — AI Agent per la Salute delle Piante
+    readme = f"""# 🌿 DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante
 
 {badges}
 
@@ -366,7 +366,7 @@ sudo reboot
 
 ```bash
 git clone {repo_url}
-cd DELTA-2.0
+cd DELTA-PLANT
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -397,7 +397,7 @@ delta
 ##  Struttura del progetto
 
 ```
-DELTA-2.0/
+DELTA-PLANT/
 ├── main.py                  # Entry point
 ├── ai/                      # Inference TFLite + preflight + training
 ├── core/                    # Agent, config, auth
@@ -441,7 +441,7 @@ quantificazione del rischio agronomico composito:
 
 ## 📖 Documentazione
 
-Il manuale utente completo (52 pagine, PDF) è generabile con:
+Il manuale utente completo (PDF, ~63 pagine) è generabile con:
 
 ```bash
 python Manuale/genera_manuale.py

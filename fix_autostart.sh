@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DELTA AI Agent — Quick Recovery / Reset del servizio
+# DELTA Plant — Quick Recovery / Reset del servizio
 # =============================================================================
 # Script rapido per risolvere problemi di autostart senza riconfigurare tutto.
 # Utile quando il servizio è già installato ma non si avvia correttamente.

@@ -1,12 +1,12 @@
-# 🌿 DELTA Plant Disease Classifier - Model Card v2.0
+# 🌿 DELTA Plant Disease Classifier - Model Card v3.0
 
 ## Model Overview
 
-**Model Name:** plant_disease_model_39classes  
-**Version:** 2.0 (10-epoch optimized)  
+**Model Name:** plant_disease_model_39classes_v3_leafonly  
+**Version:** 3.0 (Leaf-Only Orchestrated AI)  
 **Release Date:** 2026-05-03  
 **License:** Creative Commons BY-SA 4.0 (Scientific Research)  
-**Citation:** DELTA AI Agent | PlantVillage Dataset | MobileNetV2 Backbone
+**Citation:** DELTA Plant v3.0 | PlantVillage Dataset | MobileNetV2 Backbone (Leaf-Only)
 
 ---
 
@@ -15,9 +15,9 @@
 ### Architecture
 - **Backbone:** MobileNetV2 (ImageNet pre-trained weights)
 - **Input Shape:** 224×224×3 (RGB images)
-- **Output:** 38-class softmax (disease classification)
-- **Total Parameters:** 2,623,073
-- **Model Size:** 14 MB (Keras) / 2.8 MB (TFLite)
+- **Preprocessing:** MobileNetV2 standard — `(x / 127.5) - 1.0` → range [-1, 1]
+- **Output:** 33-class softmax (disease classification)
+- **Model Size:** 14 MB (Keras) / 5.0 MB (TFLite float16)
 
 ### Training Configuration
 ```
@@ -33,19 +33,21 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 
 ## Performance Metrics
 
-### Overall Accuracy
-| Metric | Value |
+### Benchmark Reale — PlantVillage (2026-05-03)
+| Metrica | Valore |
 |--------|-------|
-| **Training Accuracy** | 87.43% |
-| **Training Loss** | 0.3839 |
-| **Validation Accuracy** | ~86.5% |
-| **Inference Speed (TFLite)** | <200ms (RPi5) |
+| **Accuratezza top-1** | **83.9%** (554/660 immagini) |
+| **Accuratezza top-3** | **96.1%** (634/660 immagini) |
+| **Classi ≥95% top-1** | 17/33 |
+| **Classi problematiche (<50%)** | 2/33 (Tomato_Bacterial_spot 15%, Tomato_Early_blight 40%) |
+| **Bassa confidenza (<50%)** | 7.6% delle predizioni |
+| **Velocità inferenza (TFLite RPi5)** | ~180ms (XNNPACK delegate) |
+| **Dataset benchmark** | 660 img PlantVillage (20/classe) |
 
 ### Bell Pepper Classification (Priority Class)
 - **Samples:** 7,425 images (7.8% of training set)
 - **Classes:** Bacterial_spot (2,991) + healthy (4,434)
-- **Expected Precision:** 92-94%
-- **Expected Recall:** 90-93%
+- **Benchmark Precision:** 100% (Bacterial_spot) / 95% (healthy)
 
 ---
 
@@ -61,14 +63,15 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 ```
 Tomato (9 classes)      | Potato (3 classes)
 Grape (4 classes)       | Corn (4 classes)
-Strawberry (2 classes)  | Squash (1 class)
-Apple (4 classes)       | Blueberry (1 class)
-Cherry (2 classes)      | Peach (2 classes)
-Bell Pepper (2 classes) | Wheat (3 classes)
+Apple (4 classes)       | Strawberry (2 classes)
+Bell Pepper (2 classes) | Cherry (2 classes)
+Squash (1 class)        | Blueberry (1 class)
+Peach (1 class)
 ```
+**Totale: 33 classi** (Wheat escluso — non presente nel modello)
 
 ### Data Preprocessing
-- Rescaling: 1/255 normalization
+- Rescaling MobileNetV2: `(x / 127.5) - 1.0` (range [-1, 1])
 - Rotation: ±20°
 - Width/Height Shift: ±20%
 - Zoom: ±20%
@@ -109,21 +112,24 @@ confidence = predictions[0][class_idx]
 
 ### TensorFlow Lite (Optimized for Edge)
 ```python
-import tensorflow as tf
 import numpy as np
+from ai_edge_litert.interpreter import Interpreter
 
-interpreter = tf.lite.Interpreter("models/plant_disease_model_39classes.tflite")
+interpreter = Interpreter("models/plant_disease_model_39classes.tflite")
 interpreter.allocate_tensors()
 
-# Prepare input
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
-input_image = np.random.rand(1, 224, 224, 3).astype(np.float32)
+
+# Preprocessing MobileNetV2: float32, range [-1, 1]
+image = load_image_224x224()  # numpy uint8 HWC
+input_image = (image.astype(np.float32) / 127.5) - 1.0
+input_image = np.expand_dims(input_image, axis=0)
 
 # Inference
 interpreter.set_tensor(input_details[0]['index'], input_image)
 interpreter.invoke()
-output = interpreter.get_tensor(output_details[0]['index'])
+output = interpreter.get_tensor(output_details[0]['index'])  # shape [1, 33]
 ```
 
 ---
@@ -132,9 +138,10 @@ output = interpreter.get_tensor(output_details[0]['index'])
 
 1. **Dataset Bias:** PlantVillage images are controlled conditions (limited outdoor variability)
 2. **Resolution:** Optimized for 224×224 images (may reduce accuracy on higher resolutions)
-3. **Crop Coverage:** 38/39 intended classes (one class unavailable in PlantVillage)
+3. **Crop Coverage:** 33 classes (Wheat and other PlantVillage classes not included in this model)
 4. **Thermal Constraints:** RPi5 thermal throttling may reduce inference speed in hot environments
 5. **Lighting Conditions:** Model trained on varied lighting but may struggle with extreme conditions
+6. **Inter-class confusion:** Tomato spot diseases (Bacterial_spot, Early_blight, Septoria, Target_Spot) are morphologically similar — top-3 accuracy (96.1%) recommended for clinical use
 
 ---
 
@@ -159,13 +166,14 @@ Dataset: PlantVillage v2.0 (spMohanty/PlantVillage-Dataset)
 
 ### Citation
 ```bibtex
-@software{delta2024,
-  title={DELTA: AI-Powered Plant Disease Classification System},
-  author={DELTA AI Agent},
+@software{delta2026,
+  title={DELTA Plant: AI-Powered Plant Disease Classification System},
+  author={Ciccolella, Paolo},
   year={2026},
-  url={https://github.com/your-repo/DELTA},
-  dataset={PlantVillage Dataset},
-  license={Creative Commons BY-SA 4.0}
+  url={https://github.com/Proctor81/DELTA-PLANT},
+  dataset={PlantVillage Dataset (spMohanty/PlantVillage-Dataset)},
+  license={Proprietary (Scientific Research Use)},
+  note={33-class MobileNetV2 TFLite float16; top-1 83.9\%, top-3 96.1\% on 660-image benchmark}
 }
 ```
 
@@ -173,10 +181,10 @@ Dataset: PlantVillage v2.0 (spMohanty/PlantVillage-Dataset)
 
 ## Contact & Support
 
-- **Repository:** [GitHub Link - To Be Updated]
+- **Repository:** [https://github.com/Proctor81/DELTA-PLANT](https://github.com/Proctor81/DELTA-PLANT)
 - **Dataset Source:** [PlantVillage GitHub](https://github.com/spMohanty/PlantVillage-Dataset)
-- **License:** CC BY-SA 4.0
-- **Last Updated:** 2026-05-03
+- **License:** Proprietary (Scientific Research Use — see LICENSE)
+- **Last Updated:** 2026-05-03 (benchmark reale 33 classi, 660 immagini)
 
 ---
 

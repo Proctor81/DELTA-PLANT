@@ -2,7 +2,7 @@
 DELTA - setup_raspberry.py
 ===========================
 Script Python interattivo per la configurazione post-installazione
-di DELTA AI Agent su Raspberry Pi 5 con Raspberry Pi OS.
+di DELTA Plant su Raspberry Pi 5 con Raspberry Pi OS.
 Richiede Python 3.12+
     python setup_raspberry.py
 
@@ -238,7 +238,7 @@ def generate_manual():
 
 def print_summary(camera_backend):
     header("Configurazione completata")
-    print(f"\n  {GREEN}{BOLD}DELTA AI Agent è pronto per l'uso!{RESET}")
+    print(f"\n  {GREEN}{BOLD}DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante è pronto per l'uso!{RESET}")
     print(f"\n  Directory:  {ROOT}")
     print(f"  Camera:     {camera_backend or 'non disponibile — modalità cartella attiva'}")
     print(f"  Input img:  {ROOT / 'input_images'}")
@@ -256,7 +256,7 @@ def print_summary(camera_backend):
 def main():
     print(f"\n{BOLD}{BLUE}")
     print("╔══════════════════════════════════════════════════════╗")
-    print("║     DELTA AI Agent — Setup Raspberry Pi 5            ║")
+    print("║     DELTA Plant — Setup Raspberry Pi 5               ║")
     print("╚══════════════════════════════════════════════════════╝")
     print(RESET)
 

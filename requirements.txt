@@ -1,4 +1,4 @@
-# DELTA AI Agent - Dipendenze Python
+# DELTA Plant - Dipendenze Python
 # Target: Raspberry Pi 5 (16GB) + AI HAT 2+ | Python consigliato: 3.10-3.12
 # Nota: TensorFlow/tflite-runtime potrebbero non avere wheel per Python >=3.13
 # ─────────────────────────────────────────────────────────────

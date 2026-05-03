@@ -220,9 +220,9 @@ confidence = output[0][prediction]
 ```bibtex
 @software{delta2026_model,
   title={DELTA: AI-Powered Plant Disease Classification System (v2.0.6)},
-  author={DELTA AI Agent},
+  author={DELTA Plant},
   year={2026},
-  url={https://github.com/Proctor81/DELTA-2.0},
+  url={https://github.com/Proctor81/DELTA-PLANT},
   dataset={PlantVillage Dataset v2.0},
   model={MobileNetV2 Transfer Learning},
   accuracy={0.8743},

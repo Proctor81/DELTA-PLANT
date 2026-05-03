@@ -9,6 +9,19 @@ from typing import Dict, Any, List, Tuple
 
 from core.config import SENSOR_CONFIG
 
+
+def _is_healthy_label(label: str) -> bool:
+    """Riconosce le classi sane in modo robusto (italiano + PlantVillage)."""
+    normalized = (label or "").strip().lower()
+    if not normalized:
+        return False
+
+    healthy_aliases = {"sano", "fiore_sano", "frutto_sano", "healthy"}
+    if normalized in healthy_aliases:
+        return True
+
+    return normalized.endswith("_healthy") or normalized.endswith("_sano")
+
 # ─────────────────────────────────────────────
 # LIVELLI DI RISCHIO
 # ─────────────────────────────────────────────
@@ -225,9 +238,8 @@ class AiDiseaseRule(DiagnosisRule):
 
     def evaluate(self, sensor_data, ai_result) -> bool:
         cls = ai_result.get("class", "Sano")
-        confidence = ai_result.get("confidence", 0.0)
         above_threshold = ai_result.get("above_threshold", False)
-        return cls != "Sano" and above_threshold
+        return (not _is_healthy_label(cls)) and above_threshold
 
 
 class AiLowConfidenceRule(DiagnosisRule):
@@ -475,9 +487,23 @@ def evaluate_all_rules(
     """
     Valuta tutte le regole e restituisce quelle attivate,
     ordinate per priorità decrescente.
+
+    v3.0: Exclude flower/fruit rules in leaf-only mode
     """
+    from core.config import ORGAN_CONFIG
+    leaf_only_mode = ORGAN_CONFIG.get("leaf_only_mode", False)
+
+    # In v3.0 leaf-only mode, skip flower and fruit rules
+    if leaf_only_mode:
+        # Filter to only leaf rules (indices 0-11)
+        rules_to_evaluate = [r for r in ALL_RULES
+                            if not (r.rule_id.startswith('FLOW_') or
+                                   r.rule_id.startswith('FRUT_'))]
+    else:
+        rules_to_evaluate = ALL_RULES
+
     activated = [
-        rule for rule in ALL_RULES
+        rule for rule in rules_to_evaluate
         if rule.evaluate(sensor_data, ai_result)
     ]
     activated.sort(key=lambda r: RISK_PRIORITY.get(r.risk_level, 0), reverse=True)

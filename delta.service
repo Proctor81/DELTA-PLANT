@@ -1,5 +1,5 @@
 # ============================================================
-# DELTA AI Agent — Unità systemd
+# DELTA PLANT — Unità systemd
 # ============================================================
 # Installazione rapida (da eseguire come root):
 #
@@ -11,7 +11,7 @@
 # ============================================================
 
 [Unit]
-Description=DELTA AI Agent — Diagnosi Piante & Bot Telegram @DELTAPLANO_bot
+Description=DELTA Plant — AI & Robotics Orchestrator per la Salute delle Piante
 Documentation=file:///DELTA_DIR/Manuale/DELTA_Manuale_Utente.pdf
 # Attende che la rete (con connettività reale) sia disponibile
 # prima di avviare il bot Telegram.

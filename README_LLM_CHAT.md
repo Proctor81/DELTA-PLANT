@@ -1,4 +1,4 @@
-# DELTA-2.0 Conversational AI Extension
+# DELTA Plant — Conversational AI Extension
 
 ## Architettura
 

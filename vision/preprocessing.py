@@ -59,12 +59,11 @@ class Preprocessor:
         # ── 3. BGR → RGB (TFLite addestrato su RGB) ──────────
         rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
 
-        # ── 4. uint8 [0, 255] - adatto a INT8 quantizzato ────
-        if rgb.dtype != np.uint8:
-            rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+        # ── 4. MobileNetV2 preprocessing: [0,255] → [-1, 1] float32 ──
+        normalized = (rgb.astype(np.float32) / 127.5) - 1.0
 
         # ── 5. Aggiungi dimensione batch ─────────────────────
-        batched = np.expand_dims(rgb, axis=0)  # (1, H, W, 3)
+        batched = np.expand_dims(normalized, axis=0)  # (1, H, W, C)
 
         return batched
 

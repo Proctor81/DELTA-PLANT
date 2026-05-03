@@ -647,6 +647,13 @@ async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
 
+    # v3.0: Prevent chat during active diagnosis (manual sensor input phase)
+    if context.user_data.get("diagnosis_active"):
+        await _send(update,
+            "⏳ Una diagnosi è in corso. Completa prima con /annulla oppure attendi il termine.\n\n"
+            "La chat è disabilitata durante l'acquisizione dati sensori per evitare interferenze.")
+        return ConversationHandler.END
+
     engine = _get_chat_engine(context)
     status = engine.get_status()
     hf_ok = status.get("hf_token_valid", False)
@@ -898,6 +905,10 @@ SENSOR_FIELDS: List[Tuple[str, str]] = [
 async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+
+    # v3.0: Set diagnosis_active flag to inhibit chat during manual input
+    context.user_data["diagnosis_active"] = True
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📷 Invia foto", callback_data=DIAG_IMAGE_UPLOAD)],
         [InlineKeyboardButton("🖼 Usa ultima immagine", callback_data=DIAG_IMAGE_LAST)],

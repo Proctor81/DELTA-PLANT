@@ -1,17 +1,17 @@
-# 🌿 DELTA — AI Agent per la Salute delle Piante
+# 🌿 DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red?logo=raspberry-pi)
-![AI](https://img.shields.io/badge/AI-TFLite%20INT8-orange)
+![AI](https://img.shields.io/badge/AI-TFLite%20float16-orange)
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
-![Version](https://img.shields.io/badge/Version-v2.0.6--MODEL-green)
-![Classes](https://img.shields.io/badge/Classes-38%20(PlantVillage)-blue)
-![Accuracy](https://img.shields.io/badge/Accuracy-87.43%25-success)
+![Version](https://img.shields.io/badge/Version-v3.0--LEAF--ONLY-green)
+![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
+![Accuracy](https://img.shields.io/badge/Accuracy-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
 
 
+> **DELTA Plant** — *AI & Robotics Orchestrator per la Salute delle Piante*  
 > **DELTA** (Detection and Evaluation of Leaf Troubles and Anomalies)  
-> Sistema embedded di intelligenza artificiale per il monitoraggio fitosanitario in tempo reale  
-> su **Raspberry Pi 5** con **AI HAT 2+**.
+> Sistema AI orchestrato specializzato nella diagnostica fitosanitaria fogliare su **Raspberry Pi 5** — v3.0 Leaf-Only Architecture
 
 ---
 
@@ -34,8 +34,8 @@
 
 | Funzionalità | Descrizione |
 |---|---|
-| **Analisi multi-organo** | Foglie, fiori e frutti rilevati simultaneamente via HSV multi-range |
-| **38 classi diagnostiche** | Modello PlantVillage MobileNetV2 — TFLite INT8 — 2.8 MB — 87.43% accuracy |
+| **Analisi fogliare esclusiva** | Diagnostica 33 classi di malattie/patologie fogliari via MobileNetV2 transfer learning |
+| **Input sensori manuale** | Utente invia foto + 7 dati sensori (TEMP, UMID, PRESS, LUMI, CO₂, pH, EC) |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
 | **7 sensori ambientali** | Temperatura, Umidità, Pressione, Luce, CO₂, pH, EC via I2C |
@@ -67,35 +67,38 @@ main.py ──► DeltaAgent
 
 | Parametro | Valore |
 |---|---|
-| Formato | TensorFlow Lite INT8 (MobileNetV2 transfer learning) |
-| Dimensione Keras | 14 MB (precision) |
-| Dimensione TFLite | 2.8 MB (quantized) |
-| Input shape | `(224, 224, 3)` |
-| Accuracy (Training) | 87.43% |
-| Accuracy (Validation) | ~86.5% |
-| Inferenza (RPi5) | 150ms |
-| Soglia confidenza | 65% |
-| Soglia preflight gate | 50% |
+| Formato | TensorFlow Lite float16 (MobileNetV2 transfer learning) |
+| Dimensione Keras | 14 MB |
+| Dimensione TFLite | 5.0 MB (float16) |
+| Input shape | `(224, 224, 3)` — preprocessing MobileNetV2: `(x/127.5)−1.0` |
+| Classi output | 33 classi PlantVillage |
+| Accuracy top-1 | **83.9%** (554/660 img, benchmark PlantVillage) |
+| Accuracy top-3 | **96.1%** (634/660 img, benchmark PlantVillage) |
+| Inferenza (RPi5) | ~180ms (XNNPACK delegate) |
+| Soglia confidenza | 50% (fallback Classe_NonClassificato) |
 | Thread inferenza | 4 |
 
-### Classi diagnostiche — 38 PlantVillage Crops
+### Classi diagnostiche — 33 classi PlantVillage
 
-| Crop Type | Classes | Priority |
-|-----------|---------|----------|
-| **Bell Pepper** | 2 (Healthy, Bacterial Spot) | 🔴 **HIGH** |
-| **Tomato** | 9 (Leaf Mold, Septoria, Bacterial Spot, Blight, Mosaic, etc.) | 🟡 Medium |
-| **Grape** | 4 (Leaf Blight, Black Rot, Esca, Isariopsis) | 🟡 Medium |
-| **Apple** | 4 (Cedar Rust, Black Rot, Rust, Scab) | 🟢 Low |
-| **Corn** | 4 (Gray Leaf Spot, Common Rust, Northern Leaf Blight, Cercospora) | 🟢 Low |
-| **Potato** | 3 (Early Blight, Late Blight, Healthy) | 🟡 Medium |
-| **Strawberry** | 2 (Leaf Scorch, Powdery Mildew) | 🟢 Low |
-| **Squash** | 1 (Powdery Mildew) | 🟢 Low |
-| **Blueberry** | 1 (Leaf Scorch) | 🟢 Low |
-| **Cherry** | 2 (Powdery Mildew, Healthy) | 🟢 Low |
-| **Peach** | 2 (Bacterial Spot, Healthy) | 🟢 Low |
-| **Wheat** | 3 (Loose Smut, Septoria, Brown Rust) | 🟢 Low |
+| Crop Type | Classi | Accuracy benchmark | Priorità |
+|-----------|--------|--------------------|----------|
+| **Bell Pepper** | 2 (Bacterial Spot, Healthy) | 100% / 95% | 🔴 **HIGH** |
+| **Tomato** | 9 (Bacterial Spot, Early Blight, Late Blight, Leaf Mold, Mosaic Virus, Septoria, Target Spot, Yellow Leaf Curl, Healthy) | 15%–100% | 🟡 Medium |
+| **Grape** | 4 (Black Rot, Esca, Leaf Blight, Healthy) | 65%–100% | 🟡 Medium |
+| **Apple** | 4 (Apple Scab, Black Rot, Cedar Rust, Healthy) | 55%–90% | 🟢 Low |
+| **Corn** | 4 (Cercospora, Common Rust, Northern Leaf Blight, Healthy) | 70%–95% | 🟢 Low |
+| **Potato** | 3 (Early Blight, Late Blight, Healthy) | 85%–90% | 🟡 Medium |
+| **Strawberry** | 2 (Leaf Scorch, Healthy) | 100% | 🟢 Low |
+| **Squash** | 1 (Powdery Mildew) | 100% | 🟢 Low |
+| **Blueberry** | 1 (Healthy) | 100% | 🟢 Low |
+| **Cherry** | 2 (Powdery Mildew, Healthy) | 95% | 🟢 Low |
+| **Peach** | 1 (Healthy) | 100% | 🟢 Low |
 
-**Total:** 38 granular disease classes
+**Totale:** 33 classi — benchmark reale su 660 immagini PlantVillage (20/classe, 2026-05-03)
+
+> ℹ️ Le classi con bassa accuratezza (es. Tomato_Bacterial_spot 15%, Tomato_Early_blight 40%) presentano
+> confusioni morfologiche inter-classe tipiche di macchie fogliari visivamente simili.
+> L'accuratezza top-3 è **96.1%** — la classe corretta appare quasi sempre tra le prime 3 predizioni.
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 
@@ -120,7 +123,7 @@ main.py ──► DeltaAgent
 ### Raspberry Pi 5 (raccomandato)
 
 ```bash
-git clone https://github.com/Proctor81/DELTA-2.0 ~/DELTA
+git clone https://github.com/Proctor81/DELTA-PLANT ~/DELTA
 cd ~/DELTA
 chmod +x install_raspberry.sh
 sudo ./install_raspberry.sh
@@ -130,8 +133,8 @@ sudo reboot
 ### Manuale (qualsiasi sistema)
 
 ```bash
-git clone https://github.com/Proctor81/DELTA-2.0
-cd DELTA-2.0
+git clone https://github.com/Proctor81/DELTA-PLANT
+cd DELTA-PLANT
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -178,7 +181,7 @@ sudo bash fix_autostart.sh --hard-reset      # Recovery totale
 ##  Struttura del progetto
 
 ```
-DELTA-2.0/
+DELTA-PLANT/
 ├── main.py                  # Entry point
 ├── ai/                      # Inference TFLite + preflight + training
 ├── core/                    # Agent, config, auth
@@ -231,7 +234,7 @@ quantificazione del rischio agronomico composito:
 
 ## 📖 Documentazione
 
-Il manuale utente completo (52 pagine, PDF) è generabile con:
+Il manuale utente completo (PDF, ~63 pagine) è generabile con:
 
 ```bash
 python Manuale/genera_manuale.py
@@ -242,8 +245,16 @@ python Manuale/genera_manuale.py
 
 ## 📄 Licenza
 
-Software proprietario — Copyright © 2026 Paolo Ciccolella. All rights reserved.  
-Non è consentita la ridistribuzione o il riutilizzo senza autorizzazione scritta.
+**DELTA PLANT SOFTWARE LICENSE** — Software Release: **v3.0**  
+Copyright © 2026 Paolo Ciccolella. All rights reserved.
+
+Il core di DELTA Plant è software proprietario. È consentito l'uso a scopi di
+**ricerca scientifica e accademica non commerciale**, mantenendo intatte le note
+di copyright, citando l'autore in pubblicazioni e report e senza ridistribuire
+il core proprietario o build derivate proprietarie.
+
+L'uso commerciale richiede un accordo scritto separato con l'autore.  
+Il testo integrale è nel file [`LICENSE`](LICENSE) del repository.
 
 ---
 
@@ -273,10 +284,17 @@ Non è consentita la ridistribuzione o il riutilizzo senza autorizzazione scritt
 
 ### Optimization Details
 - **Architecture:** MobileNetV2 (ImageNet pre-trained)
-- **Fine-tuning:** Frozen backbone + custom head (Dense 256→128→38)
+- **Fine-tuning:** Frozen backbone + custom head (Dense 256→128→33)
 - **Callbacks:** EarlyStopping (patience=10), ReduceLROnPlateau
 - **Training Time:** ~24 hours (RPi5 4-core)
 
+### Benchmark indipendente (2026-05-03)
+- **Dataset:** 660 immagini PlantVillage (20/classe, tutte e 33 le classi)
+- **Accuratezza top-1:** 83.9% (554/660)
+- **Accuratezza top-3:** 96.1% (634/660)
+- **Tempo inferenza medio:** ~180ms/img (XNNPACK CPU delegate)
+- **Classi ≥95%:** 17/33 — **Classi <50%:** 2/33 (Tomato_Bacterial_spot, Tomato_Early_blight)
+
 ---
 
-*README generato automaticamente da DELTA v2.0.6 — 03/05/2026 08:15*
+*README aggiornato con risultati benchmark reale — 03/05/2026*

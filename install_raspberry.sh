@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DELTA AI Agent — Installazione automatica Raspberry Pi 5
+# DELTA Plant — Installazione automatica Raspberry Pi 5
 # Compatibile con: Raspberry Pi OS (64-bit, Bookworm o superiore)
 # Richiede Python 3.12+
 # Hardware target: Raspberry Pi 5 (4/8/16 GB) + AI HAT 2+
@@ -38,7 +38,7 @@ PYTHON_MIN="3.12"
 SERVICE_NAME="delta"
 VENV_DIR="${DELTA_DIR}/.venv"
 
-header "DELTA AI Agent — Setup Raspberry Pi 5"
+header "DELTA Plant — Setup Raspberry Pi 5"
 echo ""
 info "Utente target:     ${DELTA_USER}"
 info "Directory target:  ${DELTA_DIR}"
@@ -215,7 +215,7 @@ else
     # Fallback: generazione inline
     cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=DELTA AI Agent — Diagnosi Piante & Bot Telegram @DELTAPLANO_bot
+Description=DELTA Plant — AI & Robotics Orchestrator per la Salute delle Piante
 Documentation=file://${DELTA_DIR}/Manuale/DELTA_Manuale_Utente.pdf
 After=network-online.target
 Wants=network-online.target
@@ -255,7 +255,7 @@ header "9/9  Creazione script di avvio rapido"
 LAUNCHER="/usr/local/bin/delta"
 cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash
-# Avvio rapido DELTA AI Agent
+# Avvio rapido DELTA Plant
 cd "${DELTA_DIR}"
 exec "${VENV_DIR}/bin/python" "${DELTA_DIR}/main.py" "\$@"
 EOF
@@ -265,7 +265,7 @@ ok "Comando rapido disponibile: 'delta' (da qualsiasi directory)"
 # ─── Riepilogo finale ─────────────────────────────────────────────────────────
 header "Installazione completata"
 echo ""
-echo -e "${GREEN}${BOLD}DELTA AI Agent è stato installato correttamente!${RESET}"
+echo -e "${GREEN}${BOLD}DELTA Plant è stato installato correttamente!${RESET}"
 echo ""
 echo "  Directory:   ${DELTA_DIR}"
 echo "  Python venv: ${VENV_DIR}"

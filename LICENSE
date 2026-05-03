@@ -1,12 +1,14 @@
-DELTA 2.0 SOFTWARE LICENSE
+DELTA PLANT SOFTWARE LICENSE
 
 Copyright © 2026 Paolo Ciccolella. All rights reserved.
+Software Release: v3.0
+(This release field must be updated at each official software release.)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. CORE SYSTEM (PROPRIETARY)
 
-The DELTA 2.0 core system, including but not limited to:
+The DELTA PLANT core system, including but not limited to:
   • main control software
   • sensor management system
   • automation engine
@@ -25,7 +27,7 @@ Any unauthorized use of the core system is strictly prohibited.
 
 2. MODULES / EXTENSIONS (OPEN SOURCE COMPONENTS)
 
-Certain modules, plugins, or SDK components of DELTA 2.0 may be released
+Certain modules, plugins, or SDK components of DELTA PLANT may be released
 under open-source licenses (such as MIT or Apache 2.0).
 
 These components are clearly marked in their respective directories.
@@ -69,9 +71,25 @@ THE SOFTWARE.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-5. COMMERCIAL USE
+5. SCIENTIFIC RESEARCH USE
 
-Commercial use of the DELTA 2.0 core system requires a separate written
+Scientific and academic research use of the DELTA PLANT core system is allowed
+only for non-commercial purposes, subject to all terms in this license.
+
+For research use, you must:
+  • keep all copyright and license notices intact
+  • provide clear attribution to the author in publications and reports
+  • use the software in compliance with applicable laws and ethical standards
+  • avoid redistributing proprietary core code or derivative proprietary builds
+
+Research use does NOT grant ownership or relicensing rights on the DELTA PLANT
+proprietary core system.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. COMMERCIAL USE
+
+Commercial use of the DELTA PLANT core system requires a separate written
 license agreement with the author.
 
 Open-source modules may be used commercially according to their respective
@@ -79,9 +97,9 @@ licenses.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-6. FINAL TERMS
+7. FINAL TERMS
 
-By using any part of DELTA 2.0, you agree to these terms.
+By using any part of DELTA PLANT, you agree to these terms.
 
 Violation of this license may result in termination of usage rights and
 legal action.

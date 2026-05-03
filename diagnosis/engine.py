@@ -50,6 +50,7 @@ class DiagnosisEngine:
         organ_analyses = organ_analyses or {}
 
         # Arricchisci ai_result con informazioni organi per le regole
+        # v3.0: Flower/fruit enrichment disabled in leaf-only mode
         enriched_ai = dict(ai_result)
         if "fiore" in organ_analyses:
             enriched_ai["flower_detected"] = True
@@ -117,6 +118,19 @@ class DiagnosisEngine:
     @staticmethod
     def _determine_plant_status(ai_result: Dict[str, Any], overall_risk: str) -> str:
         """Determina lo stato generale della pianta in linguaggio naturale."""
+        def is_healthy_label(label: str) -> bool:
+            normalized = (label or "").strip().lower()
+            if not normalized:
+                return False
+            healthy_aliases = {"sano", "fiore_sano", "frutto_sano", "healthy"}
+            if normalized in healthy_aliases:
+                return True
+            return normalized.endswith("_healthy") or normalized.endswith("_sano")
+
+        def is_crop_specific_healthy(label: str) -> bool:
+            normalized = (label or "").strip().lower()
+            return normalized.endswith("_healthy") and normalized not in {"healthy"}
+
         ai_class = ai_result.get("class", "Sano")
         above_threshold = ai_result.get("above_threshold", False)
 
@@ -129,16 +143,18 @@ class DiagnosisEngine:
 
         if overall_risk == "critico":
             return "Critico"
-        elif ai_class == "Sano" and flower_cls == "Fiore_sano" and fruit_cls == "Frutto_sano":
+        elif is_healthy_label(ai_class) and is_healthy_label(flower_cls) and is_healthy_label(fruit_cls):
+            if is_crop_specific_healthy(ai_class) and overall_risk in (RISK_NONE, "basso"):
+                return "Sano con verifica specie"
             if overall_risk in (RISK_NONE, "basso"):
                 return "Ottimale"
             elif overall_risk == "medio":
                 return "Buono con riserva"
-        elif ai_class != "Sano" and above_threshold:
+        elif (not is_healthy_label(ai_class)) and above_threshold:
             return f"Patologico - {ai_class}"
-        elif flower_cls != "Fiore_sano" and flower_result.get("above_threshold", False):
+        elif (not is_healthy_label(flower_cls)) and flower_result.get("above_threshold", False):
             return f"Fiore compromesso - {flower_cls}"
-        elif fruit_cls != "Frutto_sano" and fruit_result.get("above_threshold", False):
+        elif (not is_healthy_label(fruit_cls)) and fruit_result.get("above_threshold", False):
             return f"Frutto compromesso - {fruit_cls}"
         elif overall_risk == "alto":
             return "Compromesso"
@@ -168,6 +184,11 @@ class DiagnosisEngine:
         lines.append(
             f"Analisi foglia{sim_note}: '{cls}' con confidenza {conf:.1f}%."
         )
+        if str(cls).strip().lower().endswith("_healthy"):
+            lines.append(
+                "Nota: classe healthy specifica di coltura. Se la specie osservata non coincide,"
+                " trattare il risultato come indicativo e richiedere verifica manuale."
+            )
 
         # AI Vision — fiore
         if "fiore" in organ_analyses:

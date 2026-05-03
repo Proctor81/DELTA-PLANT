@@ -1,6 +1,6 @@
 """
 DELTA - main.py
-Entry point dell'applicazione DELTA AI Agent.
+Entry point dell'applicazione DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante.
 Inizializza tutti i moduli, avvia i thread e lancia l'interfaccia utente.
 """
 
@@ -87,7 +87,7 @@ from ai.preflight_validator import validate_model_artifacts, PreflightGateError
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="DELTA AI Agent")
+    parser = argparse.ArgumentParser(description="DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante")
     parser.add_argument(
         "--preflight",
         action="store_true",
@@ -151,7 +151,7 @@ def main():
     """Funzione principale di avvio DELTA."""
     args = _build_parser().parse_args()
     _acquire_pid_lock()
-    logger.info("═══ AVVIO DELTA AI AGENT ═══")
+    logger.info("═══ AVVIO DELTA PLANT ORCHESTRATOR ═══")
 
     if args.preflight or args.preflight_only:
         try:
@@ -226,7 +226,7 @@ def main():
             logger.critical("Errore critico non gestito: %s", exc, exc_info=True)
         finally:
             agent.shutdown()
-            logger.info("═══ DELTA AI AGENT SPENTO ═══")
+            logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
     else:
         if args.daemon:
             print("[DEBUG] Modalità daemon: CLI disabilitata. Processo in attesa.")
@@ -241,7 +241,7 @@ def main():
             logger.info("Interruzione utente (CTRL+C).")
         finally:
             agent.shutdown()
-            logger.info("═══ DELTA AI AGENT SPENTO ═══")
+            logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
 
 
 if __name__ == "__main__":

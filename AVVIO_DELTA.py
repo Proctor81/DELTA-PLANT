@@ -44,7 +44,8 @@ def _print_splash() -> None:
     print(r"  ╚═════╝ ╚══════╝╚══════╝╚═╝   ╚═╝  ╚═╝")
     print(f"{R}")
     print(f"  {W}Detection and Evaluation of Leaf Troubles and Anomalies{R}")
-    print(f"  {D}Versione 2.0  |  Raspberry Pi 5 + AI HAT 2+  |  Multi-Organ + Quantum Oracle{R}")
+    print(f"  {D}DELTA Plant - AI & Robotics Orchestrator per la Salute delle Piante{R}")
+    print(f"  {D}Versione 3.0  |  Raspberry Pi 5 + AI HAT 2+{R}")
     print(f"  {'─' * 65}\n")
 
 

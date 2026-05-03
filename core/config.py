@@ -27,7 +27,7 @@ for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEA
 # ─────────────────────────────────────────────
 MODEL_CONFIG = {
     "model_path": str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
-    "labels_path": str(MODELS_DIR / "labels_39classes.txt"),
+    "labels_path": str(MODELS_DIR / "labels_33classes_correct.txt"),
     "validation_image_path": str(MODELS_DIR / "validation_sample.jpg"),
     "preflight_min_confidence": 0.50,  # Soglia minima preflight gate di deploy
     "input_size": (224, 224),          # WxH
@@ -36,8 +36,9 @@ MODEL_CONFIG = {
     "low_confidence_threshold": 0.50,  # Soglia active learning
     "num_threads": 4,                  # Thread inferenza NPU/CPU
     "use_edge_tpu": True,              # Raspberry Pi AI HAT 2+
-    "model_version": "v2.0.6",         # 38-class PlantVillage MobileNetV2
+    "model_version": "v3.0-33c",      # 33-class PlantVillage MobileNetV2 (leaf-only)
     "model_accuracy": 0.8743,          # Training accuracy
+    "leaf_only_mode": True,            # v3.0: Focus on leaf diseases only
 }
 
 # ─────────────────────────────────────────────
@@ -48,7 +49,7 @@ MODEL_CONFIG = {
 MODELS_REGISTRY: dict = {
     "generale": {
         "model_path":   str(MODELS_DIR / "plant_disease_model.tflite"),
-        "labels_path":  str(MODELS_DIR / "labels.txt"),
+        "labels_path":  str(MODELS_DIR / "labels_generale.txt"),
         "description":  "Classificatore generale malattie piante (PlantVillage)",
         "input_size":   (224, 224),
         "num_classes":  7,
@@ -235,8 +236,8 @@ ORGAN_CONFIG = {
     },
     # Soglie confidenza rilevamento organo
     "detection_confidence": 0.15,   # % area immagine minima per rilevare organo
-    "enable_flower_analysis": True,
-    "enable_fruit_analysis": True,
+    "enable_flower_analysis": False,  # DISABLED in v3.0 (leaf-only focus)
+    "enable_fruit_analysis": False,   # DISABLED in v3.0 (leaf-only focus)
 }
 
 # ─────────────────────────────────────────────

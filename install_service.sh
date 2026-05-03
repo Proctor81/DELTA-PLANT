@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DELTA AI Agent — Installazione servizio systemd (autostart al boot)
+# DELTA Plant — Installazione servizio systemd (autostart al boot)
 # =============================================================================
 # Installa e abilita il servizio systemd che avvia automaticamente DELTA
 # (incluso il bot Telegram @DELTAPLANO_bot) ad ogni accensione del Raspberry Pi.
@@ -56,7 +56,7 @@ if [[ "${1:-}" == "--remove" ]]; then
 fi
 
 # ─── Banner ───────────────────────────────────────────────────────────────────
-header "DELTA AI Agent — Installazione autostart"
+header "DELTA Plant — Installazione autostart"
 info "Directory progetto:  ${DELTA_DIR}"
 info "Utente di esecuzione: ${DELTA_USER}"
 info "Python venv:         ${VENV_PYTHON}"

@@ -1,6 +1,6 @@
 """
 DELTA - core/agent.py
-Orchestratore principale del sistema AI Agent.
+Orchestratore principale del sistema DELTA Plant.
 Coordina sensori, visione artificiale, AI e diagnosi tramite multithreading.
 """
 
@@ -33,7 +33,7 @@ logger = logging.getLogger("delta.agent")
 
 class DeltaAgent:
     """
-    AI Agent principale DELTA.
+    Orchestratore principale DELTA Plant.
     Gestisce il ciclo di vita completo: acquisizione dati,
     inferenza, diagnosi e raccomandazioni.
     """
@@ -166,28 +166,32 @@ class DeltaAgent:
 
         # ── 5. Segmentazione fiore (se rilevato) ─────────────
         organ_analyses: Dict[str, Any] = {}
-        if organ_results.get("fiore") and organ_results["fiore"].detected:
-            flower_roi = organ_results["fiore"].roi
-            if flower_roi is not None:
-                flower_processed = self.preprocessor.prepare_for_inference(flower_roi)
-                flower_ai = self.inference_engine.predict(
-                    flower_processed, sensor_data, label_set="flower"
-                )
-                organ_analyses["fiore"] = flower_ai
-                logger.info("Analisi fiore: %s (%.1f%%)",
-                            flower_ai.get("class"), flower_ai.get("confidence", 0) * 100)
+        # v3.0: Flower analysis disabled in leaf-only mode
+        if not MODEL_CONFIG.get("leaf_only_mode", False):
+            if organ_results.get("fiore") and organ_results["fiore"].detected:
+                flower_roi = organ_results["fiore"].roi
+                if flower_roi is not None:
+                    flower_processed = self.preprocessor.prepare_for_inference(flower_roi)
+                    flower_ai = self.inference_engine.predict(
+                        flower_processed, sensor_data, label_set="flower"
+                    )
+                    organ_analyses["fiore"] = flower_ai
+                    logger.info("Analisi fiore: %s (%.1f%%)",
+                                flower_ai.get("class"), flower_ai.get("confidence", 0) * 100)
 
         # ── 6. Segmentazione frutto (se rilevato) ────────────
-        if organ_results.get("frutto") and organ_results["frutto"].detected:
-            fruit_roi = organ_results["frutto"].roi
-            if fruit_roi is not None:
-                fruit_processed = self.preprocessor.prepare_for_inference(fruit_roi)
-                fruit_ai = self.inference_engine.predict(
-                    fruit_processed, sensor_data, label_set="fruit"
-                )
-                organ_analyses["frutto"] = fruit_ai
-                logger.info("Analisi frutto: %s (%.1f%%)",
-                            fruit_ai.get("class"), fruit_ai.get("confidence", 0) * 100)
+        # v3.0: Fruit analysis disabled in leaf-only mode
+        if not MODEL_CONFIG.get("leaf_only_mode", False):
+            if organ_results.get("frutto") and organ_results["frutto"].detected:
+                fruit_roi = organ_results["frutto"].roi
+                if fruit_roi is not None:
+                    fruit_processed = self.preprocessor.prepare_for_inference(fruit_roi)
+                    fruit_ai = self.inference_engine.predict(
+                        fruit_processed, sensor_data, label_set="fruit"
+                    )
+                    organ_analyses["frutto"] = fruit_ai
+                    logger.info("Analisi frutto: %s (%.1f%%)",
+                                fruit_ai.get("class"), fruit_ai.get("confidence", 0) * 100)
 
         # ── 7. Preprocessing foglia ───────────────────────────
         processed = self.preprocessor.prepare_for_inference(target_image)
@@ -197,7 +201,10 @@ class DeltaAgent:
         logger.info("Inferenza AI foglia: %s (%.1f%%)",
                     ai_result["class"], ai_result["confidence"] * 100)
 
-        # ── 9. Active learning: bassa confidenza ─────────────
+        # ── 9. Active learning: bassa confidenza o healthy specifico ──
+        ai_class_norm = str(ai_result.get("class", "")).strip().lower()
+        crop_specific_healthy = ai_class_norm.endswith("_healthy") and ai_class_norm != "healthy"
+
         if ai_result["confidence"] < MODEL_CONFIG["low_confidence_threshold"]:
             if ai_result.get("simulated"):
                 logger.info("Confidenza bassa (%.1f%%) su output simulato — nessun modello reale.",
@@ -205,6 +212,12 @@ class DeltaAgent:
             else:
                 logger.warning("Confidenza bassa (%.1f%%) - richiesto input utente.",
                                ai_result["confidence"] * 100)
+            ai_result["needs_human_review"] = True
+        elif crop_specific_healthy:
+            logger.info(
+                "Classe healthy specifica (%s): attivo revisione umana per verifica specie.",
+                ai_result.get("class"),
+            )
             ai_result["needs_human_review"] = True
         else:
             ai_result["needs_human_review"] = False

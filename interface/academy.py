@@ -535,7 +535,7 @@ class DeltaAcademy:
     def _tutorial_guidato(self):
         """Tutorial interattivo passo-passo per il primo utilizzo."""
         print(f"\n{BOLD}{'=' * 60}{RESET}")
-        print(f"{BOLD}{BLUE}  TUTORIAL GUIDATO — DELTA AI AGENT{RESET}")
+        print(f"{BOLD}{BLUE}  TUTORIAL GUIDATO — DELTA PLANT{RESET}")
         print(f"{BOLD}{'=' * 60}{RESET}")
 
         passi = [

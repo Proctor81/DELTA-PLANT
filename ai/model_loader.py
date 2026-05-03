@@ -142,6 +142,7 @@ class ModelLoader:
             self.interpreter.allocate_tensors()
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()
+            self._align_labels_with_output()
             self._backend = "edge_tpu"
             self._log_model_io_details()
             logger.info("Modello caricato su Edge TPU (AI HAT 2+).")
@@ -173,6 +174,7 @@ class ModelLoader:
             self.interpreter.allocate_tensors()
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()
+            self._align_labels_with_output()
             self._backend = f"cpu:{runtime}"
             self._log_model_io_details()
             logger.info("Modello TFLite caricato su CPU (%d thread).",
@@ -192,6 +194,48 @@ class ModelLoader:
                 exc,
                 version_hint,
             )
+
+    def _align_labels_with_output(self):
+        """Allinea il numero di etichette con il numero di classi in output del modello."""
+        if not self.output_details:
+            return
+
+        shape = self.output_details[0].get("shape")
+        if shape is None:
+            return
+
+        if len(shape) == 0:
+            return
+
+        try:
+            output_classes = int(shape[-1])
+        except (TypeError, ValueError):
+            return
+
+        if output_classes <= 0:
+            return
+
+        labels_count = len(self.labels)
+        if labels_count == output_classes:
+            return
+
+        if labels_count > output_classes:
+            logger.warning(
+                "Mismatch labels/output: labels=%d, output=%d. "
+                "Le etichette extra verranno ignorate.",
+                labels_count,
+                output_classes,
+            )
+            self.labels = self.labels[:output_classes]
+            return
+
+        logger.warning(
+            "Mismatch labels/output: labels=%d, output=%d. "
+            "Aggiungo etichette segnaposto mancanti.",
+            labels_count,
+            output_classes,
+        )
+        self.labels.extend(f"Classe_{i}" for i in range(labels_count, output_classes))
 
     def _log_model_io_details(self):
         """Log diagnostico completo su tensori di input/output del modello."""

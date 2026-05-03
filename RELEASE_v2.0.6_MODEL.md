@@ -169,9 +169,9 @@ Bell Pepper (2 classes)  | Wheat (3 classes)
 ```bibtex
 @software{delta2026,
   title={DELTA: AI-Powered Plant Disease Classification System},
-  author={DELTA AI Agent},
+  author={DELTA Plant},
   year={2026},
-  url={https://github.com/Proctor81/DELTA-2.0},
+  url={https://github.com/Proctor81/DELTA-PLANT},
   dataset={PlantVillage Dataset},
   model={MobileNetV2 Transfer Learning},
   license={Creative Commons BY-SA 4.0}
@@ -219,7 +219,7 @@ python -c "import flatbuffers; print('✓ TFLite support')"
 - **Model Card:** `MODEL_CARD.md` — Full scientific documentation
 - **Training Report:** `models/TRAINING_REPORT.json` — Detailed metrics
 - **Class Mapping:** `models/CLASS_MAPPING.csv` — Class indices and priorities
-- **Repository:** https://github.com/Proctor81/DELTA-2.0
+- **Repository:** https://github.com/Proctor81/DELTA-PLANT
 
 ---
 
