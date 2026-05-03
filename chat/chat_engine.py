@@ -5,6 +5,7 @@ Fallback automatico a TinyLlama locale se HF non disponibile.
 """
 import os
 import logging
+from pathlib import Path
 from memory.conversation_memory import ConversationMemory
 from llm.huggingface_llm import HuggingFaceLLM, DELTA_SYSTEM_PROMPT
 
@@ -30,9 +31,11 @@ class ChatEngine:
             model_name=os.environ.get("HF_MODEL_NAME", "mistralai/Mistral-7B-Instruct-v0.3"),
             max_tokens=512,
             temperature=0.65,
+            timeout=15,
         )
-        # Validazione token all'avvio (non bloccante)
-        self._hf_available = self._check_hf_token()
+        # Evita chiamate di rete sincrone in __init__: il bot Telegram deve
+        # potersi istanziare subito e tentare HF solo quando arriva un messaggio.
+        self._hf_available = bool(self._hf_llm.api_token)
         # LLM fallback locale (TinyLlama via llama.cpp)
         self._local_llm = None  # inizializzato lazy
 
@@ -48,6 +51,14 @@ class ChatEngine:
     def _get_local_llm(self):
         """Inizializza TinyLlama solo quando necessario (lazy)."""
         if self._local_llm is None:
+            model_path = Path(self.model_path) if self.model_path else None
+            llama_bin = Path("./llama.cpp/build/bin/llama-cli")
+            if not model_path or not model_path.is_file():
+                logger.warning("TinyLlama non disponibile: modello mancante (%s)", self.model_path)
+                return None
+            if not llama_bin.is_file():
+                logger.warning("TinyLlama non disponibile: binario assente (%s)", llama_bin)
+                return None
             try:
                 from llm.llama_cpp_wrapper import LlamaCppWrapper
                 self._local_llm = LlamaCppWrapper(self.model_path)
@@ -117,9 +128,11 @@ class ChatEngine:
                 for token in local_llm.generate(prompt):
                     tokens.append(token)
                 response = " ".join(tokens).strip()
-                if response:
+                if response and not response.startswith("[ERRORE llama.cpp]"):
                     self.memory.append(user_id, user_input, response)
                     return response
+                if response:
+                    logger.warning("TinyLlama fallback non riuscito: %s", response)
         except Exception as e:
             logger.error(f"Eccezione TinyLlama: {e}")
 

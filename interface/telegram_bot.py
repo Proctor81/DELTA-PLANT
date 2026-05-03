@@ -76,6 +76,11 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if not update.message or not update.message.text:
         logger.debug("free_chat_handler: messaggio vuoto o non testuale")
         return
+    # Inibisci la chat libera durante una diagnosi attiva (es. inserimento manuale sensori).
+    # I valori dei sensori non devono essere instradati all'LLM.
+    if context.user_data.get("diagnosis_active"):
+        logger.debug("free_chat_handler: diagnosi in corso, chat libera inibita")
+        return
     user_text = update.message.text.strip()
     user_id = update.effective_user.id if update.effective_user else None
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
@@ -87,7 +92,7 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
             deltachat_bot = DELTAPLANOBot("models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf")
             context.application.bot_data["deltaplano_bot"] = deltachat_bot
         logger.info(f"Instrado comando a DELTAPLANOBot: {user_text}")
-        response = deltachat_bot.handle_command(user_id, user_text)
+        response = await asyncio.to_thread(deltachat_bot.handle_command, user_id, user_text)
         logger.info(f"Risposta DELTAPLANOBot: {response}")
         await _send(update, response)
         return
@@ -98,7 +103,7 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         deltachat_bot = DELTAPLANOBot("models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf")
         context.application.bot_data["deltaplano_bot"] = deltachat_bot
     logger.info(f"Instrado messaggio a DELTAPLANOBot: {user_text}")
-    response = deltachat_bot.handle_message(user_id, user_text)
+    response = await asyncio.to_thread(deltachat_bot.handle_message, user_id, user_text)
     logger.info(f"Risposta DELTAPLANOBot: {response}")
     await _send(update, response)
 
@@ -206,10 +211,10 @@ def _load_allowed_usernames() -> Set[str]:
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            # Pulsante primario "Chiedi a DELTA" — chat intelligente HF LLM
+            # Pulsante primario "Chiedi a DELTA Plant" — chat intelligente HF LLM
             # Telegram non supporta colori CSS, ma il posizionamento in prima riga
             # e l'emoji distintiva lo rendono immediatamente visibile.
-            InlineKeyboardButton("🔵 💬 Chiedi a DELTA", callback_data=CMD_CHAT),
+            InlineKeyboardButton("🔵 💬 Chiedi a DELTA Plant", callback_data=CMD_CHAT),
         ],
         [
             InlineKeyboardButton("🆕 Diagnosi", callback_data=CMD_DIAGNOSE),
@@ -291,10 +296,133 @@ def _split_message(text: str, limit: int = 3500) -> List[str]:
     return chunks
 
 
-async def _send_long(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
+async def _send_long(
+    update: Update,
+    text: str,
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    parse_mode: Optional[str] = None,
+):
     chunks = _split_message(text)
     for idx, chunk in enumerate(chunks):
-        await _send(update, chunk, reply_markup if idx == 0 else None)
+        await _send(
+            update,
+            chunk,
+            reply_markup if idx == 0 else None,
+            parse_mode=parse_mode,
+        )
+
+
+async def _send_diagnosis_paginated(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    parse_mode: Optional[str] = None,
+):
+    """Invia la diagnosi in pagine: usa /continua se il testo e lungo."""
+    chunks = _split_message(text)
+    closing = "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂"
+
+    # Sovrascrive eventuale coda precedente per evitare pagine stale.
+    context.user_data.pop("diag_pending_chunks", None)
+    context.user_data.pop("diag_pending_parse_mode", None)
+    context.user_data.pop("diag_pending_closing", None)
+
+    if len(chunks) == 1:
+        await _send(update, chunks[0], parse_mode=parse_mode)
+        await _send(update, closing)
+        return
+
+    context.user_data["diag_pending_chunks"] = chunks[1:]
+    context.user_data["diag_pending_parse_mode"] = parse_mode
+    context.user_data["diag_pending_closing"] = closing
+
+    await _send(update, chunks[0], parse_mode=parse_mode)
+    await _send(update, "Messaggio lungo. Per continuare digita /continua.")
+
+
+async def _send_chat_paginated(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    parse_mode: Optional[str] = None,
+):
+    """Invia la risposta chat in pagine: usa /continua se il testo e lungo."""
+    chunks = _split_message(text)
+
+    context.user_data.pop("chat_pending_chunks", None)
+    context.user_data.pop("chat_pending_parse_mode", None)
+
+    if len(chunks) == 1:
+        await _send(update, chunks[0], reply_markup=reply_markup, parse_mode=parse_mode)
+        return
+
+    context.user_data["chat_pending_chunks"] = chunks[1:]
+    context.user_data["chat_pending_parse_mode"] = parse_mode
+
+    await _send(update, chunks[0], reply_markup=reply_markup, parse_mode=parse_mode)
+    await _send(update, "Messaggio lungo. Per continuare digita /continua.")
+
+
+async def _continue_pending(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    chunks_key: str,
+    parse_mode_key: str,
+    prompt_text: Optional[str] = None,
+    closing_key: Optional[str] = None,
+):
+    pending = context.user_data.get(chunks_key) or []
+    if not pending:
+        return False
+
+    parse_mode = context.user_data.get(parse_mode_key)
+    next_chunk = pending.pop(0)
+    await _send(update, next_chunk, parse_mode=parse_mode)
+
+    if pending:
+        context.user_data[chunks_key] = pending
+        if prompt_text:
+            await _send(update, prompt_text)
+        return True
+
+    context.user_data.pop(chunks_key, None)
+    context.user_data.pop(parse_mode_key, None)
+    if closing_key:
+        closing = context.user_data.pop(closing_key, "")
+        if closing:
+            await _send(update, closing)
+    return True
+
+
+async def continue_diagnosis_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Invia la pagina successiva di un messaggio lungo su richiesta /continua."""
+    if not await _guard(update):
+        return
+
+    progressed = await _continue_pending(
+        update,
+        context,
+        chunks_key="diag_pending_chunks",
+        parse_mode_key="diag_pending_parse_mode",
+        prompt_text="Per continuare digita /continua.",
+        closing_key="diag_pending_closing",
+    )
+    if progressed:
+        return
+
+    progressed = await _continue_pending(
+        update,
+        context,
+        chunks_key="chat_pending_chunks",
+        parse_mode_key="chat_pending_parse_mode",
+        prompt_text="Per continuare digita /continua.",
+    )
+    if progressed:
+        return
+
+    await _send(update, "Nessun contenuto in attesa. Avvia una nuova diagnosi o chat.")
 
 
 def _leaf_labels(agent) -> List[str]:
@@ -710,7 +838,12 @@ async def chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error("Errore chat LLM: %s", exc, exc_info=True)
         response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
 
-    await _send_long(update, response, reply_markup=_chat_exit_keyboard())
+    await _send_chat_paginated(
+        update,
+        context,
+        response,
+        reply_markup=_chat_exit_keyboard(),
+    )
     return STATE_CHAT_WAITING
 
 
@@ -749,11 +882,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     intro = (
         "Benvenuto in @DELTAPLANO_bot.\n"
-        "Qui puoi interagire con DELTA da Telegram per avviare diagnosi, "
+        "Qui puoi interagire con DELTA Plant da Telegram per avviare diagnosi, "
         "consultare report e leggere i dati sensori.\n"
         "Usa /menu per vedere le azioni disponibili."
     )
-    await _send(update, intro, reply_markup=_menu_keyboard())
     await _send(update, intro, reply_markup=_menu_keyboard())
 
 
@@ -931,6 +1063,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
     if query.data == DIAG_IMAGE_LAST:
         latest = _get_latest_input_image()
         if not latest:
+            context.user_data["diagnosis_active"] = False
             await _send(update, "Nessuna immagine in input_images. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = str(latest)
@@ -938,10 +1071,12 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
     if query.data == DIAG_IMAGE_CAMERA:
         agent = _get_agent(context)
         if not agent or agent.camera._backend is None:
+            context.user_data["diagnosis_active"] = False
             await _send(update, "Camera locale non disponibile. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = ""
         return await _ask_sensor_mode(update, context)
+    context.user_data["diagnosis_active"] = False
     await _send(update, "Scelta non valida.")
     return ConversationHandler.END
 
@@ -984,7 +1119,7 @@ async def choose_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if query.data == DIAG_SENSOR_MANUAL:
         context.user_data["sensor_data"] = {"source": "telegram_manual"}
         context.user_data["sensor_index"] = 0
-        await _send(update, f"Inserisci {SENSOR_FIELDS[0][1]} (vuoto per saltare):")
+        await _send(update, f"Inserisci {SENSOR_FIELDS[0][1]} (digita x per saltare):")
         return STATE_DIAG_TEMP
     await _send(update, "Scelta non valida.")
     return ConversationHandler.END
@@ -996,24 +1131,132 @@ async def manual_sensor_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not update.message:
         return STATE_DIAG_TEMP
     value_raw = update.message.text.strip()
+    is_skip = value_raw.lower() == "x"
     idx = int(context.user_data.get("sensor_index", 0))
     if idx >= len(SENSOR_FIELDS):
         return ConversationHandler.END
     key, label = SENSOR_FIELDS[idx]
-    if value_raw:
+    if value_raw and not is_skip:
         parsed = _parse_float(value_raw)
         if parsed is None:
-            await _send(update, f"Valore non valido. Inserisci {label} (o vuoto per saltare).")
+            await _send(update, f"Valore non valido. Inserisci {label} (oppure digita x per saltare).")
             return STATE_DIAG_TEMP
         context.user_data["sensor_data"][key] = parsed
     idx += 1
     context.user_data["sensor_index"] = idx
     if idx < len(SENSOR_FIELDS):
-        await _send(update, f"Inserisci {SENSOR_FIELDS[idx][1]} (vuoto per saltare):")
+        await _send(update, f"Inserisci {SENSOR_FIELDS[idx][1]} (digita x per saltare):")
         return STATE_DIAG_TEMP
     sensor_data = context.user_data.get("sensor_data", {})
     await _run_diagnosis(update, context, sensor_data)
     return ConversationHandler.END
+
+
+def _sanitize_diagnosis_opinion(opinion: str) -> str:
+    """Riduce aperture metalinguistiche poco utili nelle opinioni post-diagnosi."""
+    text = (opinion or "").strip()
+    if not text:
+        return text
+
+    lowered = text.lower()
+    bad_prefixes = (
+        "sembra che tu stia",
+        "mi sembra che tu stia",
+        "pare che tu stia",
+        "sembra che tu",
+        "pare che tu",
+    )
+    if lowered.startswith(bad_prefixes):
+        # Rimuove la prima frase metalinguistica e conserva la parte tecnica.
+        parts = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)
+        if len(parts) == 2 and parts[1].strip():
+            return parts[1].strip()
+        return (
+            "Valutazione agronomica: la diagnosi AI e compatibile con il quadro osservato, "
+            "ma va confermata con rilievo in campo su distribuzione delle lesioni, progressione "
+            "dei sintomi e condizioni microclimatiche. "
+            "Priorita operative: riduzione stress ambientale, intervento fitosanitario mirato "
+            "secondo etichetta, e monitoraggio strutturato a 24-48 ore e a 7 giorni."
+        )
+
+    return text
+
+
+def _build_diagnosis_prompt(record: Dict[str, Any]) -> str:
+    """Costruisce il prompt per un unico messaggio AI di risultato diagnosi."""
+    dx = record.get("diagnosis", {})
+    ai = record.get("ai_result", {})
+    recs = record.get("recommendations", [])
+    sensor = record.get("sensor_snapshot", {})
+    quantum_risk = dx.get("quantum_risk", {})
+
+    ai_class = ai.get("class", "N/D")
+    ai_conf = ai.get("confidence", 0)
+    risk = dx.get("overall_risk", "N/D")
+    status = dx.get("plant_status", "N/D")
+    explanation = dx.get("explanation", "")
+    qrs = quantum_risk.get("quantum_risk_score", 0.0) if quantum_risk else 0.0
+    qdom = quantum_risk.get("dominant_description", "") if quantum_risk else ""
+    anomalies = sensor.get("_anomalies", [])
+    top_recs = recs[:3] if recs else []
+    rec_text = "; ".join(
+        f"{r.get('category','?').upper()}: {r.get('action','')}" for r in top_recs
+    )
+    anomaly_text = ", ".join(anomalies) if anomalies else "nessuna"
+
+    raw_report = re.sub(r"<[^>]+>", "", _format_diagnosis_full(record))
+    return (
+        "Trasforma il report seguente in un UNICO messaggio finale per l'utente, "
+        "in italiano, con stile professionale da agronomo esperto, dettagliato ma chiaro.\n\n"
+        f"REPORT RAW RISULTATO DIAGNOSI DELTA:\n{raw_report}\n\n"
+        "Vincoli obbligatori:\n"
+        "- Non usare frasi metalinguistiche (es: 'Sembra che tu stia chiedendo').\n"
+        "- Non ripetere il titolo del report.\n"
+        "- Struttura in 5 blocchi: 1) Esito tecnico, 2) Diagnosi differenziale breve, "
+        "3) Azioni immediate (0-24h), 4) Azioni a breve (2-7 giorni), "
+        "5) Monitoraggio e prevenzione.\n"
+        "- Fornisci indicazioni operative concrete e verificabili (cosa osservare, quando ricontrollare, "
+        "quali parametri dare priorita).\n"
+        "- Se appropriato, indica pratiche di difesa integrata e igiene colturale.\n"
+        "- Mantieni tono tecnico-professionale, senza essere prolisso.\n"
+        "- Mantieni coerenza con: "
+        f"classe={ai_class}, confidenza={ai_conf*100:.1f}%, stato={status}, rischio={risk}, "
+        f"QRS={qrs:.4f}, evento_dominante={qdom}, anomalie={anomaly_text}, raccomandazioni={rec_text if rec_text else 'nessuna'}."
+    )
+
+
+async def _send_ai_diagnosis_opinion(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    record: Dict[str, Any],
+):
+    """Genera e invia il messaggio unico AI di risultato diagnosi."""
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    prompt = _build_diagnosis_prompt(record)
+
+    def _ask():
+        return engine.chat(user_id, prompt)
+
+    try:
+        opinion = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        logger.warning("Errore opinione AI post-diagnosi: %s", exc)
+        return
+
+    opinion = _sanitize_diagnosis_opinion(opinion)
+
+    await _send_diagnosis_paginated(
+        update,
+        context,
+        f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
+        parse_mode="HTML",
+    )
 
 
 async def _run_diagnosis(
@@ -1023,6 +1266,7 @@ async def _run_diagnosis(
 ):
     agent = _get_agent(context)
     if not agent:
+        context.user_data["diagnosis_active"] = False
         await _send(update, "Errore sistema: agent non disponibile.")
         return
 
@@ -1031,18 +1275,25 @@ async def _run_diagnosis(
     if image_path:
         image = _load_image_from_path(Path(image_path))
         if image is None:
+            context.user_data["diagnosis_active"] = False
             await _send(update, "Impossibile caricare l'immagine.")
             return
     try:
         record = await asyncio.to_thread(agent.run_diagnosis, sensor_data=sensor_data, image=image)
     except Exception as exc:
         logger.error("Errore diagnosi Telegram: %s", exc, exc_info=True)
-        await _send(update, "Errore durante la diagnosi.")
+        context.user_data["diagnosis_active"] = False
+        await _send(update, "❌ Errore durante la diagnosi. La chat è nuovamente disponibile.")
         return
 
-    await _send(update, _format_diagnosis_full(record), parse_mode="HTML")
+    # Riattiva la chat prima di inviare i risultati
+    context.user_data["diagnosis_active"] = False
+
     if record.get("diagnosis", {}).get("needs_human_review") and image_path:
         await _prompt_label_review(update, context, Path(image_path))
+
+    # Messaggio finale unico (risultato + valutazione tecnica AI)
+    await _send_ai_diagnosis_opinion(update, context, record)
 
 
 def _labels_keyboard(prefix: str, labels: List[str]) -> InlineKeyboardMarkup:
@@ -1910,21 +2161,22 @@ async def _academy_lab(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def run_telegram_bot(agent=None):
     """
-    Avvia il bot Telegram in un thread daemon separato.
-    Richiede TELEGRAM_CONFIG["enable_telegram"] = True.
+    Costruisce l'Application Telegram e registra tutti gli handler.
+    Restituisce l'Application (o None se disabilitato/errore).
+    Il polling deve essere avviato dal main thread tramite serve_telegram_polling().
     """
     if not TELEGRAM_CONFIG.get("enable_telegram", False):
         logger.info("Bot Telegram disabilitato nella configurazione.")
-        return
+        return None
 
     if not TELEGRAM_AVAILABLE:
         logger.error("python-telegram-bot non installato. Bot Telegram non disponibile.")
-        return
+        return None
 
     token = _get_token()
     if not token:
         logger.error("Token Telegram mancante (env %s).", TELEGRAM_CONFIG.get("token_env"))
-        return
+        return None
 
     if not API_CONFIG.get("enable_api", False):
         logger.warning("API REST disabilitata: il bot potrebbe non funzionare.")
@@ -1934,9 +2186,12 @@ def run_telegram_bot(agent=None):
     # Forza la creazione della cartella logs/ se non esiste
     import os
     os.makedirs("logs", exist_ok=True)
-    application = Application.builder().token(token).build()
-    application.bot_data["agent"] = agent
-    logger.info("[DEBUG] run_telegram_bot: Application e bot_data inizializzati")
+
+    # NB: l'oggetto Application viene costruito dentro il worker thread
+    # (vedi _serve sotto), perché PTB v20+ lega le primitive asyncio
+    # (HTTPXRequest, Lock interni) all'event loop corrente al momento del
+    # builder.build(). Costruirlo nel main thread e usarlo in un altro loop
+    # produce deadlock silenziosi sul long-poll.
 
     diagnosis_handler = ConversationHandler(
         entry_points=[
@@ -1963,7 +2218,10 @@ def run_telegram_bot(agent=None):
             STATE_DIAG_TEMP: [MessageHandler(filters.TEXT & ~filters.COMMAND, manual_sensor_input)],
             ConversationHandler.TIMEOUT: [MessageHandler(filters.ALL, timeout)],
         },
-        fallbacks=[CommandHandler("annulla", cancel)],
+        fallbacks=[
+            CommandHandler("continua", continue_diagnosis_message),
+            CommandHandler("annulla", cancel),
+        ],
         conversation_timeout=TELEGRAM_CONFIG.get("conversation_timeout_sec", 300),
         allow_reentry=True,
     )
@@ -1998,7 +2256,39 @@ def run_telegram_bot(agent=None):
         allow_reentry=True,
     )
 
-    logger.info("[DEBUG] run_telegram_bot: Registrazione handler Telegram in corso...")
+    chat_conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("chat", chat_start),
+            CallbackQueryHandler(chat_start, pattern=f"^{CMD_CHAT}$"),
+        ],
+        states={
+            STATE_CHAT_WAITING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, chat_message),
+                CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"),
+                CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("continua", continue_diagnosis_message),
+            CommandHandler("chiudi", chat_command_chiudi),
+            CommandHandler("annulla", cancel),
+            CommandHandler("menu", menu),
+        ],
+        conversation_timeout=TELEGRAM_CONFIG.get("chat_timeout_sec", 600),
+        allow_reentry=True,
+    )
+
+    logger.info("[DEBUG] run_telegram_bot: ConversationHandler costruiti, costruzione Application")
+
+    _conflict_handled = False
+
+    # Application + handlers vengono costruiti sul thread chiamante.
+    # In modalità daemon, main.py chiamerà serve_telegram_polling() sul main thread,
+    # dove run_polling() funziona correttamente (PTB v20+ è main-thread bound).
+    application = Application.builder().token(token).build()
+    application.bot_data["agent"] = agent
+    logger.info("[DEBUG] run_telegram_bot: Application e bot_data inizializzati")
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu))
     application.add_handler(CommandHandler("report", report))
@@ -2012,39 +2302,10 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("academy", academy_start))
     application.add_handler(CommandHandler("license", license_text))
     application.add_handler(CommandHandler("batch", batch_analyze))
-    # ── ConversationHandler per Diagnosi, Upload e Chat PRIMA dei callback globali ──
-    # Questo assicura che i loro entry_point abbiano priorità
     application.add_handler(diagnosis_handler)
     application.add_handler(upload_handler)
-
-    # ── Chat intelligente "Chiedi a DELTA" ──────────────────────────────────────
-    chat_conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("chat", chat_start),
-            CallbackQueryHandler(chat_start, pattern=f"^{CMD_CHAT}$"),
-        ],
-        states={
-            STATE_CHAT_WAITING: [
-                # Messaggi di testo: risposta LLM
-                MessageHandler(filters.TEXT & ~filters.COMMAND, chat_message),
-                # Callback bottoni integrati nella chat
-                CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"),
-                CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"),
-            ],
-        },
-        fallbacks=[
-            CommandHandler("chiudi", chat_command_chiudi),
-            CommandHandler("annulla", cancel),
-            CommandHandler("menu", menu),
-        ],
-        conversation_timeout=TELEGRAM_CONFIG.get("chat_timeout_sec", 600),
-        allow_reentry=True,
-    )
     application.add_handler(chat_conv_handler)
-    # ── Callback globali dopo i ConversationHandler ──
-    application.add_handler(
-        CallbackQueryHandler(menu_callback, pattern=r"^CMD_")
-    )
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
     application.add_handler(
         CallbackQueryHandler(handle_label_callback, pattern=r"^(LABEL_TRAIN_|LABEL_REVIEW_|UPLOAD_SKIP_LABEL)")
     )
@@ -2052,22 +2313,15 @@ def run_telegram_bot(agent=None):
     application.add_handler(CallbackQueryHandler(finetune_load_callback, pattern=r"^FINETUNE_LOAD_LEAF$"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pending_label_name_router), group=2)
-    # Handler globale per chat libera:
-    # 1. /chat è gestito dal chat_conv_handler (ConversationHandler sopra)
-    # 2. CHAT_EXIT / CHAT_RESET fuori conversazione (ignore silenzioso)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
     application.add_handler(CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"))
     application.add_handler(CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"))
-    # 3. Messaggi di testo non comando: attiva la chat libera SOLO se non in conversazione guidata
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
-    logger.info("[DEBUG] run_telegram_bot: Handler per chat libera registrato (group=99)")
-
-    _conflict_handled = False
+    logger.info("[DEBUG] run_telegram_bot: free_chat_handler registrato (group=99)")
 
     async def _error_handler(update, context) -> None:
         nonlocal _conflict_handled
         from telegram.error import BadRequest, Conflict, NetworkError, TimedOut
         err = context.error
-        # Query callback scadute (>60 s) o già risposte: non è un errore critico
         if isinstance(err, BadRequest) and (
             "query is too old" in str(err).lower()
             or "query id is invalid" in str(err).lower()
@@ -2075,25 +2329,15 @@ def run_telegram_bot(agent=None):
             logger.debug("Bot Telegram: callback query scaduta o già risposta (ignorata): %s", err)
             return
         if isinstance(err, Conflict):
-            if _conflict_handled:
-                return
-            _conflict_handled = True
-            logger.error(
-                "Bot Telegram: conflitto di polling — un'altra istanza di DELTA è attiva. "
-                "Il bot verrà fermato. Chiudere le istanze duplicate e riavviare DELTA."
-            )
-            # Ferma prima l'Updater (polling HTTP), poi l'Application
-            try:
-                updater = context.application.updater
-                if updater is not None and updater.running:
-                    await updater.stop()
-            except Exception:
-                pass
-            try:
-                if context.application.running:
-                    await context.application.stop()
-            except Exception:
-                pass
+            # NON spegnere il bot su Conflict: potrebbe essere transitorio
+            # (probe curl, riavvio in corso). PTB ritenta automaticamente.
+            if not _conflict_handled:
+                _conflict_handled = True
+                logger.warning(
+                    "Bot Telegram: conflitto di polling temporaneo "
+                    "(altra istanza o probe esterno). PTB ritenterà."
+                )
+            return
         elif isinstance(err, (NetworkError, TimedOut)):
             logger.warning("Bot Telegram: errore di rete temporaneo: %s", err)
         else:
@@ -2101,15 +2345,24 @@ def run_telegram_bot(agent=None):
 
     application.add_error_handler(_error_handler)
 
-    def _serve():
-        logger.info("[DEBUG] run_telegram_bot: Avvio polling Telegram...")
+    logger.info("Bot Telegram pronto: pronto per polling sul main thread.")
+    return application
+
+
+def serve_telegram_polling(application) -> None:
+    """
+    Avvia application.run_polling() sul thread chiamante (deve essere il main thread).
+    Bloccante: ritorna solo allo shutdown.
+    """
+    if application is None:
+        return
+    logger.info("[DEBUG] serve_telegram_polling: avvio run_polling sul main thread")
+    try:
         application.run_polling(
             poll_interval=TELEGRAM_CONFIG.get("poll_interval_sec", 1.0),
             allowed_updates=Update.ALL_TYPES,
-            stop_signals=(),
+            close_loop=False,
+            stop_signals=None,  # signal handler già gestito da main.py
         )
-
-    import threading
-    thread = threading.Thread(target=_serve, name="TelegramBot", daemon=True)
-    thread.start()
-    logger.info("Bot Telegram avviato in polling.")
+    except Exception as exc:
+        logger.error("Polling Telegram terminato con errore: %s", exc, exc_info=True)

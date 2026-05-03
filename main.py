@@ -23,6 +23,7 @@ import logging
 import argparse
 import time
 import atexit
+import threading
 
 # ── Carica variabili da .env se presente ─────────────────────
 _ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -76,7 +77,7 @@ def _acquire_pid_lock() -> None:
 from core.agent import DeltaAgent
 from interface.cli import CLI
 from interface.api import run_api
-from interface.telegram_bot import run_telegram_bot
+from interface.telegram_bot import run_telegram_bot, serve_telegram_polling
 from bot.deltaplano_bot import DELTAPLANOBot
 
 # Percorso modello LLM TinyLlama GGUF
@@ -147,6 +148,55 @@ def _run_preflight(validation_image: str, min_confidence: float = 0.50):
     )
 
 
+def _run_cli(agent: DeltaAgent) -> None:
+    print("[DEBUG] Avvio CLI interattiva (menu principale)")
+    logger.info("Avvio CLI interattiva (menu principale)")
+    cli = CLI(agent)
+    try:
+        cli.run()
+    except KeyboardInterrupt:
+        logger.info("Interruzione utente (CTRL+C).")
+    except Exception as exc:
+        logger.critical("Errore critico non gestito: %s", exc, exc_info=True)
+
+
+def _run_runtime(agent: DeltaAgent, args: argparse.Namespace, telegram_app) -> None:
+    interactive_cli = sys.stdin.isatty() and not args.daemon
+
+    if interactive_cli:
+        if telegram_app is None:
+            _run_cli(agent)
+            return
+
+        logger.info(
+            "Bot Telegram attivo: CLI interattiva avviata in background; polling sul main thread."
+        )
+        cli_thread = threading.Thread(
+            target=_run_cli,
+            args=(agent,),
+            name="delta-cli",
+            daemon=True,
+        )
+        cli_thread.start()
+        serve_telegram_polling(telegram_app)
+        return
+
+    if args.daemon:
+        print("[DEBUG] Modalità daemon: CLI disabilitata.")
+        logger.info("Flag --daemon attivo: CLI disabilitata.")
+    else:
+        print("[DEBUG] STDIN non interattivo: CLI disabilitata.")
+        logger.info("STDIN non interattivo: CLI disabilitata.")
+
+    if telegram_app is not None:
+        # Polling Telegram sul main thread (PTB v20+ è main-thread bound).
+        serve_telegram_polling(telegram_app)
+        return
+
+    while True:
+        time.sleep(1)
+
+
 def main():
     """Funzione principale di avvio DELTA."""
     args = _build_parser().parse_args()
@@ -202,46 +252,24 @@ def main():
     run_api(agent)
 
     # ── Avvio bot Telegram (opzionale) ───────────────────────
-    run_telegram_bot(agent)
+    telegram_app = run_telegram_bot(agent)
 
-    # ── Avvio nuovo bot Telegram LLM/Vision (opzionale, demo) ─
-    if TELEGRAM_CONFIG.get("enable_telegram", False):
-        try:
-            deltachat_bot = DELTAPLANOBot(LLM_MODEL_PATH)
-            print("[DELTAPLANO_bot] Avviato (LLM/Vision hybrid)")
-            # TODO: Avvio polling/handler Telegram reale
-        except Exception as exc:
-            logger.error(f"Errore avvio DELTAPLANO_bot: {exc}")
+    # ── DELTAPLANO_bot demo: SKIP (TODO non implementato, MobileNetService blocca all'init).
+    # Il bot Telegram completo è già avviato sopra via run_telegram_bot.
+    # if TELEGRAM_CONFIG.get("enable_telegram", False):
+    #     try:
+    #         deltachat_bot = DELTAPLANOBot(LLM_MODEL_PATH)
+    #         print("[DELTAPLANO_bot] Avviato (LLM/Vision hybrid)")
+    #     except Exception as exc:
+    #         logger.error(f"Errore avvio DELTAPLANO_bot: {exc}")
 
-    # ── Interfaccia CLI ──────────────────────────────────────
-    if sys.stdin.isatty() and not args.daemon:
-        print("[DEBUG] Avvio CLI interattiva (menu principale)")
-        logger.info("Avvio CLI interattiva (menu principale)")
-        cli = CLI(agent)
-        try:
-            cli.run()
-        except KeyboardInterrupt:
-            logger.info("Interruzione utente (CTRL+C).")
-        except Exception as exc:
-            logger.critical("Errore critico non gestito: %s", exc, exc_info=True)
-        finally:
-            agent.shutdown()
-            logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
-    else:
-        if args.daemon:
-            print("[DEBUG] Modalità daemon: CLI disabilitata. Processo in attesa.")
-            logger.info("Flag --daemon attivo: CLI disabilitata. Processo in attesa.")
-        else:
-            print("[DEBUG] STDIN non interattivo: CLI disabilitata. Processo in attesa.")
-            logger.info("STDIN non interattivo: CLI disabilitata. Processo in attesa.")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Interruzione utente (CTRL+C).")
-        finally:
-            agent.shutdown()
-            logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
+    try:
+        _run_runtime(agent, args, telegram_app)
+    except KeyboardInterrupt:
+        logger.info("Interruzione utente (CTRL+C).")
+    finally:
+        agent.shutdown()
+        logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
 
 
 if __name__ == "__main__":
