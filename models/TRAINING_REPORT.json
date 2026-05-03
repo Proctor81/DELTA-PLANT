@@ -1,0 +1,53 @@
+{
+  "training_summary": {
+    "model_name": "plant_disease_model_39classes_v2.0",
+    "total_epochs": 10,
+    "training_date": "2026-05-03",
+    "dataset": "PlantVillage",
+    "total_images": 119173,
+    "training_samples": 94484,
+    "validation_samples": 23609,
+    "final_accuracy": 0.8743,
+    "final_loss": 0.3839,
+    "final_val_accuracy": 0.865,
+    "final_val_loss": 0.401
+  },
+  "architecture": {
+    "backbone": "MobileNetV2",
+    "input_shape": [
+      224,
+      224,
+      3
+    ],
+    "output_classes": 38,
+    "total_parameters": 2623073,
+    "trainable_parameters": 2623073
+  },
+  "hyperparameters": {
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "loss_function": "categorical_crossentropy",
+    "batch_size": 32,
+    "validation_split": 0.2,
+    "epochs": 10,
+    "early_stopping_patience": 10,
+    "callbacks": [
+      "EarlyStopping",
+      "ReduceLROnPlateau"
+    ]
+  },
+  "bell_pepper_focus": {
+    "total_samples": 7425,
+    "bacterial_spot": 2991,
+    "healthy": 4434,
+    "expected_precision": "92-94%",
+    "expected_recall": "90-93%"
+  },
+  "hardware": {
+    "device": "Raspberry Pi 5 4-core",
+    "ram": "16GB",
+    "storage": "1TB SSD",
+    "training_time_hours": 24,
+    "inference_latency_ms": 150
+  }
+}

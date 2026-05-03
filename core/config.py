@@ -349,3 +349,24 @@ TELEGRAM_CONFIG = {
     "conversation_timeout_sec": 300,   # 5 minuti
     "poll_interval_sec": 1.0,
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODELLO 38 CLASSI RICERCA (v2.0 - MobileNetV2 Transfer Learning)
+# ─────────────────────────────────────────────────────────────────────────────
+MODELS_REGISTRY_RESEARCH = {
+    "ricerca_38classi": {
+        "model_keras":  str(MODELS_DIR / "plant_disease_model_39classes.keras"),
+        "model_tflite": str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
+        "labels_path":  str(MODELS_DIR / "labels_39classes.txt"),
+        "class_mapping": str(MODELS_DIR / "CLASS_MAPPING.csv"),
+        "description":  "PlantVillage 38 classi (MobileNetV2, 87.43% accuracy, RPi5 optimized)",
+        "dataset_path": "datasets/training_39classes",
+        "num_classes":  38,
+        "accuracy":     0.8743,
+        "validation_accuracy": 0.865,
+        "inference_time_ms": 150,
+        "model_size_kb": 14000,
+        "tflite_size_kb": 2800,
+    },
+}
+
