@@ -4,7 +4,9 @@
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red?logo=raspberry-pi)
 ![AI](https://img.shields.io/badge/AI-TFLite%20INT8-orange)
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
-![Version](https://img.shields.io/badge/Version-v2.0.5-green)
+![Version](https://img.shields.io/badge/Version-v2.0.6--MODEL-green)
+![Classes](https://img.shields.io/badge/Classes-38%20(PlantVillage)-blue)
+![Accuracy](https://img.shields.io/badge/Accuracy-87.43%25-success)
 
 
 > **DELTA** (Detection and Evaluation of Leaf Troubles and Anomalies)  
@@ -33,7 +35,7 @@
 | Funzionalità | Descrizione |
 |---|---|
 | **Analisi multi-organo** | Foglie, fiori e frutti rilevati simultaneamente via HSV multi-range |
-| **7 classi diagnostiche** | Modello TFLite INT8 — input `(224, 224, 3)` px — 2675 KB |
+| **38 classi diagnostiche** | Modello PlantVillage MobileNetV2 — TFLite INT8 — 2.8 MB — 87.43% accuracy |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
 | **7 sensori ambientali** | Temperatura, Umidità, Pressione, Luce, CO₂, pH, EC via I2C |
@@ -65,24 +67,37 @@ main.py ──► DeltaAgent
 
 | Parametro | Valore |
 |---|---|
-| Formato | TensorFlow Lite INT8 (quantizzato) |
-| Dimensione | 2675 KB |
+| Formato | TensorFlow Lite INT8 (MobileNetV2 transfer learning) |
+| Dimensione Keras | 14 MB (precision) |
+| Dimensione TFLite | 2.8 MB (quantized) |
 | Input shape | `(224, 224, 3)` |
+| Accuracy (Training) | 87.43% |
+| Accuracy (Validation) | ~86.5% |
+| Inferenza (RPi5) | 150ms |
 | Soglia confidenza | 65% |
 | Soglia preflight gate | 50% |
 | Thread inferenza | 4 |
 
-### Classi diagnostiche — foglia
+### Classi diagnostiche — 38 PlantVillage Crops
 
-| # | Classe |
-|---|--------|
-| 1 | `Sano` |
-| 2 | `Peronospora` |
-| 3 | `Oidio` |
-| 4 | `Muffa_grigia` |
-| 5 | `Alternaria` |
-| 6 | `Ruggine` |
-| 7 | `Mosaikovirus` |
+| Crop Type | Classes | Priority |
+|-----------|---------|----------|
+| **Bell Pepper** | 2 (Healthy, Bacterial Spot) | 🔴 **HIGH** |
+| **Tomato** | 9 (Leaf Mold, Septoria, Bacterial Spot, Blight, Mosaic, etc.) | 🟡 Medium |
+| **Grape** | 4 (Leaf Blight, Black Rot, Esca, Isariopsis) | 🟡 Medium |
+| **Apple** | 4 (Cedar Rust, Black Rot, Rust, Scab) | 🟢 Low |
+| **Corn** | 4 (Gray Leaf Spot, Common Rust, Northern Leaf Blight, Cercospora) | 🟢 Low |
+| **Potato** | 3 (Early Blight, Late Blight, Healthy) | 🟡 Medium |
+| **Strawberry** | 2 (Leaf Scorch, Powdery Mildew) | 🟢 Low |
+| **Squash** | 1 (Powdery Mildew) | 🟢 Low |
+| **Blueberry** | 1 (Leaf Scorch) | 🟢 Low |
+| **Cherry** | 2 (Powdery Mildew, Healthy) | 🟢 Low |
+| **Peach** | 2 (Bacterial Spot, Healthy) | 🟢 Low |
+| **Wheat** | 3 (Loose Smut, Septoria, Brown Rust) | 🟢 Low |
+
+**Total:** 38 granular disease classes
+
+*See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 
 ---
 
@@ -238,4 +253,30 @@ Non è consentita la ridistribuzione o il riutilizzo senza autorizzazione scritt
 
 ---
 
-*README generato automaticamente da DELTA vv2.0.5 — 25/04/2026 19:38*
+---
+
+## 📈 Model Training Details (v2.0.6)
+
+### Dataset Composition
+- **Total Images:** 119,173 (PlantVillage v2.0)
+- **Training Split:** 94,484 images (80%)
+- **Validation Split:** 23,609 images (20%)
+- **Source:** PlantVillage Dataset (spMohanty/PlantVillage-Dataset)
+- **Resolution:** 224×224 px (normalized to [0,1])
+
+### Augmentation Strategy
+- Rotation: ±20°
+- Width/Height Shift: ±20%
+- Zoom: ±20%
+- Horizontal Flip: Enabled
+- Fill Mode: Nearest
+
+### Optimization Details
+- **Architecture:** MobileNetV2 (ImageNet pre-trained)
+- **Fine-tuning:** Frozen backbone + custom head (Dense 256→128→38)
+- **Callbacks:** EarlyStopping (patience=10), ReduceLROnPlateau
+- **Training Time:** ~24 hours (RPi5 4-core)
+
+---
+
+*README generato automaticamente da DELTA v2.0.6 — 03/05/2026 08:15*
