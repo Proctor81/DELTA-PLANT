@@ -110,6 +110,7 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
 (
     STATE_DIAG_IMAGE_SOURCE,
     STATE_DIAG_WAIT_PHOTO,
+    STATE_DIAG_USER_DESCRIPTION,
     STATE_DIAG_SENSOR_MODE,
     STATE_DIAG_TEMP,
     STATE_DIAG_HUM,
@@ -130,7 +131,11 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     STATE_ACADEMY_QUIZ,
     STATE_PRECHECK_IMAGE,
     STATE_CHAT_WAITING,
- ) = range(22)
+ ) = range(23)
+
+(STATE_DIAG_FOLLOWUP,) = range(23, 24)
+
+MAX_FOLLOWUP_QUESTIONS = 5
 
 CMD_DIAGNOSE = "CMD_DIAGNOSE"
 CMD_UPLOAD = "CMD_UPLOAD"
@@ -1055,7 +1060,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
             await _send(update, "Nessuna immagine in input_images. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = str(latest)
-        return await _ask_sensor_mode(update, context)
+        return await _ask_user_description(update, context)
     if query.data == DIAG_IMAGE_CAMERA:
         agent = _get_agent(context)
         if not agent or agent.camera._backend is None:
@@ -1063,7 +1068,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
             await _send(update, "Camera locale non disponibile. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = ""
-        return await _ask_sensor_mode(update, context)
+        return await _ask_user_description(update, context)
     context.user_data["diagnosis_active"] = False
     await _send(update, "Scelta non valida.")
     return ConversationHandler.END
@@ -1082,6 +1087,34 @@ async def receive_diag_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _send(update, "Immagine non valida.")
         return STATE_DIAG_WAIT_PHOTO
     context.user_data["diag_image_path"] = str(saved)
+    return await _ask_user_description(update, context)
+
+
+async def _ask_user_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Chiede all'utente il tipo di pianta e l'anomalia riscontrata."""
+    await _send(
+        update,
+        "Di che pianta si tratta? Descrivimi l'anomalia che hai riscontrato, "
+        "sarò ben lieto di aiutarti 😊\n\n"
+        "_Esempio: 'Pomodoro con macchie gialle sulle foglie e bordi secchi'_",
+        parse_mode="Markdown",
+    )
+    return STATE_DIAG_USER_DESCRIPTION
+
+
+async def receive_user_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Riceve la descrizione testuale utente e procede alla scelta sensori."""
+    if not await _guard(update):
+        return ConversationHandler.END
+    if not update.message or not update.message.text:
+        await _send(update, "Per favore descrivi la pianta e l'anomalia osservata.")
+        return STATE_DIAG_USER_DESCRIPTION
+    description = update.message.text.strip()
+    if len(description) < 3:
+        await _send(update, "Descrizione troppo breve. Aggiungi dettagli sulla pianta e sull'anomalia.")
+        return STATE_DIAG_USER_DESCRIPTION
+    context.user_data["diag_user_description"] = description
+    await _send(update, "Grazie! Ora acquisisco i dati ambientali... 🌱")
     return await _ask_sensor_mode(update, context)
 
 
@@ -1102,8 +1135,7 @@ async def choose_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
     await query.answer()
     if query.data == DIAG_SENSOR_AUTO:
-        await _run_diagnosis(update, context, None)
-        return ConversationHandler.END
+        return await _run_diagnosis(update, context, None)
     if query.data == DIAG_SENSOR_MANUAL:
         context.user_data["sensor_data"] = {"source": "telegram_manual"}
         context.user_data["sensor_index"] = 0
@@ -1136,8 +1168,7 @@ async def manual_sensor_input(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _send(update, f"Inserisci {SENSOR_FIELDS[idx][1]} (digita x per saltare):")
         return STATE_DIAG_TEMP
     sensor_data = context.user_data.get("sensor_data", {})
-    await _run_diagnosis(update, context, sensor_data)
-    return ConversationHandler.END
+    return await _run_diagnosis(update, context, sensor_data)
 
 
 def _sanitize_diagnosis_opinion(opinion: str) -> str:
@@ -1170,7 +1201,7 @@ def _sanitize_diagnosis_opinion(opinion: str) -> str:
     return text
 
 
-def _build_diagnosis_prompt(record: Dict[str, Any]) -> str:
+def _build_diagnosis_prompt(record: Dict[str, Any], user_description: str = "") -> str:
     """Costruisce il prompt per un unico messaggio AI di risultato diagnosi."""
     dx = record.get("diagnosis", {})
     ai = record.get("ai_result", {})
@@ -1193,23 +1224,269 @@ def _build_diagnosis_prompt(record: Dict[str, Any]) -> str:
     anomaly_text = ", ".join(anomalies) if anomalies else "nessuna"
 
     raw_report = re.sub(r"<[^>]+>", "", _format_diagnosis_full(record))
+
+    corrected_class = record.get("_corrected_class", "")
+    class_note = ""
+    if corrected_class and corrected_class != ai_class:
+        class_note = (
+            f"\nNOTA: la classe PlantVillage originale ({ai_class}) è stata corretta "
+            f"in '{corrected_class}' sulla base della descrizione dell'utente.\n"
+        )
+
+    description_block = ""
+    if user_description:
+        description_block = f"\nDESCRIZIONE UTENTE: {user_description}\n"
+
     return (
         "Trasforma il report seguente in un UNICO messaggio finale per l'utente, "
         "in italiano, con stile professionale da agronomo esperto, dettagliato ma chiaro.\n\n"
-        f"REPORT RAW RISULTATO DIAGNOSI DELTA:\n{raw_report}\n\n"
+        f"REPORT RAW RISULTATO DIAGNOSI DELTA:\n{raw_report}\n"
+        f"{description_block}"
+        f"{class_note}\n"
         "Vincoli obbligatori:\n"
         "- Non usare frasi metalinguistiche (es: 'Sembra che tu stia chiedendo').\n"
         "- Non ripetere il titolo del report.\n"
+        "- Tieni conto della descrizione dell'utente per arricchire e personalizzare la diagnosi.\n"
         "- Struttura in 5 blocchi: 1) Esito tecnico, 2) Diagnosi differenziale breve, "
         "3) Azioni immediate (0-24h), 4) Azioni a breve (2-7 giorni), "
         "5) Monitoraggio e prevenzione.\n"
-        "- Fornisci indicazioni operative concrete e verificabili (cosa osservare, quando ricontrollare, "
-        "quali parametri dare priorita).\n"
+        "- Fornisci indicazioni operative concrete e verificabili.\n"
         "- Se appropriato, indica pratiche di difesa integrata e igiene colturale.\n"
         "- Mantieni tono tecnico-professionale, senza essere prolisso.\n"
         "- Mantieni coerenza con: "
-        f"classe={ai_class}, confidenza={ai_conf*100:.1f}%, stato={status}, rischio={risk}, "
-        f"QRS={qrs:.4f}, evento_dominante={qdom}, anomalie={anomaly_text}, raccomandazioni={rec_text if rec_text else 'nessuna'}."
+        f"classe={corrected_class or ai_class}, confidenza={ai_conf*100:.1f}%, "
+        f"stato={status}, rischio={risk}, "
+        f"QRS={qrs:.4f}, evento_dominante={qdom}, anomalie={anomaly_text}, "
+        f"raccomandazioni={rec_text if rec_text else 'nessuna'}."
+    )
+
+
+_PLANTVILLAGE_CLASSES = [
+    "Apple_Apple_scab", "Apple_Black_rot", "Apple_Cedar_apple_rust", "Apple_healthy",
+    "Bell_pepper_Bacterial_spot", "Bell_pepper_healthy", "Blueberry_healthy",
+    "Cherry_Powdery_mildew", "Cherry_healthy", "Corn_Cercospora", "Corn_Common_rust",
+    "Corn_Northern_Leaf_Blight", "Corn_healthy", "Grape_Black_rot", "Grape_Esca",
+    "Grape_Leaf_blight", "Grape_healthy", "Peach_healthy", "Potato_Early_blight",
+    "Potato_Late_blight", "Potato_healthy", "Squash_Powdery_mildew",
+    "Strawberry_Leaf_scorch", "Strawberry_healthy", "Tomato_Bacterial_spot",
+    "Tomato_Early_blight", "Tomato_Late_blight", "Tomato_Leaf_Mold",
+    "Tomato_Septoria_leaf_spot", "Tomato_Target_Spot", "Tomato_Yellow_Leaf_Curl",
+    "Tomato_healthy", "Tomato_mosaic_virus",
+]
+
+
+async def _reclassify_with_description(
+    engine,
+    user_id: str,
+    ai_class: str,
+    user_description: str,
+) -> str:
+    """
+    Usa il ChatEngine per verificare se la classe PlantVillage rilevata dal modello
+    è coerente con la descrizione dell'utente. Se non lo è, restituisce la classe
+    più appropriata tra quelle disponibili.
+    Restituisce la classe corretta (uguale o diversa da ai_class).
+    """
+    classes_list = "\n".join(f"- {c}" for c in _PLANTVILLAGE_CLASSES)
+    prompt = (
+        f"Sei un agronomo esperto. L'utente ha descritto la sua pianta così:\n"
+        f"'{user_description}'\n\n"
+        f"Il modello AI ha classificato l'immagine come: '{ai_class}'\n\n"
+        f"Elenco delle classi PlantVillage disponibili:\n{classes_list}\n\n"
+        "Analizza se la classe rilevata è coerente con la descrizione dell'utente.\n"
+        "Se la classe è corretta, rispondi SOLO con il nome esatto della classe.\n"
+        "Se la classe non è corretta o non è la più appropriata, indica la classe "
+        "PlantVillage più adatta tra quelle elencate.\n"
+        "Rispondi SOLO con il nome esatto della classe PlantVillage, senza altre parole."
+    )
+    try:
+        corrected = await asyncio.to_thread(engine.chat, user_id, prompt)
+        corrected = corrected.strip().strip('"').strip("'")
+        # Verifica che la risposta sia una classe valida
+        if corrected in _PLANTVILLAGE_CLASSES:
+            return corrected
+        # Cerca una corrispondenza parziale (l'LLM potrebbe aver aggiunto spazi o underscore diversi)
+        corrected_lower = corrected.lower().replace(" ", "_")
+        for cls in _PLANTVILLAGE_CLASSES:
+            if cls.lower() == corrected_lower:
+                return cls
+        logger.warning("Reclassificazione: classe non riconosciuta '%s', uso originale '%s'", corrected, ai_class)
+    except Exception as exc:
+        logger.warning("Reclassificazione fallita: %s", exc)
+    return ai_class
+
+
+async def _generate_followup_question(
+    engine, user_id: str, user_description: str, qa_pairs: list
+) -> tuple:
+    """
+    Genera la prossima domanda di approfondimento oppure segnala che la diagnosi può
+    già essere elaborata. Restituisce (testo_domanda, should_stop).
+    """
+    history = ""
+    for i, (q, a) in enumerate(qa_pairs, 1):
+        history += f"D{i}: {q}\nR{i}: {a}\n"
+    prompt = (
+        "Sei un agronomo esperto che sta diagnosticando una malattia vegetale "
+        "senza aver visto l'immagine della pianta.\n"
+        f"Descrizione iniziale dell'utente: '{user_description}'\n"
+        + (f"\nDomande e risposte precedenti:\n{history}" if history else "")
+        + "\nValuta se hai informazioni sufficienti per una diagnosi accurata.\n"
+        "Se sì, rispondi esattamente con: DIAGNOSI_PRONTA\n"
+        "Altrimenti, formula UNA sola domanda breve e mirata (colore, aspetto, "
+        "parte colpita, progressione, condizioni ambientali, ecc.).\n"
+        "Rispondi SOLO con la domanda oppure con DIAGNOSI_PRONTA, senza altre parole."
+    )
+    try:
+        resp = await asyncio.to_thread(engine.chat, user_id, prompt)
+        resp = (resp or "").strip()
+        if "DIAGNOSI_PRONTA" in resp.upper():
+            return "", True
+        return resp, False
+    except Exception as exc:
+        logger.warning("Errore generazione domanda follow-up: %s", exc)
+        return "", True
+
+
+async def _start_followup_questioning(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, record: dict
+) -> int:
+    """
+    Avvia la modalità interrogazione follow-up per piante non riconosciute dal modello.
+    Salva il record parziale, invia l'avviso e pone la prima domanda.
+    """
+    context.user_data["diag_fallback_record"] = record
+    context.user_data["diag_followup_qa"] = []
+    context.user_data["diag_followup_count"] = 0
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    user_description = context.user_data.get("diag_user_description", "")
+
+    await _send(
+        update,
+        "⚠️ <b>Pianta non riconosciuta nel database.</b>\n"
+        "Procederò comunque con una diagnosi basata sulla tua descrizione.\n"
+        f"Ti farò al massimo {MAX_FOLLOWUP_QUESTIONS} domande di approfondimento. 🌿",
+        parse_mode="HTML",
+    )
+
+    question, should_stop = await _generate_followup_question(engine, user_id, user_description, [])
+    if should_stop or not question:
+        await _send(update, "Ho già abbastanza informazioni. Elaboro la diagnosi... 🔬")
+        await _send_conversational_diagnosis(update, context)
+        return ConversationHandler.END
+
+    context.user_data["diag_followup_count"] = 1
+    context.user_data["diag_followup_last_question"] = question
+    await _send(update, f"❓ (1/{MAX_FOLLOWUP_QUESTIONS}) {question}")
+    return STATE_DIAG_FOLLOWUP
+
+
+async def receive_followup_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handler per le risposte alle domande di approfondimento."""
+    if not await _guard(update):
+        return ConversationHandler.END
+    if not update.message:
+        return STATE_DIAG_FOLLOWUP
+
+    answer = (update.message.text or "").strip()
+    if not answer:
+        await _send(update, "Non ho ricevuto una risposta. Riprova.")
+        return STATE_DIAG_FOLLOWUP
+
+    qa_pairs = context.user_data.get("diag_followup_qa", [])
+    count = context.user_data.get("diag_followup_count", 1)
+    last_question = context.user_data.get("diag_followup_last_question", "")
+
+    qa_pairs.append((last_question, answer))
+    context.user_data["diag_followup_qa"] = qa_pairs
+
+    if count >= MAX_FOLLOWUP_QUESTIONS:
+        await _send(update, "✅ Ho raccolto abbastanza informazioni. Elaboro la diagnosi... 🔬")
+        await _send_conversational_diagnosis(update, context)
+        return ConversationHandler.END
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    user_description = context.user_data.get("diag_user_description", "")
+
+    question, should_stop = await _generate_followup_question(engine, user_id, user_description, qa_pairs)
+    if should_stop or not question:
+        await _send(update, "✅ Ho raccolto abbastanza informazioni. Elaboro la diagnosi... 🔬")
+        await _send_conversational_diagnosis(update, context)
+        return ConversationHandler.END
+
+    new_count = count + 1
+    context.user_data["diag_followup_count"] = new_count
+    context.user_data["diag_followup_last_question"] = question
+    await _send(update, f"❓ ({new_count}/{MAX_FOLLOWUP_QUESTIONS}) {question}")
+    return STATE_DIAG_FOLLOWUP
+
+
+async def _send_conversational_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Genera e invia una diagnosi basata esclusivamente sulla conversazione con l'utente."""
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    user_description = context.user_data.get("diag_user_description", "")
+    qa_pairs = context.user_data.get("diag_followup_qa", [])
+    sensor_data = context.user_data.get("sensor_data", {})
+
+    qa_text = ""
+    for i, (q, a) in enumerate(qa_pairs, 1):
+        qa_text += f"\nD{i}: {q}\nR{i}: {a}"
+
+    sensor_text = ""
+    if sensor_data:
+        sensor_text = "\nDati ambientali rilevati:\n" + "\n".join(
+            f"  {k}: {v}" for k, v in sensor_data.items() if k != "source"
+        )
+
+    prompt = (
+        "Sei un agronomo esperto. Il modello AI non ha riconosciuto la pianta dal database.\n"
+        f"Descrizione iniziale dell'utente: '{user_description}'\n"
+        + (f"\nDomande di approfondimento e risposte:{qa_text}" if qa_text else "")
+        + sensor_text
+        + "\n\nFornisci una diagnosi professionale in italiano strutturata in 5 blocchi:\n"
+        "1) Ipotesi diagnostica (patologia o parassita più probabile)\n"
+        "2) Diagnosi differenziale (alternative possibili)\n"
+        "3) Azioni immediate (0-24h)\n"
+        "4) Azioni a breve termine (2-7 giorni)\n"
+        "5) Monitoraggio e prevenzione\n"
+        "⚠️ La diagnosi si basa solo sulla descrizione verbale, non su un'immagine classificata. "
+        "Indica esplicitamente il grado di incertezza dove necessario e raccomanda "
+        "conferma da un agronomo fisico se il caso è grave."
+    )
+
+    def _ask():
+        return engine.chat(user_id, prompt)
+
+    try:
+        opinion = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        logger.warning("Errore diagnosi conversazionale: %s", exc)
+        await _send(update, "❌ Errore durante la diagnosi conversazionale.")
+        return
+
+    opinion = _sanitize_diagnosis_opinion(opinion)
+
+    for key in (
+        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
+        "diag_followup_last_question", "diag_user_description",
+    ):
+        context.user_data.pop(key, None)
+    context.user_data["diagnosis_active"] = False
+
+    await _send_diagnosis_paginated(
+        update,
+        context,
+        f"🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>\n\n{opinion}",
+        parse_mode="HTML",
     )
 
 
@@ -1226,7 +1503,23 @@ async def _send_ai_diagnosis_opinion(
 
     engine = _get_chat_engine(context)
     user_id = str(update.effective_user.id if update.effective_user else "0")
-    prompt = _build_diagnosis_prompt(record)
+    user_description = context.user_data.get("diag_user_description", "")
+
+    # ── Reclassificazione con descrizione utente ──────────────────────────
+    if user_description:
+        ai_class = (record.get("ai_result") or {}).get("class", "")
+        if ai_class:
+            corrected = await _reclassify_with_description(
+                engine, user_id, ai_class, user_description
+            )
+            record["_corrected_class"] = corrected
+            if corrected != ai_class:
+                logger.info(
+                    "Reclassificazione: '%s' → '%s' (descrizione: %s)",
+                    ai_class, corrected, user_description[:60],
+                )
+
+    prompt = _build_diagnosis_prompt(record, user_description)
 
     def _ask():
         return engine.chat(user_id, prompt)
@@ -1252,11 +1545,12 @@ async def _run_diagnosis(
     context: ContextTypes.DEFAULT_TYPE,
     sensor_data: Optional[Dict[str, Any]],
 ):
+    # Restituisce un ConversationHandler state (END o STATE_DIAG_FOLLOWUP)
     agent = _get_agent(context)
     if not agent:
         context.user_data["diagnosis_active"] = False
         await _send(update, "Errore sistema: agent non disponibile.")
-        return
+        return ConversationHandler.END
 
     image_path = context.user_data.get("diag_image_path")
     image = None
@@ -1265,23 +1559,28 @@ async def _run_diagnosis(
         if image is None:
             context.user_data["diagnosis_active"] = False
             await _send(update, "Impossibile caricare l'immagine.")
-            return
+            return ConversationHandler.END
     try:
         record = await asyncio.to_thread(agent.run_diagnosis, sensor_data=sensor_data, image=image)
     except Exception as exc:
         logger.error("Errore diagnosi Telegram: %s", exc, exc_info=True)
         context.user_data["diagnosis_active"] = False
         await _send(update, "❌ Errore durante la diagnosi. La chat è nuovamente disponibile.")
-        return
+        return ConversationHandler.END
 
     # Riattiva la chat prima di inviare i risultati
     context.user_data["diagnosis_active"] = False
+
+    # Pianta non riconosciuta → modalità follow-up conversazionale
+    if record.get("ai_result", {}).get("fallback", False):
+        return await _start_followup_questioning(update, context, record)
 
     if record.get("diagnosis", {}).get("needs_human_review") and image_path:
         await _prompt_label_review(update, context, Path(image_path))
 
     # Messaggio finale unico (risultato + valutazione tecnica AI)
     await _send_ai_diagnosis_opinion(update, context, record)
+    return ConversationHandler.END
 
 
 def _labels_keyboard(prefix: str, labels: List[str]) -> InlineKeyboardMarkup:
@@ -1398,22 +1697,15 @@ async def pending_label_name_router(update: Update, context: ContextTypes.DEFAUL
 
 async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
-        return
-    # Se non c'è nessun flow attivo, tratta la foto come upload learning-by-doing
-    if context.user_data.get("pending_label_path") or context.user_data.get("diag_image_path"):
-        await _send(update, "Hai già un'operazione in corso. Completa l'etichettatura oppure usa /annulla per ricominciare.")
         return ConversationHandler.END
-    saved = await _download_telegram_image(update)
-    if not saved:
-        await _send(update, "Immagine non valida.")
+    # Se c'è un upload etichettatura in corso, evita collisioni tra flow.
+    if context.user_data.get("pending_label_path"):
+        await _send(update, "Hai già un'operazione di upload in corso. Completa l'etichettatura o usa /annulla.")
         return ConversationHandler.END
-    await _send(update, f"Immagine salvata in input_images: {saved.name}")
-    context.user_data["pending_label_path"] = str(saved)
-    context.user_data["pending_label_mode"] = "TRAIN"
-    context.user_data["pending_label_need_name"] = True
-    context.user_data.pop("pending_label_organ", None)
-    await _send(update, "Inserisci il nome della pianta (obbligatorio per training):")
-    return STATE_UPLOAD_PLANT
+    context.user_data["diagnosis_active"] = True
+    context.user_data.pop("diag_user_description", None)
+    await _send(update, "📷 Foto ricevuta. Avvio la procedura diagnosi.")
+    return await receive_diag_photo(update, context)
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2186,6 +2478,7 @@ def run_telegram_bot(agent=None):
             CommandHandler("nuovo", start_diagnosis),
             CommandHandler("diagnosi", start_diagnosis),
             CallbackQueryHandler(start_diagnosis, pattern=f"^{CMD_DIAGNOSE}$"),
+            MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo),
         ],
         states={
             STATE_DIAG_IMAGE_SOURCE: [
@@ -2197,6 +2490,9 @@ def run_telegram_bot(agent=None):
                 MessageHandler(filters.PHOTO | filters.Document.IMAGE, receive_diag_photo),
                 MessageHandler(filters.ALL, diag_expect_photo),
             ],
+            STATE_DIAG_USER_DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_description),
+            ],
             STATE_DIAG_SENSOR_MODE: [
                 CallbackQueryHandler(
                     choose_sensor_mode,
@@ -2204,6 +2500,9 @@ def run_telegram_bot(agent=None):
                 )
             ],
             STATE_DIAG_TEMP: [MessageHandler(filters.TEXT & ~filters.COMMAND, manual_sensor_input)],
+            STATE_DIAG_FOLLOWUP: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_followup_answer),
+            ],
             ConversationHandler.TIMEOUT: [MessageHandler(filters.ALL, timeout)],
         },
         fallbacks=[
@@ -2218,7 +2517,6 @@ def run_telegram_bot(agent=None):
         entry_points=[
             CommandHandler("upload", start_upload),
             CallbackQueryHandler(start_upload, pattern=f"^{CMD_UPLOAD}$"),
-            MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo),
         ],
         states={
             STATE_UPLOAD_WAIT_PHOTO: [
