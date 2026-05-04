@@ -1,8 +1,82 @@
+# DELTA v3.1 — Intelligent PlantVillage Generalization
+
+**Release Date:** 4 May 2026
+**Version:** 3.1
+**Status:** Production Ready ✅
+
+---
+
+## 🚀 Highlights v3.1
+
+> **DELTA Plant ha imparato a generalizzare sulle classi PlantVillage, evolvendo il suo modello di Computer Vision.**
+
+Il sistema ora riconosce il genere botanico dalla descrizione dell'operatore e filtra dinamicamente le classi di classificazione, eliminando la confusione cross-genus e migliorando drasticamente la precisione diagnostica.
+
+---
+
+## 🌿 What's New in v3.1
+
+### 1. **Genus Detection Programmatico**
+- Nuovo `_GENUS_KEYWORD_MAP` con 11 generi PlantVillage (IT + EN)
+- Priorità multi-parola: `"bell pepper"` rilevato prima di `"pepper"`
+- Zero costi LLM per il rilevamento del genere (logica Python pura)
+- Previene errore storico: peperone → classe Tomato (ora → Bell_pepper)
+
+### 2. **Class Filtering per Genus**
+- L'LLM riceve SOLO le classi del genere rilevato (es. 2 classi per Bell_pepper vs 33 totali)
+- Elimina falsi positivi causati da firme visive simili tra generi diversi
+- Fallback: se genus non rilevato → flusso Q&A interattivo
+
+### 3. **Healthy Check Contestuale (LLM Stateless)**
+- Sostituisce il semplice match sulla parola `"sano"`
+- Valuta l'intera frase dell'operatore con prompt binario SANO/NON_SANO/INCERTO
+- Usa `chat_internal()` → nessuna contaminazione della ConversationMemory
+
+### 4. **Fix Doppio Messaggio Q&A**
+- Causa: `free_chat_handler` (PTB group=99) rispondeva anche durante il follow-up
+- Fix: flag `diag_qa_active` dedicato al flusso Q&A, separato da `diagnosis_active`
+- Risultato: zero messaggi doppi durante le domande di approfondimento
+
+### 5. **Fix Loop Richiesta Foto**
+- Causa: LLM aggiungeva "invia una foto per ulteriore analisi" in fondo alla diagnosi
+- Fix livello 1: vincolo nel prompt — fase di acquisizione immagine già conclusa
+- Fix livello 2: `_PHOTO_REQUEST_PATTERNS` regex rimuove frasi residue dall'output LLM
+
+### 6. **Pulsante Inline `/continua`**
+- Handler globale `CMD_CONTINUA` registrato direttamente sull'Application (non nei fallbacks)
+- Pulsante inline `📄 Continua lettura` sostituisce il testo `/continua`
+- Funziona anche dopo `ConversationHandler.END`
+
+### 7. **Menu Telegram Ridisegnato**
+- "Export Excel" → "Report Excel"
+- "Preflight" e "Health" affiancati sulla stessa riga
+- Layout più compatto: 4 righe invece di 5
+
+### 8. **Academy Aggiornata**
+- 2 nuovi scenari di simulazione (v3.1): peperone con maculatura batterica + vite sana con rilevamento contestuale
+- 3 nuove domande quiz su: genus-filter, chat_internal stateless, flag diag_qa_active
+- Tutorial guidato: aggiunto Passo 6 — come DELTA interpreta la descrizione dell'operatore
+
+---
+
+## 🔄 Riepilogo Bug Fix
+
+| Bug | Causa | Fix |
+|---|---|---|
+| Peperone classificato come Tomato | Nessun filtro per genus | `_detect_genus_from_description()` + class filtering |
+| Doppio messaggio durante Q&A | `free_chat_handler` group=99 non inibito | Flag `diag_qa_active` |
+| Loop richiesta foto | LLM aggiungeva frase "invia foto" | Vincolo prompt + regex `_PHOTO_REQUEST_PATTERNS` |
+| `/continua` non funzionava dopo END | Handler nei fallbacks del ConversationHandler | Handler globale + pulsante inline |
+| Healthy check solo su parola "sano" | Match stringa rigido | LLM contestuale con `chat_internal()` |
+| Auto-risposta LLM nel Q&A | `engine.chat()` contaminava ConversationMemory | `chat_internal()` stateless |
+
+---
+
 # DELTA v3.0 — Leaf-Only Architecture Changelog
 
-**Release Date:** 3 May 2026  
-**Version:** 3.0  
-**Status:** Production Ready ✅
+**Release Date:** 3 May 2026
+**Version:** 3.0
+**Status:** Superseded by v3.1
 
 ---
 
@@ -10,7 +84,7 @@
 
 ### Architectural Shift: Multi-Organ → Leaf-Only
 
-**DELTA v2.0** ⟹ Multi-organ diagnostic system (leaf + flower + fruit)  
+**DELTA v2.0** ⟹ Multi-organ diagnostic system (leaf + flower + fruit)
 **DELTA v3.0** ⟹ Orchestrated AI specializing in **leaf disease classification**
 
 | Component | v2.0 | v3.0 | Status |

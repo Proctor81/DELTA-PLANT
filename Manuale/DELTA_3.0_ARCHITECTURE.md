@@ -1,7 +1,7 @@
-# DELTA v3.0 — Leaf-Only Architecture: Technical User Guide
+# DELTA v3.1 — Intelligent PlantVillage Generalization: Technical User Guide
 
-**Date:** 3 May 2026  
-**Version:** 3.0  
+**Date:** 4 May 2026  
+**Version:** 3.1  
 **Audience:** Technical users, system administrators, agronomists  
 
 ---
@@ -346,4 +346,98 @@ Content-Type: application/json
 
 ---
 
-**DELTA v3.0 — Orchestrated AI for Leaf Health | 3 May 2026**
+---
+
+## What's New in v3.1 — Intelligent PlantVillage Generalization
+
+### Overview
+
+DELTA v3.1 evolves the Computer Vision model by introducing **contextual generalization over PlantVillage classes**. The system now understands which plant genus the operator is working with and restricts AI classification to that genus only — eliminating cross-genus confusion and dramatically improving diagnostic accuracy for plants whose visual symptoms overlap across species.
+
+---
+
+### Key Innovations
+
+#### 1. Genus Detection (Programmatic, Zero-LLM)
+
+When the operator describes the plant, DELTA extracts the **genus** using a prioritized keyword map:
+
+```python
+_GENUS_KEYWORD_MAP = [
+    (["bell pepper", "peperone", "pepper", "capsicum"], "Bell_pepper"),
+    (["apple", "mela"],                                  "Apple"),
+    (["blueberry", "mirtillo"],                          "Blueberry"),
+    (["cherry", "ciliegio", "ciliegia"],                 "Cherry"),
+    (["corn", "mais", "granturco"],                      "Corn"),
+    (["grape", "uva", "vite", "vitis"],                  "Grape"),
+    (["peach", "pesca", "pesco"],                        "Peach"),
+    (["potato", "patata"],                               "Potato"),
+    (["squash", "zucca"],                                "Squash"),
+    (["strawberry", "fragola"],                          "Strawberry"),
+    (["tomato", "pomodoro"],                             "Tomato"),
+]
+```
+
+**Two-phase matching:**
+1. Multi-word keywords first (e.g. `"bell pepper"` before `"pepper"`)
+2. Single-word keywords second
+
+This ensures `"bell pepper"` is never mistaken for `"pepper"` (Tomato genus).
+
+#### 2. Class Filtering
+
+Once the genus is detected, the LLM receives **only the classes belonging to that genus**:
+
+| Operator says | Genus detected | Classes offered to LLM |
+|---|---|---|
+| "peperone con macchie" | Bell_pepper | Bell_pepper_Bacterial_spot, Bell_pepper_healthy |
+| "pomodoro con macchie" | Tomato | Tomato_Bacterial_spot, Tomato_Early_blight, … |
+| "vite sembra sana" | Grape | Grape_Black_rot, Grape_Esca, Grape_Leaf_blight, Grape_healthy |
+
+Without filtering, `Bell_pepper_Bacterial_spot` and `Tomato_Bacterial_spot` share very similar visual features — the model would frequently misclassify.
+
+#### 3. Contextual Health Detection (LLM Stateless)
+
+The health check no longer relies on the single keyword `"sano"`. Instead, an LLM call evaluates the **entire operator sentence**:
+
+- Input: `"la vite sembra stare benone"`
+- LLM prompt: binary classification → `SANO` / `NON_SANO` / `INCERTO`
+- If `SANO`: skip disease flow, produce wellness assessment
+- Uses `chat_internal()` (stateless, no ConversationMemory read/write)
+
+#### 4. Q&A Follow-up Loop Fix
+
+Previously, `free_chat_handler` (PTB group 99) would intercept operator answers during the Q&A phase, generating a double response. Fixed with dedicated flag `diag_qa_active`:
+
+```
+START follow-up → diag_qa_active = True
+  operator answers → ConversationHandler handles it (group 0)
+  free_chat_handler skips (diag_qa_active is True)
+END follow-up → diag_qa_active = False
+```
+
+#### 5. No-Photo-Loop Fix
+
+The LLM was occasionally appending "send a photo for further analysis" to the diagnosis, causing the bot to restart the photo upload flow. Fixed at two levels:
+
+1. **Prompt constraint:** `"Do not ask the user to send photos — image acquisition phase is complete."`
+2. **Post-processing filter:** `_PHOTO_REQUEST_PATTERNS` regex removes any residual photo-request sentences from LLM output before delivery.
+
+#### 6. Paginated Messages — Inline Button
+
+Long diagnosis messages (>4096 chars) are split into chunks. The continuation button is now an **inline keyboard button** (`📄 Continua lettura`) registered as a global handler — works even after `ConversationHandler.END`.
+
+---
+
+### Telegram Menu Layout (v3.1)
+
+```
+[ 🆕 Diagnosi                              ]
+[ 🌡 Sensori        ]  [ 📤 Report Excel  ]
+[ 🧪 Preflight      ]  [ ✅ Health        ]
+[ 🎓 Academy        ]  [ 📄 Licenza       ]
+```
+
+---
+
+**DELTA v3.1 — Orchestrated AI for Leaf Health | 4 May 2026**

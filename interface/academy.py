@@ -280,6 +280,112 @@ SCENARIOS = [
             "Rischio ALTO ma non critico: intervento entro 2-3 giorni."
         ),
     },
+    # ── SCENARI v3.1 — Generalizzazione PlantVillage ──────────────────────────
+    {
+        "id": 6,
+        "titolo": "Peperone: maculatura batterica (reclassificazione genus)",
+        "contesto": "Tunnel plastica — peperone California Wonder, 60 giorni",
+        "sintomi_visivi": (
+            "Foglie con piccole macchie acquose circolari, poi necrotiche al centro e con alone giallastro. "
+            "Le macchie si concentrano sui bordi fogliari. I frutti mostrano lesioni superficiali ruvide. "
+            "La progressione e rapida nelle ultime 48 ore dopo un temporale."
+        ),
+        "dati_sensori": {
+            "Temperatura":  ("24.0 C",   "Favorevole ai batteri"),
+            "Umidita":      ("88.0 %",   "CRITICA — sopra soglia fungina"),
+            "Pressione":    ("1008 hPa", "Bassa — tempo instabile"),
+            "Luminosita":   ("18000 lux","Normale"),
+            "CO2":          ("420 ppm",  "Normale"),
+            "pH":           ("6.7",      "Ottimale"),
+            "EC":           ("2.0 mS/cm","Ottimale"),
+        },
+        "stato_sensori": {
+            "Temperatura": "warn", "Umidita": "err", "Pressione": "warn",
+            "Luminosita": "ok", "CO2": "ok", "pH": "ok", "EC": "ok",
+        },
+        "ai_class": "Maculatura batterica peperone (Bell_pepper_Bacterial_spot)",
+        "ai_confidence": 84.2,
+        "ai_top3": [
+            ("Bell_pepper_Bacterial_spot", 84.2),
+            ("Tomato_Bacterial_spot",      10.1),
+            ("Bell_pepper_healthy",         3.4),
+        ],
+        "rischio_corretto": "alto",
+        "diagnosi": (
+            "Maculatura batterica da Xanthomonas spp. su peperone. "
+            "L'operatore ha descritto 'peperone con macchie', quindi DELTA ha correttamente "
+            "classificato il genere Bell_pepper e selezionato la classe specifica tra le sole "
+            "classi del genere corrispondente — evitando confusione con Tomato_Bacterial_spot. "
+            "Umidita 88% e pioggia recente hanno favorito la diffusione batterica."
+        ),
+        "raccomandazioni_corrette": [
+            "Applicare rame ossicloruro o idrossido di rame (a base rameica)",
+            "Evitare irrigazione a pioggia o lavori su piante bagnate",
+            "Rimuovere foglie gravemente colpite e distruggerle",
+            "Abbassare l'umidita relativa sotto il 75% con ventilazione",
+        ],
+        "spiegazione_finale": (
+            "INNOVAZIONE v3.1 — DELTA ora riconosce il genere della pianta dalla descrizione "
+            "dell'operatore (es. 'peperone', 'pomodoro', 'uva'). Questo gli permette di filtrare "
+            "le classi PlantVillage al solo genere corretto prima di chiedere all'LLM la diagnosi. "
+            "Senza questo filtro, 'Bell_pepper_Bacterial_spot' e 'Tomato_Bacterial_spot' hanno "
+            "firme visive simili e il modello poteva classificare male. "
+            "Il genus-filter a due fasi (multi-parola prima, poi parola singola) garantisce che "
+            "'bell pepper' sia riconosciuto prima di 'pepper' o 'peperone'."
+        ),
+    },
+    {
+        "id": 7,
+        "titolo": "Vite in buona salute — rilevazione contestuale",
+        "contesto": "Vigneto biologico — Barbera d'Asti, luglio",
+        "sintomi_visivi": (
+            "Foglie verde intenso, lamina integra senza macchie o deformazioni. "
+            "I grappoli si stanno sviluppando regolarmente. "
+            "L'operatore dice: 'la vite sembra stare benone, vediamo come va'."
+        ),
+        "dati_sensori": {
+            "Temperatura":  ("23.5 C",   "Ottimale"),
+            "Umidita":      ("62.0 %",   "Nella norma"),
+            "Pressione":    ("1016 hPa", "Alta — tempo stabile"),
+            "Luminosita":   ("30000 lux","Ottimale per vite"),
+            "CO2":          ("415 ppm",  "Normale"),
+            "pH":           ("6.2",      "Ottimale"),
+            "EC":           ("1.7 mS/cm","Ottimale"),
+        },
+        "stato_sensori": {
+            "Temperatura": "ok", "Umidita": "ok", "Pressione": "ok",
+            "Luminosita": "ok", "CO2": "ok", "pH": "ok", "EC": "ok",
+        },
+        "ai_class": "Grape_healthy",
+        "ai_confidence": 93.7,
+        "ai_top3": [
+            ("Grape_healthy",    93.7),
+            ("Grape_Black_rot",   3.1),
+            ("Grape_Esca",        1.8),
+        ],
+        "rischio_corretto": "nessuno",
+        "diagnosi": (
+            "Vite in ottime condizioni fitosanitarie. "
+            "DELTA ha rilevato la parola 'vite' nella descrizione e ha limitato la ricerca "
+            "alle classi Grape_* di PlantVillage. "
+            "Poiche l'operatore ha descritto la pianta come sana ('sta benone'), "
+            "l'analisi LLM contestuale ha confermato SANO e ha prodotto una valutazione "
+            "di benessere senza avviare il flusso diagnostico patologico."
+        ),
+        "raccomandazioni_corrette": [
+            "Mantenere le condizioni attuali di irrigazione e fertilizzazione",
+            "Monitoraggio preventivo per peronospora e oidio ogni 5-7 giorni",
+            "Documentare i parametri attuali come baseline stagionale",
+        ],
+        "spiegazione_finale": (
+            "INNOVAZIONE v3.1 — Il rilevamento contestuale della salute non si basa piu "
+            "sulla sola parola 'sano' ma su valutazione LLM dell'intera frase dell'operatore. "
+            "Frasi come 'sta benone', 'sembra in forma', 'nessun problema visibile' "
+            "vengono ora interpretate correttamente come stato di salute positivo. "
+            "L'LLM risponde con SANO/NON_SANO/INCERTO su un prompt stateless (senza memoria) "
+            "per evitare contaminazione della conversazione principale."
+        ),
+    },
 ]
 
 QUIZ_QUESTIONS = [
@@ -309,7 +415,7 @@ QUIZ_QUESTIONS = [
         "corretta": 2,
         "spiegazione": (
             "Il sistema di Active Learning chiede conferma quando la confidenza e < 50%. "
-            "L'etichetta fornita dall'operatore viene usata per il futuro fine-tuning del modello."
+            "Nella logica semplificata la revisione umana resta informativa e di controllo qualita operativa."
         ),
     },
     {
@@ -372,18 +478,17 @@ QUIZ_QUESTIONS = [
         ),
     },
     {
-        "domanda": "Qual e lo scopo principale del fine-tuning del modello AI in DELTA?",
+        "domanda": "Qual e l'obiettivo principale della logica semplificata AI in DELTA?",
         "opzioni": [
-            "Aumentare la velocita di acquisizione delle immagini",
-            "Adattare il modello alle specie e condizioni locali specifiche",
-            "Aggiornare il firmware dell'AI HAT 2+",
-            "Ridurre il consumo energetico del Raspberry Pi",
+            "Ridurre i flussi runtime non necessari mantenendo diagnosi affidabili",
+            "Aumentare la complessita dei menu operatore",
+            "Spostare tutta la logica in training on-device continuo",
+            "Disattivare completamente la diagnosi automatica",
         ],
-        "corretta": 1,
+        "corretta": 0,
         "spiegazione": (
-            "Il fine-tuning specializza il modello pre-addestrato per le varieta locali, "
-            "le condizioni di luce specifiche e le patologie piu comuni "
-            "nell'area geografica dell'utente."
+            "La versione semplificata privilegia stabilita operativa: "
+            "meno flussi runtime, meno punti di errore, comportamento piu prevedibile."
         ),
     },
     {
@@ -399,6 +504,70 @@ QUIZ_QUESTIONS = [
             "La modalita 'simulated' genera valori random realistici per ogni sensore, "
             "permettendo sviluppo e test completi senza hardware. "
             "Esiste anche la modalita 'manual' per l'inserimento da tastiera."
+        ),
+    },
+    # ── QUIZ v3.1 — Generalizzazione PlantVillage ─────────────────────────────
+    {
+        "domanda": (
+            "v3.1 — Perche DELTA identifica il genere della pianta dalla descrizione "
+            "dell'operatore prima di interrogare l'LLM sulla malattia?"
+        ),
+        "opzioni": [
+            "Per ridurre i costi API verso HuggingFace",
+            "Per filtrare le classi PlantVillage al solo genere corretto, evitando "
+            "che l'LLM confonda classi visivamente simili di generi diversi",
+            "Per permettere la diagnosi senza immagine",
+            "Per disabilitare il flusso Q&A se la pianta e nota",
+        ],
+        "corretta": 1,
+        "spiegazione": (
+            "Il genus-filter programmatico riduce le classi candidate da 33 a poche "
+            "(es. 2 classi per Bell_pepper). L'LLM lavora su un sottoinsieme mirato "
+            "anziche sull'intera lista, eliminando la confusione tra classi a firma "
+            "visiva simile appartenenti a generi diversi (es. Bell_pepper_Bacterial_spot "
+            "vs Tomato_Bacterial_spot)."
+        ),
+    },
+    {
+        "domanda": (
+            "v3.1 — Perche il rilevamento contestuale della salute usa una chiamata "
+            "LLM 'stateless' (senza memoria) invece del metodo chat() normale?"
+        ),
+        "opzioni": [
+            "Perche chat() non funziona in Telegram",
+            "Per risparmiare tempo: chat() e piu lento",
+            "Per evitare che la valutazione salute contamini la ConversationMemory "
+            "dell'utente con prompt interni non destinati all'operatore",
+            "Perche chat_internal e piu preciso sull'analisi delle piante",
+        ],
+        "corretta": 2,
+        "spiegazione": (
+            "chat() scrive sempre nella memoria conversazionale dell'utente. "
+            "chat_internal() invia la richiesta all'LLM con history=[] senza "
+            "leggere ne scrivere la ConversationMemory. Cosi i prompt tecnici interni "
+            "(SANO/NON_SANO/INCERTO, genus detection, follow-up generation) non "
+            "appaiono nella storia della chat dell'operatore."
+        ),
+    },
+    {
+        "domanda": (
+            "v3.1 — Durante il flusso Q&A follow-up (max 5 domande), quale flag "
+            "blocca il free_chat_handler dal rispondere in parallelo?"
+        ),
+        "opzioni": [
+            "diagnosis_active — lo stesso flag usato per l'inserimento sensori",
+            "diag_qa_active — flag dedicato impostato a True prima di STATE_DIAG_FOLLOWUP",
+            "chat_enabled — flag globale del sistema",
+            "sensor_lock — blocco hardware per evitare interferenze",
+        ],
+        "corretta": 1,
+        "spiegazione": (
+            "diagnosis_active viene resettato a False prima del Q&A follow-up, "
+            "percio non puo proteggere quella fase. Il nuovo flag diag_qa_active "
+            "viene impostato True appena prima di return STATE_DIAG_FOLLOWUP e "
+            "resettato a False solo quando il ConversationHandler torna a END. "
+            "Questo impedisce al free_chat_handler (group=99) di rispondere anche "
+            "lui alle risposte dell'operatore, eliminando il doppio messaggio."
         ),
     },
 ]
@@ -554,7 +723,7 @@ class DeltaAcademy:
                 "PASSO 2 — Il Menu Principale",
                 "Il menu offre 6 funzioni principali:\n\n"
                 "  [1] Diagnosi pianta      — analisi completa (immagine + sensori)\n"
-                "  [2] Fine-tuning AI       — migliora il modello con nuovi dati\n"
+                "  [2] Fine-tuning AI       — disabilitato nella logica semplificata\n"
                 "  [3] Dati sensori         — lettura istantanea dell'ambiente\n"
                 "  [4] Esporta Excel        — salva tutti i dati in .xlsx\n"
                 "  [5] Ultime diagnosi      — storico delle analisi nel database\n"
@@ -595,6 +764,30 @@ class DeltaAcademy:
                 "  pH           :  5.5 - 6.5       (idroponica; 6.0-7.0 per suolo)\n"
                 "  EC           :  1.5 - 2.5 mS/cm (soluzione nutritiva)\n"
                 "  Pressione    :  980 - 1020 hPa  (indicatore meteorologico)",
+            ),
+            (
+                "PASSO 6 — DELTA impara dalla tua descrizione (v3.1)",
+                "Quando avvii una diagnosi DELTA ti chiede:\n"
+                "  'Di che pianta si tratta? Descrivimi l'anomalia riscontrata.'\n\n"
+                "Cosa fa DELTA con la tua risposta:\n\n"
+                "  1. GENUS DETECTION (programmatico)\n"
+                "     Rileva il genere PlantVillage dalla descrizione:\n"
+                "     'peperone' -> Bell_pepper, 'vite' -> Grape, 'mais' -> Corn...\n"
+                "     Le parole multi-termine ('bell pepper') hanno priorita.\n\n"
+                "  2. FILTRO CLASSI\n"
+                "     Limita la ricerca alle sole classi del genere rilevato.\n"
+                "     Es. per 'peperone': solo Bell_pepper_Bacterial_spot e Bell_pepper_healthy\n\n"
+                "  3. HEALTHY CHECK (LLM contestuale)\n"
+                "     Se descrivi la pianta come sana ('sta benone', 'nessun problema')\n"
+                "     DELTA lo rileva e produce una valutazione di benessere anziche\n"
+                "     una diagnosi di malattia.\n\n"
+                "  4. Q&A FOLLOW-UP (se serve)\n"
+                "     Se il genere non e riconosciuto o la classe non corrisponde,\n"
+                "     DELTA fa fino a 5 domande di approfondimento per affinare\n"
+                "     la diagnosi tramite dialogo Operatore/AI.\n\n"
+                "CONSIGLIO: descrivi sempre tipo di pianta, parte colpita e sintomi.\n"
+                "  Esempio ottimale: 'Peperone con macchie acquose sulle foglie,\n"
+                "                     bordi necrotici e alone giallastro, dopo la pioggia'",
             ),
         ]
 
