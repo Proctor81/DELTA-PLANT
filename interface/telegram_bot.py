@@ -789,7 +789,7 @@ async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
 
-    # v3.0: Prevent chat during active diagnosis (manual sensor input phase)
+    # v3.1: Prevent chat during active diagnosis (manual sensor input phase)
     if context.user_data.get("diagnosis_active"):
         await _send(update,
             "⏳ Una diagnosi è in corso. Completa prima con /annulla oppure attendi il termine.\n\n"
@@ -1100,7 +1100,7 @@ async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
 
-    # v3.0: Set diagnosis_active flag to inhibit chat during manual input
+    # v3.1: Set diagnosis_active flag to inhibit chat during manual input
     context.user_data["diagnosis_active"] = True
 
     keyboard = InlineKeyboardMarkup([
