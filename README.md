@@ -4,14 +4,16 @@
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red?logo=raspberry-pi)
 ![AI](https://img.shields.io/badge/AI-TFLite%20float16-orange)
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
-![Version](https://img.shields.io/badge/Version-v3.0--LEAF--ONLY-green)
+![Version](https://img.shields.io/badge/Version-v3.1--Generalized--CV-green)
 ![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
 ![Accuracy](https://img.shields.io/badge/Accuracy-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
 
 
 > **DELTA Plant** — *AI & Robotics Orchestrator per la Salute delle Piante*  
 > **DELTA** (Detection and Evaluation of Leaf Troubles and Anomalies)  
-> Sistema AI orchestrato specializzato nella diagnostica fitosanitaria fogliare su **Raspberry Pi 5** — v3.0 Leaf-Only Architecture
+> Sistema AI orchestrato specializzato nella diagnostica fitosanitaria fogliare su **Raspberry Pi 5** — v3.1 Generalized Computer Vision Architecture
+
+> 🧠 **v3.1 — DELTA ha imparato a generalizzare:** il sistema di Computer Vision ha evoluto la sua capacità di riconoscimento dalle specie specifiche verso un modello generalizzato su 33 classi PlantVillage, con genus-filter adattivo, rilevamento contestuale della salute e Q&A follow-up intelligente.
 
 ---
 
@@ -30,11 +32,26 @@
 
 ---
 
+## 🆕 Novità in v3.1 — Generalized Computer Vision
+
+> **DELTA Plant ha imparato a generalizzare**, evolvendo il suo modello di Computer Vision da un sistema specializzato a un'architettura generalizzata capace di operare su tutte le 33 classi PlantVillage con intelligenza contestuale.
+
+| Innovazione | Descrizione |
+|---|---|
+| **Genus-Filter adattivo** | Rileva automaticamente il genere della pianta dalla descrizione dell'operatore e filtra le classi diagnostiche in modo contestuale |
+| **Contextual Health Detection** | Il modello AI riconosce le piante sane non solo per classificazione diretta ma in modo contestuale, basandosi sul genere rilevato |
+| **Q&A Follow-up intelligente** | Dialogo bidirezionale post-diagnosi: DELTA pone domande specifiche per approfondire la diagnosi senza richiedere ulteriori foto |
+| **Anti-photo-loop fix** | Eliminato il loop di richiesta foto a fine diagnosi — il flusso è ora completamente lineare |
+| **Paginazione messaggi** | Messaggi lunghi paginati automaticamente con pulsante `/continua` per una UX fluida su mobile |
+| **PlantVillage Benchmark** | 83.9% top-1 / 96.1% top-3 su 660 immagini reali — la classe corretta appare nelle prime 3 predizioni nel 96% dei casi |
+
+---
+
 ## ✨ Caratteristiche principali
 
 | Funzionalità | Descrizione |
 |---|---|
-| **Analisi fogliare esclusiva** | Diagnostica 33 classi di malattie/patologie fogliari via MobileNetV2 transfer learning |
+| **Analisi fogliare generalizzata** | Diagnostica 33 classi di malattie/patologie fogliari via MobileNetV2 transfer learning con genus-filter adattivo |
 | **Input sensori manuale** | Utente invia foto + 7 dati sensori (TEMP, UMID, PRESS, LUMI, CO₂, pH, EC) |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
@@ -245,7 +262,7 @@ python Manuale/genera_manuale.py
 
 ## 📄 Licenza
 
-**DELTA PLANT SOFTWARE LICENSE** — Software Release: **v3.0**  
+**DELTA PLANT SOFTWARE LICENSE** — Software Release: **v3.1**  
 Copyright © 2026 Paolo Ciccolella. All rights reserved.
 
 Il core di DELTA Plant è software proprietario. È consentito l'uso a scopi di
