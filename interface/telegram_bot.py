@@ -1704,8 +1704,14 @@ async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_
         return ConversationHandler.END
     context.user_data["diagnosis_active"] = True
     context.user_data.pop("diag_user_description", None)
-    await _send(update, "📷 Foto ricevuta. Avvio la procedura diagnosi.")
-    return await receive_diag_photo(update, context)
+    # Salva la foto e poi chiede la descrizione utente (stesso flusso della diagnosi guidata)
+    saved = await _download_telegram_image(update)
+    if not saved:
+        await _send(update, "Immagine non valida.")
+        return ConversationHandler.END
+    context.user_data["diag_image_path"] = str(saved)
+    await _send(update, "📷 Foto ricevuta.")
+    return await _ask_user_description(update, context)
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

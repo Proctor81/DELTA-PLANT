@@ -859,6 +859,42 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "12. Analisi fiore/frutto disponibile solo se leaf_only_mode=False in core/config.py",
     ])
 
+    pdf._subsection("5.4a Diagnosi intelligente Telegram — flusso v3.1")
+    pdf._body(
+        "A partire dalla v3.1, il flusso diagnosi su Telegram include una fase di raccolta "
+        "della descrizione utente e, in caso di pianta non riconosciuta, un ciclo di "
+        "domande di approfondimento conversazionale con l'LLM. "
+        "Il flusso si attiva sia dal menu (pulsante Diagnosi) sia inviando liberamente "
+        "una foto in chat senza passare dal menu."
+    )
+    pdf._bullet([
+        "1. Ricezione foto (da menu Diagnosi o invio libero in chat)",
+        "2. DELTA chiede: 'Di che pianta si tratta? Descrivi l'anomalia riscontrata'",
+        "3. L'utente descrive la pianta e il problema (es. 'Pomodoro con macchie gialle sulle foglie')",
+        "4. Scelta sensori: automatici o inserimento manuale passo-passo",
+        "5. Inferenza AI sul modello TFLite (33 classi PlantVillage)",
+        "   - Se confidenza >= 50%: ramo normale (punto 6)",
+        "   - Se confidenza < 50%: ramo fallback conversazionale (punto 7)",
+        "6. Ramo normale — reclassificazione con LLM:",
+        "   • L'LLM verifica se la classe PlantVillage rilevata e coerente con la descrizione utente",
+        "   • Se non lo e, corregge la classe con quella piu appropriata tra le 33 disponibili",
+        "   • Diagnosi strutturata generata con descrizione utente integrata nel prompt",
+        "7. Ramo fallback — follow-up conversazionale:",
+        "   • Avviso: 'Pianta non riconosciuta nel database'",
+        "   • L'LLM genera fino a 5 domande mirate (colore, parte colpita, progressione, ecc.)",
+        "   • Stop anticipato se l'LLM ritiene di avere gia informazioni sufficienti",
+        "   • Diagnosi finale strutturata in 5 blocchi: ipotesi, differenziale, azioni immediate,",
+        "     azioni a breve termine, monitoraggio — con esplicito avviso di incertezza",
+        "8. Risposta inviata in chat con paginazione automatica (/continua se testo lungo)",
+    ])
+    pdf._kv_table([
+        ("Soglia fallback",          "confidenza < 50% sul modello TFLite reale (configurabile in core/config.py)"),
+        ("Max domande follow-up",    "5 (configurabile tramite MAX_FOLLOWUP_QUESTIONS in telegram_bot.py)"),
+        ("Reclassificazione LLM",    "Attiva solo se l'utente ha fornito una descrizione"),
+        ("Diagnosi conversazionale", "Basata su descrizione + Q&A + dati sensori, senza immagine classificata"),
+        ("Foto libera",              "Stessa procedura del flusso guidato: foto → descrizione → sensori → diagnosi"),
+    ])
+
     pdf._subsection("5.5 Output diagnosi — interpretazione")
     pdf._kv_table([
         ("Stato pianta",    "Classe fitosanitaria rilevata dal modello AI"),
@@ -1035,7 +1071,11 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     )
     pdf._subsection("Funzionalita principali")
     pdf._bullet([
-        "Diagnosi completa con foto da smartphone o immagini in input_images",
+        "Diagnosi intelligente con foto da smartphone o immagini in input_images",
+        "  - Descrizione utente raccolta prima dell'inferenza AI",
+        "  - Reclassificazione LLM se la classe non coincide con la descrizione",
+        "  - Follow-up conversazionale (max 5 domande) se la pianta non e nel database",
+        "Invio foto libero in chat: stessa procedura guidata della diagnosi da menu",
         "Upload immagini con etichettatura foglia/fiore/frutto per fine-tuning",
         "Report, export Excel e storico diagnosi direttamente in chat",
         "Academy, preflight AI e dati sensori disponibili via Telegram",
