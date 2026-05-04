@@ -78,10 +78,6 @@ from core.agent import DeltaAgent
 from interface.cli import CLI
 from interface.api import run_api
 from interface.telegram_bot import run_telegram_bot, serve_telegram_polling
-from bot.deltaplano_bot import DELTAPLANOBot
-
-# Percorso modello LLM TinyLlama GGUF
-LLM_MODEL_PATH = "models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf"
 from core.config import API_CONFIG, MODEL_CONFIG, TELEGRAM_CONFIG
 from core.auth import initialize_password
 from ai.preflight_validator import validate_model_artifacts, PreflightGateError

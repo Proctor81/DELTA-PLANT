@@ -15,7 +15,7 @@
 
 ### 🤖 ChatEngine con HuggingFace Inference API
 - Modello primario: **`meta-llama/Llama-3.1-8B-Instruct`** (testato, risposte in italiano)
-- Fallback automatico a TinyLlama locale se HF non disponibile
+- Nota storica: in 2.0.6 era presente fallback TinyLlama locale (rimosso nelle release successive)
 - Validazione token all'avvio con messaggio chiaro in caso di errore 401
 - Memoria conversazionale per sessione (per utente Telegram)
 
@@ -28,7 +28,7 @@
 - Timeout chat: 600 secondi (configurabile via `chat_timeout_sec` in config)
 
 ### 🔧 Bot e Router aggiornati
-- **`bot/deltaplano_bot.py`**: rimosso stub TinyLlama, usa `ChatEngine` con HF LLM reale
+- **`bot/deltaplano_bot.py`**: usa `ChatEngine` con HF LLM reale
   - `handle_message()`: chat LLM o vision a seconda dell'input
   - `handle_command("/status")`: mostra stato HF token e MobileNet
   - `handle_command("/reset")`: azzera memoria conversazionale
@@ -75,8 +75,16 @@
 2. Usa `/start` o `/menu`
 3. Clicca **`🔵 💬 Chiedi a DELTA`** (prima riga del menu)
 4. Scrivi qualsiasi domanda: malattie piante, agronomia, interpretazione diagnosi
-5. DELTA risponde usando Llama-3.1-8B via HuggingFace (o TinyLlama offline)
+5. DELTA risponde usando Llama-3.1-8B via HuggingFace
 6. Clicca **"🔴 Termina chat"** o invia `/chiudi` per tornare al menu
+
+---
+
+## Aggiornamento successivo (post 2.0.6)
+
+- TinyLlama/llama.cpp rimossi dai flussi runtime.
+- Chat bot: solo HuggingFace.
+- Orchestrator: HuggingFace con fallback Ollama (opzionale).
 
 ---
 

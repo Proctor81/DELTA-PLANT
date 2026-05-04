@@ -23,15 +23,8 @@ class HuggingFaceAdapter(BaseLLMAdapter):
     Usa InferenceClient (huggingface_hub) con fallback su lista di modelli.
     """
 
-    # Modelli in ordine di priorità per DELTA
-    _MODEL_PRIORITY = [
-        "mistralai/Mistral-7B-Instruct-v0.3",
-        "Qwen/Qwen2.5-7B-Instruct",
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "microsoft/Phi-3.5-mini-instruct",
-        "HuggingFaceH4/zephyr-7b-beta",
-        "Qwen/Qwen2.5-3B-Instruct",
-    ]
+    # Modello default consigliato (sovrascrivibile con HF_MODEL_NAME)
+    _DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
     def __init__(
         self,
@@ -41,7 +34,7 @@ class HuggingFaceAdapter(BaseLLMAdapter):
         **kwargs,
     ):
         _model = model_name or os.environ.get(
-            "HF_MODEL_NAME", self._MODEL_PRIORITY[0]
+            "HF_MODEL_NAME", self._DEFAULT_MODEL
         )
         super().__init__(_model, **kwargs)
         self.api_token = api_token or os.environ.get("HF_API_TOKEN", "")
@@ -66,41 +59,29 @@ class HuggingFaceAdapter(BaseLLMAdapter):
             {"role": "user", "content": prompt},
         ]
 
-        # Usa il modello attivo o il primo della lista
-        models_to_try = []
-        if self._active_model:
-            models_to_try.append(self._active_model)
-        models_to_try.append(self.model_name)
-        models_to_try.extend(
-            m for m in self._MODEL_PRIORITY
-            if m not in models_to_try
-        )
-
-        for model in models_to_try:
-            try:
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=512,
-                    temperature=0.65,
-                )
-                answer = resp.choices[0].message.content.strip()
-                self._active_model = model
-                logger.info(
-                    "HuggingFace risposta OK",
-                    model=model,
-                    chars=len(answer),
-                )
-                return answer
-            except Exception as e:
-                logger.warning(
-                    "HuggingFace generate error",
-                    model=model,
-                    error=str(e)[:120],
-                )
-                continue
-
-        return "[HuggingFace error: nessun modello disponibile]"
+        model = self._active_model or self.model_name
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=512,
+                temperature=0.65,
+            )
+            answer = resp.choices[0].message.content.strip()
+            self._active_model = model
+            logger.info(
+                "HuggingFace risposta OK",
+                model=model,
+                chars=len(answer),
+            )
+            return answer
+        except Exception as e:
+            logger.warning(
+                "HuggingFace generate error",
+                model=model,
+                error=str(e)[:120],
+            )
+            return f"[HuggingFace error: {e}]"
 
     def is_available(self) -> bool:
         """Controlla la disponibilità sincrona del servizio HF."""
@@ -122,5 +103,5 @@ class HuggingFaceAdapter(BaseLLMAdapter):
         return {
             "active_model": self._active_model or self.model_name,
             "has_token": bool(self.api_token),
-            "priority_list": self._MODEL_PRIORITY,
+            "priority_list": [self.model_name],
         }

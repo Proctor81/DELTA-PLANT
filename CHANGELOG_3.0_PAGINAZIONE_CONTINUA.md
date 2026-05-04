@@ -23,7 +23,7 @@ Questa release implementa la **paginazione messaggi lunghi** con comando `/conti
 
 #### Chat Libera
 - Lo stesso meccanismo applicato alle risposte dell'LLM in chat libera
-- Se la risposta HF/TinyLlama è lunga, viene paginata con `/continua`
+- Se la risposta LLM è lunga, viene paginata con `/continua`
 - No chiusura aggiuntiva nella chat (comportamento semplice)
 
 #### Handler `/continua` Unificato
@@ -105,8 +105,8 @@ Questa release implementa la **paginazione messaggi lunghi** con comando `/conti
 - **Stabilizzazione LLM:**
   - Timeout HF aumentato e configurabile (15s default)
   - Validazione token non bloccante (non chiama rete in `__init__`)
-  - Check robusti fallback locale: verifica esistenza modello e binario llama.cpp
-  - Logging migliorato fallback
+  - Gestione errori backend con fallback finale controllato
+  - Logging migliorato backend
 
 #### `tests/test_telegram_bot.py`
 - Aggiunti 5 nuovi test:

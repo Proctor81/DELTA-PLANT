@@ -91,7 +91,7 @@ def test_inference(token: str) -> tuple[bool, str]:
         from huggingface_hub import InferenceClient
         client = InferenceClient(api_key=token, timeout=30)
         resp = client.chat.completions.create(
-            model="mistralai/Mistral-7B-Instruct-v0.3",
+            model="meta-llama/Llama-3.1-8B-Instruct",
             messages=[{"role": "user", "content": "Rispondi con una sola parola: ciao"}],
             max_tokens=10,
             temperature=0.1,

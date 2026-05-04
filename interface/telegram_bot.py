@@ -1105,8 +1105,7 @@ async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📷 Invia foto", callback_data=DIAG_IMAGE_UPLOAD)],
-        [InlineKeyboardButton("🖼 Usa ultima immagine", callback_data=DIAG_IMAGE_LAST)],
-        [InlineKeyboardButton("📸 Camera locale", callback_data=DIAG_IMAGE_CAMERA)],
+        [InlineKeyboardButton(" Camera locale", callback_data=DIAG_IMAGE_CAMERA)],
     ])
     await _send(update, "Diagnosi: scegli la fonte immagine.", reply_markup=keyboard)
     return STATE_DIAG_IMAGE_SOURCE

@@ -61,7 +61,7 @@ flask>=3.0.0
 
 # ── HuggingFace Inference API (LLM cloud per chat intelligente) ──────────────
 # Richiede token HF_API_TOKEN nel file .env
-# Modello preferito: mistralai/Mistral-7B-Instruct-v0.3
+# Modello preferito: meta-llama/Llama-3.1-8B-Instruct
 huggingface_hub>=0.27.0
 
 # ── Telegram bot (opzionale) ─────────────────────────────────

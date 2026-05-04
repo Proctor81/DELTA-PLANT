@@ -29,8 +29,6 @@ _TOKEN_HELP = """
 ║  6. Incollalo in DELTA_2.0/.env:                                     ║
 ║        HF_API_TOKEN=hf_IL_TUO_NUOVO_TOKEN                           ║
 ║  7. Riavvia DELTA                                                    ║
-║                                                                      ║
-║ Nel frattempo DELTA usa TinyLlama locale come fallback.              ║
 ╚══════════════════════════════════════════════════════════════════════╝
 """
 
@@ -60,17 +58,12 @@ Sei l'interfaccia intelligente di un sistema Raspberry Pi con telecamera e senso
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LISTA MODELLI IN ORDINE DI PREFERENZA (migliore per DELTA agronomico IT)
+# Modello default consigliato (sovrascrivibile con HF_MODEL_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
-HF_MODEL_PRIORITY = [
-    "meta-llama/Llama-3.1-8B-Instruct",      # Verificato funzionante — ottimo IT
-    "Qwen/Qwen2.5-7B-Instruct",              # Forte multilingue
-    "Qwen/Qwen2.5-72B-Instruct",             # Versione grande, alta qualità
-    "microsoft/Phi-3.5-mini-instruct",        # Leggero, buone prestazioni
-    "Qwen/Qwen2.5-3B-Instruct",              # Fallback leggero
-    "HuggingFaceH4/zephyr-7b-beta",          # Fallback conversazione
-    "mistralai/Mistral-7B-Instruct-v0.3",    # Potrebbe non essere disponibile
-]
+HF_DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+
+# Conservata per compatibilita con test/tooling legacy.
+HF_MODEL_PRIORITY = [HF_DEFAULT_MODEL]
 
 
 class HuggingFaceLLM:
@@ -89,7 +82,7 @@ class HuggingFaceLLM:
     ):
         self.api_token = api_token or os.environ.get("HF_API_TOKEN", "")
         self.model_name = model_name or os.environ.get(
-            "HF_MODEL_NAME", HF_MODEL_PRIORITY[0]
+            "HF_MODEL_NAME", HF_DEFAULT_MODEL
         )
         self.max_tokens = max_tokens
         self.temperature = temperature
@@ -160,8 +153,8 @@ class HuggingFaceLLM:
 
     def select_best_model(self) -> Optional[str]:
         """
-        Prova i modelli in ordine di priorità e restituisce il primo disponibile.
-        Memorizza il risultato per evitare probe ripetuti.
+        Verifica il modello configurato e lo imposta come attivo.
+        Non applica fallback automatici tra modelli diversi.
         """
         if self._active_model:
             return self._active_model
@@ -171,19 +164,14 @@ class HuggingFaceLLM:
             return None
 
         client = self._get_client()
-        # Prima prova il modello configurato
-        models_to_try = [self.model_name] + [
-            m for m in HF_MODEL_PRIORITY if m != self.model_name
-        ]
+        model = self.model_name
+        logger.info(f"Probe modello HF configurato: {model}")
+        if self._probe_model(client, model):
+            self._active_model = model
+            logger.info(f"Modello HF selezionato: {model}")
+            return model
 
-        for model in models_to_try:
-            logger.info(f"Probe modello HF: {model}")
-            if self._probe_model(client, model):
-                self._active_model = model
-                logger.info(f"Modello HF selezionato: {model}")
-                return model
-
-        logger.error("Nessun modello HF disponibile — verifica token e connessione")
+        logger.error("Modello HF configurato non disponibile: %s", model)
         return None
 
     def chat(
@@ -252,28 +240,6 @@ class HuggingFaceLLM:
                     "none",
                 )
 
-            # Auto-fallback: prova il prossimo modello della lista
-            fallback_tried = {model}
-            for fallback in HF_MODEL_PRIORITY:
-                if fallback in fallback_tried:
-                    continue
-                fallback_tried.add(fallback)
-                try:
-                    logger.info(f"Fallback HF → {fallback}")
-                    resp = client.chat.completions.create(
-                        model=fallback,
-                        messages=messages,
-                        max_tokens=self.max_tokens,
-                        temperature=self.temperature,
-                    )
-                    answer = resp.choices[0].message.content.strip()
-                    self._active_model = fallback  # Aggiorna modello attivo
-                    logger.info(f"Fallback HF riuscito con {fallback}")
-                    return answer, fallback
-                except Exception as fe:
-                    logger.debug(f"Fallback {fallback} fallito: {fe}")
-                    continue
-
             return (
                 f"[DELTA] Impossibile generare risposta LLM. "
                 f"Verifica connessione e token HF. Errore: {err_msg[:100]}",
@@ -297,4 +263,5 @@ class HuggingFaceLLM:
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "priority_list": HF_MODEL_PRIORITY,
+            "auto_fallback_enabled": False,
         }

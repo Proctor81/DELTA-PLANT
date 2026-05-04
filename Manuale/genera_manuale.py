@@ -805,7 +805,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
     pdf._kv_table([
         ("[1] Avvia diagnosi pianta",      "Acquisisce immagine + dati sensori → diagnosi completa"),
-        ("[2] Fine-tuning modello AI",     "Riaddestra il modello con nuovi campioni raccolti"),
+        ("[2] Fine-tuning modello AI",     "Funzione runtime disabilitata nella logica semplificata"),
         ("[3] Dati sensori correnti",      "Mostra una lettura istantanea di tutti i sensori"),
         ("[4] Esporta dati in Excel",      "Genera/aggiorna il file exports/delta_diagnoses.xlsx"),
         ("[5] Ultime diagnosi",            "Mostra le diagnosi recenti memorizzate nel database"),
@@ -824,7 +824,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Per uscire dalla chat e tornare al menu principale, digitare '/exit'."
     )
     pdf._bullet([
-        "Esempi: 'Qual è lo stato attuale della pianta?', 'Mostrami le ultime diagnosi', 'Spiega il rischio attuale', 'Come si fa il fine-tuning?'",
+        "Esempi: 'Qual è lo stato attuale della pianta?', 'Mostrami le ultime diagnosi', 'Spiega il rischio attuale'",
         "La chat libera è utile per domande rapide, troubleshooting e interazione naturale con il sistema.",
         "La funzione è disponibile solo se l'orchestrator DELTA è correttamente installato e attivo.",
         "Digitare '/exit' per uscire dalla chat e tornare al menu principale.",
@@ -969,7 +969,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
 def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf.add_page()
-    pdf._section_title("6. PARTE B (cont.) — API REST, TELEGRAM E FINE-TUNING")
+    pdf._section_title("6. PARTE B (cont.) — API REST E TELEGRAM")
 
     pdf._subsection("6.1 API REST Flask (opzionale)")
     ac = cfg.get("API_CONFIG", {})
@@ -1046,8 +1046,8 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
 
     pdf._bullet([
         "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
-        "/export, /preflight, /finetune, /academy, /license, /health, /batch",
-        "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio', 'Come si fa il fine-tuning?') e ricevere risposta dall'orchestrator DELTA.",
+        "/export, /preflight, /academy, /license, /health, /batch",
+        "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
 
@@ -1076,7 +1076,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "  - Reclassificazione LLM se la classe non coincide con la descrizione",
         "  - Follow-up conversazionale (max 5 domande) se la pianta non e nel database",
         "Invio foto libero in chat: stessa procedura guidata della diagnosi da menu",
-        "Upload immagini con etichettatura foglia/fiore/frutto per fine-tuning",
+        "Upload immagini per acquisizione e diagnosi da archivio input_images",
         "Report, export Excel e storico diagnosi direttamente in chat",
         "Academy, preflight AI e dati sensori disponibili via Telegram",
         "Interfaccia con pulsanti inline per ridurre errori di input",
@@ -1130,11 +1130,9 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._subsection("Learning-by-Doing (upload + metadati)")
     lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
     pdf._body(
-        "Con il comando /upload (o inviando una foto direttamente in chat) l'operatore "
-        "inserisce il nome della pianta, seleziona l'organo (foglia/fiore/frutto) "
-        "e poi la classe specifica dell'organo. "
-        "L'immagine viene salvata in input_images e nel dataset di training dedicato, "
-        "mentre i metadati vengono registrati in JSON per ogni immagine."
+        "Con il comando /upload (o inviando una foto direttamente in chat) l'immagine "
+        "viene acquisita in input_images per analisi successive. "
+        "Nella logica semplificata i passaggi runtime di etichettatura/training non sono attivi."
     )
     pdf._code_block(
         f"# Cartella learning-by-doing\n"
@@ -1143,14 +1141,14 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         f"  records/  # metadati JSON per immagine"
     )
 
-    pdf._subsection("6.3 Fine-tuning del modello AI")
+    pdf._subsection("6.3 Training Offline (non runtime)")
     fc = cfg.get("FINETUNING_CONFIG", {})
     ffc = cfg.get("FINETUNING_FLOWER_CONFIG", {})
     frc = cfg.get("FINETUNING_FRUIT_CONFIG", {})
     pdf._body(
-        "Il fine-tuning permette di addestrare il modello con immagini raccolte "
-        "direttamente dalla propria installazione, migliorando l'accuratezza "
-        "per le specie e le condizioni locali specifiche."
+        "La logica runtime semplificata non include fine-tuning on-device. "
+        "Eventuali riaddestramenti sono previsti come workflow offline tecnico "
+        "(script in /ai e pipeline dedicate)."
     )
     if fc:
         pdf._kv_table([
@@ -1172,13 +1170,12 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
             ("[Frutto] Directory dataset",  frc.get("dataset_dir", "?")),
             ("[Frutto] Modello output",     frc.get("model_save_path", "?")),
         ])
-    pdf._body("Procedura fine-tuning:")
+    pdf._body("Procedura training offline consigliata:")
     pdf._bullet([
-        "Raccogliere almeno 10 immagini per classe (cartelle nel dataset_dir)",
-        "Da Telegram usare /finetune e scegliere foglia/fiore/frutto",
-        "Dal menu CLI selezionare [2] Fine-tuning modello AI (foglia)",
-        "Attendere il completamento — progresso visualizzato a schermo",
-        "Il nuovo modello viene salvato automaticamente e caricato al prossimo avvio",
+        "Raccogliere dataset nelle cartelle di training offline",
+        "Eseguire script dedicati in /ai (train_keras_classifier.py, convert_keras_to_tflite.py)",
+        "Validare artefatti con preflight prima del deploy",
+        "Distribuire il nuovo .tflite in ambiente operativo e riavviare il servizio",
     ])
 
 
@@ -1367,13 +1364,13 @@ def _add_troubleshooting(pdf: ManualePDF):
             ]
         ),
         (
-            "La chat LLM (llama-cli) cattura il terminale all'avvio",
+            "La chat LLM non risponde o risponde con errore backend non disponibile",
             [
-                "Sintomo: all'avvio di DELTA compare 'Loading model...' e il logo llama.cpp prima di poter usare il menu.",
-                "Causa: il subprocess llama-cli ereditava stdin del terminale — risolto in llm/llama_cpp_wrapper.py.",
-                "Fix applicato: stdin=subprocess.DEVNULL, start_new_session=True, -no-cnv, --single-turn.",
-                "Se il problema persiste: verificare che llm/llama_cpp_wrapper.py contenga start_new_session=True nel Popen.",
-                "Verifica rapida: pgrep -a llama-cli — non deve apparire nulla senza aver selezionato [C] dal menu.",
+                "Sintomo: in chat compare un messaggio di backend LLM non disponibile.",
+                "Causa: token HuggingFace assente/non valido oppure modello HF non raggiungibile.",
+                "Verificare HF_API_TOKEN e HF_MODEL_NAME nel file .env.",
+                "Verificare connettivita rete e accesso HTTPS verso router.huggingface.co.",
+                "(Orchestrator) se configurato, verificare Ollama in ascolto su OLLAMA_ENDPOINT.",
                 "Per uscire dalla chat libera CLI digitare '/exit' (non 'exit' o 'esci').",
             ]
         ),
@@ -3848,8 +3845,8 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     pdf._subsection("14b.1 Architettura")
     pdf._kv_table([
         ("Modello primario",       "meta-llama/Llama-3.1-8B-Instruct (HuggingFace InferenceClient)"),
-        ("Fallback locale",        "TinyLlama-1.1B-Chat via llama.cpp (se HF non disponibile)"),
-        ("Fallback finale",        "Risposta di cortesia statica (garantisce sempre una risposta)"),
+        ("Fallback secondario",    "Ollama locale (solo orchestrator, se configurato)"),
+        ("Fallback finale",        "Messaggio di errore controllato (nessun backend disponibile)"),
         ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
         ("Motore di chat",         "chat/chat_engine.py — ChatEngine"),
         ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o 🗑 Reset)"),
@@ -3866,25 +3863,24 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     )
     pdf._code_block(
         "# Nel file .env nella directory del progetto\n"
-        "DELTA_HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\n"
+        "HF_API_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+        "HF_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct\n\n"
         "# Il sistema valida il token all'avvio:\n"
         "# [INFO] delta.huggingface_llm: Token HF valido — utente: TuoNomeHF\n\n"
-        "# Se il token non è valido o assente, ChatEngine torna al fallback locale.",
+        "# Se il token non è valido o assente, ChatEngine segnala backend non disponibile.",
         label=".env — TOKEN HF",
     )
-    pdf._body("Priorità modelli HuggingFace (tentati in ordine):")
+    pdf._body("Modello HuggingFace configurato (senza rotazione automatica):")
     pdf._bullet([
-        "meta-llama/Llama-3.1-8B-Instruct  ← modello principale",
-        "mistralai/Mistral-7B-Instruct-v0.3",
-        "microsoft/DialoGPT-medium",
-        "distilbert/distilgpt2",
+        "meta-llama/Llama-3.1-8B-Instruct (default consigliato)",
+        "Modificabile via variabile ambiente HF_MODEL_NAME",
     ])
     pdf._info_box(
         "ACCESSO AL MODELLO LLAMA",
         "meta-llama/Llama-3.1-8B-Instruct richiede accettazione dei termini Meta su HuggingFace. "
         "Visitare: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct "
         "e accettare la licenza con l'account collegato al token. "
-        "Senza accesso il sistema passa automaticamente al modello successivo nella lista.",
+        "Senza accesso il sistema segnala che il backend configurato non e disponibile.",
         color=BLUE_MID,
     )
 
@@ -3925,7 +3921,7 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     pdf._bullet([
         "Selezionare [C] dal menu CLI per avviare la chat",
         "Digitare qualsiasi domanda in italiano o inglese",
-        "Il sistema usa HF LLM se disponibile, altrimenti fallback TinyLlama",
+        "Il sistema usa il backend HF configurato",
         "Digitare '/exit' per tornare al menu principale",
     ])
 
@@ -3938,14 +3934,13 @@ def _add_hf_llm_chat(pdf: ManualePDF):
         "Token HF presente in .env (OK/KO)",
         "Token HF valido (HfApi.whoami()) (OK/KO)",
         "Modello HF raggiungibile (ping InferenceClient) (OK/KO)",
-        "Se tutti KO: ChatEngine opera in fallback TinyLlama locale",
+        "Se KO: ChatEngine segnala backend non disponibile",
     ])
     pdf._info_box(
         "FUNZIONAMENTO OFFLINE",
-        "Se il Raspberry Pi non ha accesso a internet, il sistema torna automaticamente "
-        "al modello TinyLlama locale (llama.cpp). Il bot Telegram risponde lo stesso, "
-        "con risposte più semplici. Per abilitare l'LLM cloud assicurarsi che "
-        "il Pi abbia accesso a api-inference.huggingface.co sulla porta 443.",
+        "Se il Raspberry Pi non ha accesso a internet, il backend HuggingFace non risponde. "
+        "Nel ramo orchestrator, se Ollama e attivo localmente, puo essere usato come backend secondario. "
+        "Per abilitare l'LLM cloud assicurarsi che il Pi abbia accesso HTTPS a router.huggingface.co.",
         color=GREEN,
     )
 

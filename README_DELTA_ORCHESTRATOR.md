@@ -49,28 +49,27 @@ print(result)
 
 ## Prossimi passi consigliati
 
-# TinyLlama locale & fallback LLM
+# Pipeline LLM attuale
 
-## Pipeline LLM locale (TinyLlama)
-La pipeline DELTA ora supporta TinyLlama locale tramite llama.cpp (modello GGUF). Il bot Telegram e la CLI usano TinyLlama come LLM principale, con fallback automatico su Ollama e HuggingFace solo se TinyLlama fallisce.
+## Chat engine e priorita backend
+La pipeline DELTA usa HuggingFace come backend principale per la chat e, nel ramo orchestrator, Ollama come fallback secondario. TinyLlama locale e llama.cpp sono stati rimossi dai flussi runtime.
 
 **Requisiti:**
-- Modello GGUF valido in `models/tinyllama-1.1b-chat-v1.0-q4_K_M.gguf`
-- Binario `llama.cpp` compilato in `llama.cpp/build/bin/llama-cli`
-- Python wrapper funzionante: `llm/llama_cpp_wrapper.py`
+- Token HuggingFace valido in `.env` (`HF_API_TOKEN`)
+- Modello HF configurato in `.env` (`HF_MODEL_NAME`, default consigliato `meta-llama/Llama-3.1-8B-Instruct`)
+- (Opzionale orchestrator) endpoint Ollama raggiungibile (`OLLAMA_ENDPOINT`)
 
 **Comportamento:**
-- DELTAPLANO_bot risponde tramite TinyLlama locale.
-- Se TinyLlama fallisce, fallback su Ollama (se attivo) o HuggingFace (se configurato).
-- Log dettagliato degli errori Telegram: in caso di errore, il messaggio Telegram mostra il traceback Python per facilitare la diagnosi.
+- DELTAPLANO_bot e ChatEngine usano esclusivamente HuggingFace.
+- L'orchestrator usa HuggingFace e, se non disponibile, prova Ollama.
+- In assenza di backend disponibili, viene restituito un messaggio di errore controllato.
 
 **Note:**
 - Se ricevi "Errore durante l'elaborazione della domanda. Dettagli: ...", copia qui il traceback per la diagnosi.
-- Se la cartella `llama.cpp` è un repository git annidato, segui le istruzioni nel prompt per usare submodule o gitignore.
 
 ## Comandi utili
 ```
 git add .
-git commit -m "Patch: integrazione TinyLlama locale, fallback LLM, logging errori Telegram dettagliato"
+git commit -m "Patch: consolidamento LLM su HuggingFace/Ollama e rimozione TinyLlama"
 git push
 ```

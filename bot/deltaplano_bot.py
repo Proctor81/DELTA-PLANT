@@ -8,14 +8,14 @@ logger = logging.getLogger("delta.deltaplano_bot")
 
 class DELTAPLANOBot:
     """
-    Bot DELTA: instrada messaggi verso ChatEngine (HF LLM + fallback TinyLlama)
+    Bot DELTA: instrada messaggi verso ChatEngine (HF LLM)
     o verso MobileNetService (vision), a seconda del contenuto.
     """
 
     def __init__(self, llm_model_path: str = ""):
-        # ChatEngine usa HuggingFace Inference API come primario,
-        # TinyLlama locale come fallback.
-        self.chat_engine = ChatEngine(llm_model_path)
+        # Parametro mantenuto per compatibilita: il backend LLM e gestito da ChatEngine.
+        _ = llm_model_path
+        self.chat_engine = ChatEngine()
         self.vision_service = MobileNetService()
 
     def handle_message(self, user_id, text: str, image_path: str = None) -> str:

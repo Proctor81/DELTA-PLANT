@@ -318,6 +318,15 @@ LOGGING_CONFIG = {
 }
 
 # ─────────────────────────────────────────────
+# FEATURE FLAGS DI SISTEMA
+# ─────────────────────────────────────────────
+FEATURE_FLAGS = {
+    # Disabilita i flussi runtime (CLI/Telegram) di fine-tuning on-device.
+    # Gli script di training offline in /ai restano disponibili.
+    "enable_runtime_finetuning": False,
+}
+
+# ─────────────────────────────────────────────
 # FINE-TUNING
 # ─────────────────────────────────────────────
 FINETUNING_CONFIG = {

@@ -2,7 +2,6 @@
 
 ## Architettura
 
-- `/llm/llama_cpp_wrapper.py`: wrapper Python per TinyLlama (llama.cpp, GGUF, streaming)
 - `/chat/chat_engine.py`: gestione conversazione, memoria per utente, prompt engineering
 - `/bot/deltaplano_bot.py`: logica Telegram, routing, comandi, sessioni
 - `/router/router.py`: smistamento tra LLM e Vision (MobileNet)
@@ -14,12 +13,12 @@
 ## Note
 - Tutto gira su Raspberry Pi (16GB RAM)
 - Nessuna dipendenza Hailo, ma architettura pronta
-- TinyLlama GGUF va posizionato in `/models`
-- Serve installare `llama.cpp` e python-telegram-bot
+- Backend chat principale: HuggingFace Inference API
+- Backend secondario orchestrator: Ollama (opzionale)
 - Logging, limiti token, timeout e streaming previsti
 
 ## TODO
-- Completare implementazione wrapper llama.cpp (streaming)
+- Migliorare monitoraggio disponibilita backend HF/Ollama
 - Integrare polling Telegram reale
 - Migliorare routing e gestione sessioni
 - Testare su Raspberry Pi

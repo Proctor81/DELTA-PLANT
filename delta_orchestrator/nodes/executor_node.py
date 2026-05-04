@@ -1,6 +1,6 @@
 """
 Executor Node: chiamata tool e LLM
-Priorità LLM: 1) HuggingFace cloud  2) Ollama locale  3) TinyLlama locale
+Priorita LLM: 1) HuggingFace cloud  2) Ollama locale
 """
 from .base_node import BaseNode
 from typing import Dict, Any
@@ -9,13 +9,12 @@ import structlog
 from ..tools.registry import registry
 from delta_orchestrator.adapters.huggingface_adapter import HuggingFaceAdapter
 from delta_orchestrator.adapters.ollama_adapter import OllamaAdapter
-from delta_orchestrator.adapters.tinyllama_adapter import TinyLlamaAdapter
 
 logger = structlog.get_logger("executor_node")
 
 
 class ExecutorNode(BaseNode):
-    """Nodo executor: esegue tool e LLM con priorità HuggingFace → Ollama → TinyLlama."""
+    """Nodo executor: esegue tool e LLM con priorita HuggingFace -> Ollama."""
 
     def __init__(self):
         super().__init__("executor")
@@ -44,10 +43,10 @@ class ExecutorNode(BaseNode):
 
         llm_response = None
 
-        # ── PRIORITÀ 1: HuggingFace cloud ─────────────────────────────────
+        # ── PRIORITA 1: HuggingFace cloud ─────────────────────────────────
         hf_token = os.environ.get("HF_API_TOKEN", "")
         if hf_token:
-            hf_model = os.environ.get("HF_MODEL_NAME", "mistralai/Mistral-7B-Instruct-v0.3")
+            hf_model = os.environ.get("HF_MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
             hf_adapter = HuggingFaceAdapter(model_name=hf_model, api_token=hf_token)
             try:
                 llm_response = await hf_adapter.generate(user_message)
@@ -68,7 +67,7 @@ class ExecutorNode(BaseNode):
         else:
             logger.info("HF_API_TOKEN non presente, salto HuggingFace")
 
-        # ── PRIORITÀ 2: Ollama locale ──────────────────────────────────────
+        # ── PRIORITA 2: Ollama locale ──────────────────────────────────────
         ollama_endpoint = os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434")
         ollama = OllamaAdapter(endpoint=ollama_endpoint)
         try:
@@ -79,17 +78,6 @@ class ExecutorNode(BaseNode):
                 return state
         except Exception as e:
             logger.warning("Ollama non disponibile", error=str(e))
-
-        # ── PRIORITÀ 3: TinyLlama locale ──────────────────────────────────
-        try:
-            tinyllama = TinyLlamaAdapter()
-            llm_response = await tinyllama.generate(user_message)
-            if llm_response and not llm_response.startswith("[TinyLlama error"):
-                state["final_answer"] = llm_response.strip()
-                logger.info("ExecutorNode: risposta TinyLlama OK")
-                return state
-        except Exception as e:
-            logger.warning("TinyLlama non disponibile", error=str(e))
 
         # ── Fallback finale ────────────────────────────────────────────────
         state["final_answer"] = (

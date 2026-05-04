@@ -5,8 +5,9 @@ from vision.mobilenet_service import MobileNetService
 
 class Router:
     def __init__(self, llm_model_path: str = ""):
-        # model_path vuoto: ChatEngine usa HF cloud (TinyLlama come fallback)
-        self.chat_engine = ChatEngine(llm_model_path)
+        # model_path mantenuto per compatibilita, backend LLM gestito internamente.
+        _ = llm_model_path
+        self.chat_engine = ChatEngine()
         self.vision_service = MobileNetService()
 
     def route(self, user_id, user_input: str, image_path=None):

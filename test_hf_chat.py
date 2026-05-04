@@ -78,8 +78,8 @@ def test_import():
 
 
 def test_model_selection(token: str, verbose: bool = False) -> str | None:
-    """Testa la selezione del modello HF migliore disponibile."""
-    print("\n[3/4] Selezione modello ottimale per DELTA...")
+    """Testa la disponibilita del modello HF configurato."""
+    print("\n[3/4] Verifica modello HF configurato...")
     from llm.huggingface_llm import HuggingFaceLLM, HF_MODEL_PRIORITY
 
     llm = HuggingFaceLLM(api_token=token, max_tokens=20)
@@ -201,7 +201,7 @@ def main():
         sys.exit(1)
 
     print(f"\nToken: {token[:8]}...{token[-4:]}")
-    print(f"Modello target: {os.environ.get('HF_MODEL_NAME', 'mistralai/Mistral-7B-Instruct-v0.3')}")
+    print(f"Modello target: {os.environ.get('HF_MODEL_NAME', 'meta-llama/Llama-3.1-8B-Instruct')}")
 
     results = {}
 
