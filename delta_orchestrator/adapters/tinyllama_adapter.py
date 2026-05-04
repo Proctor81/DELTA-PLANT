@@ -24,6 +24,10 @@ class TinyLlamaAdapter(BaseLLMAdapter):
             for token in llm.generate(prompt):
                 tokens.append(token)
             response = " ".join(tokens).strip()
+            # Se il wrapper ha restituito un errore interno, propagalo come errore
+            if response.startswith("[ERRORE"):
+                logger.warning("TinyLlama llama.cpp error", result=response)
+                return f"[TinyLlama error: {response}]"
             logger.info("TinyLlama response", result=response)
             return response
         except Exception as e:

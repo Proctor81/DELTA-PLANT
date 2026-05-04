@@ -122,9 +122,7 @@ class CLI:
                 continue
             try:
                 import asyncio
-                loop = asyncio.get_event_loop() if asyncio.get_event_loop().is_running() else asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(orchestrate_task(domanda, state))
+                result = asyncio.run(orchestrate_task(domanda, state))
                 risposta = result.get("final_answer") or str(result)
                 print(f"{BOLD}DELTA:{RESET} {risposta}")
             except Exception as exc:

@@ -164,21 +164,22 @@ def _run_runtime(agent: DeltaAgent, args: argparse.Namespace, telegram_app) -> N
     interactive_cli = sys.stdin.isatty() and not args.daemon
 
     if interactive_cli:
-        if telegram_app is None:
-            _run_cli(agent)
-            return
+        if telegram_app is not None:
+            # Telegram gira in daemon thread: quando la CLI sul main thread
+            # termina (utente preme 0), il daemon thread viene terminato
+            # automaticamente e il processo può uscire.
+            logger.info(
+                "Bot Telegram attivo: polling in background; CLI interattiva sul main thread."
+            )
+            telegram_thread = threading.Thread(
+                target=serve_telegram_polling,
+                args=(telegram_app,),
+                name="delta-telegram",
+                daemon=True,
+            )
+            telegram_thread.start()
 
-        logger.info(
-            "Bot Telegram attivo: CLI interattiva avviata in background; polling sul main thread."
-        )
-        cli_thread = threading.Thread(
-            target=_run_cli,
-            args=(agent,),
-            name="delta-cli",
-            daemon=True,
-        )
-        cli_thread.start()
-        serve_telegram_polling(telegram_app)
+        _run_cli(agent)
         return
 
     if args.daemon:
@@ -270,6 +271,8 @@ def main():
     finally:
         agent.shutdown()
         logger.info("═══ DELTA PLANT ORCHESTRATOR SPENTO ═══")
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

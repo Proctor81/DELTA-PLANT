@@ -19,7 +19,7 @@ class OllamaAdapter(BaseLLMAdapter):
 
     def _lazy_load(self):
         if not self._lazy_loaded:
-            self._client = httpx.AsyncClient(base_url=self.endpoint, timeout=60)
+            self._client = httpx.AsyncClient(base_url=self.endpoint, timeout=5)
             self._lazy_loaded = True
             logger.info("Ollama client lazy loaded", model=self.model_name, endpoint=self.endpoint)
 

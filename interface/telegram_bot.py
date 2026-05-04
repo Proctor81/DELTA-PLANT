@@ -211,18 +211,7 @@ def _load_allowed_usernames() -> Set[str]:
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            # Pulsante primario "Chiedi a DELTA Plant" — chat intelligente HF LLM
-            # Telegram non supporta colori CSS, ma il posizionamento in prima riga
-            # e l'emoji distintiva lo rendono immediatamente visibile.
-            InlineKeyboardButton("🔵 💬 Chiedi a DELTA Plant", callback_data=CMD_CHAT),
-        ],
-        [
             InlineKeyboardButton("🆕 Diagnosi", callback_data=CMD_DIAGNOSE),
-            InlineKeyboardButton("📷 Carica foto", callback_data=CMD_UPLOAD),
-        ],
-        [
-            InlineKeyboardButton("📊 Report", callback_data=CMD_REPORT),
-            InlineKeyboardButton("📁 Immagini", callback_data=CMD_IMAGES),
         ],
         [
             InlineKeyboardButton("🌡 Sensori", callback_data=CMD_SENSORS),
@@ -230,7 +219,6 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🧪 Preflight", callback_data=CMD_PREFLIGHT),
-            InlineKeyboardButton("🛠 Fine-tuning", callback_data=CMD_FINETUNE),
         ],
         [
             InlineKeyboardButton("🎓 Academy", callback_data=CMD_ACADEMY),
