@@ -1,0 +1,84 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "delta plant",
+      "intents": [
+        {
+          "name": "ChatIntent",
+          "slots": [
+            {
+              "name": "userMessage",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "{userMessage}",
+            "vraag delta {userMessage}",
+            "ik heb landbouw advies nodig {userMessage}",
+            "help mij met mijn gewas {userMessage}",
+            "mijn tomaat heeft {userMessage}",
+            "wat kan ik doen bij {userMessage}",
+            "irrigatie strategie {userMessage}",
+            "ik zie gele bladeren {userMessage}",
+            "mogelijke ziekte tekenen {userMessage}",
+            "kas probleem {userMessage}",
+            "hoe schimmel voorkomen {userMessage}",
+            "boomgaard vraag {userMessage}",
+            "bodem voeding vraag {userMessage}",
+            "seizoen planning {userMessage}",
+            "geef agronomisch advies {userMessage}"
+          ]
+        },
+        {
+          "name": "LanguageSwitchIntent",
+          "slots": [
+            {
+              "name": "targetLanguage",
+              "type": "DELTA_LANGUAGE"
+            }
+          ],
+          "samples": [
+            "spreek in {targetLanguage}",
+            "wissel taal naar {targetLanguage}",
+            "gebruik {targetLanguage}",
+            "antwoord in {targetLanguage}",
+            "ik wil praten in {targetLanguage}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "DELTA_LANGUAGE",
+          "values": [
+            { "name": { "value": "italiaans", "synonyms": ["it", "italiaans"] } },
+            { "name": { "value": "engels", "synonyms": ["en", "engels"] } },
+            { "name": { "value": "frans", "synonyms": ["fr", "frans"] } },
+            { "name": { "value": "duits", "synonyms": ["de", "duits"] } },
+            { "name": { "value": "spaans", "synonyms": ["es", "spaans"] } },
+            { "name": { "value": "nederlands", "synonyms": ["nl", "nederlands"] } }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "delta plant",
+      "intents": [
+        {
+          "name": "ChatIntent",
+          "slots": [
+            {
+              "name": "userMessage",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "{userMessage}",
+            "chiedi a delta {userMessage}",
+            "ho una domanda {userMessage}",
+            "aiutami con {userMessage}",
+            "consiglio su {userMessage}",
+            "la mia pianta ha {userMessage}",
+            "il pomodoro mostra {userMessage}",
+            "come gestisco {userMessage}",
+            "come prevenire {userMessage}",
+            "parliamo di irrigazione {userMessage}",
+            "ho foglie gialle {userMessage}",
+            "la coltura sta peggiorando {userMessage}",
+            "sospetto una malattia {userMessage}",
+            "ho bisogno di pratica agricola {userMessage}",
+            "dammi un consiglio agronomico {userMessage}"
+          ]
+        },
+        {
+          "name": "LanguageSwitchIntent",
+          "slots": [
+            {
+              "name": "targetLanguage",
+              "type": "DELTA_LANGUAGE"
+            }
+          ],
+          "samples": [
+            "parla in {targetLanguage}",
+            "cambia lingua in {targetLanguage}",
+            "usa la lingua {targetLanguage}",
+            "rispondi in {targetLanguage}",
+            "voglio parlare in {targetLanguage}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "DELTA_LANGUAGE",
+          "values": [
+            { "name": { "value": "italiano", "synonyms": ["it", "italiano"] } },
+            { "name": { "value": "inglese", "synonyms": ["english", "en", "inglese"] } },
+            { "name": { "value": "francese", "synonyms": ["french", "fr", "francese"] } },
+            { "name": { "value": "tedesco", "synonyms": ["german", "de", "tedesco"] } },
+            { "name": { "value": "spagnolo", "synonyms": ["spanish", "es", "spagnolo"] } },
+            { "name": { "value": "olandese", "synonyms": ["dutch", "nl", "olandese"] } }
+          ]
+        }
+      ]
+    }
+  }
+}
