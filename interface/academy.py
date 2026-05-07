@@ -721,9 +721,8 @@ class DeltaAcademy:
             ),
             (
                 "PASSO 2 — Il Menu Principale",
-                "Il menu offre 6 funzioni principali:\n\n"
+                "Il menu offre le funzioni principali:\n\n"
                 "  [1] Diagnosi pianta      — analisi completa (immagine + sensori)\n"
-                "  [2] Fine-tuning AI       — disabilitato nella logica semplificata\n"
                 "  [3] Dati sensori         — lettura istantanea dell'ambiente\n"
                 "  [4] Esporta Excel        — salva tutti i dati in .xlsx\n"
                 "  [5] Ultime diagnosi      — storico delle analisi nel database\n"

@@ -320,45 +320,7 @@ LOGGING_CONFIG = {
 # ─────────────────────────────────────────────
 # FEATURE FLAGS DI SISTEMA
 # ─────────────────────────────────────────────
-FEATURE_FLAGS = {
-    # Disabilita i flussi runtime (CLI/Telegram) di fine-tuning on-device.
-    # Gli script di training offline in /ai restano disponibili.
-    "enable_runtime_finetuning": False,
-}
-
-# ─────────────────────────────────────────────
-# FINE-TUNING
-# ─────────────────────────────────────────────
-FINETUNING_CONFIG = {
-    "epochs": 10,
-    "batch_size": 16,
-    "learning_rate": 0.001,
-    "train_split": 0.8,
-    "model_save_path": str(MODELS_DIR / "plant_disease_model_finetuned.tflite"),
-    "dataset_dir": str(DATASETS_DIR / "training"),
-    "min_samples_per_class": 10,
-}
-
-# Dataset separati per fiore e frutto (learning-by-doing)
-FINETUNING_FLOWER_CONFIG = {
-    "epochs": 10,
-    "batch_size": 16,
-    "learning_rate": 0.001,
-    "train_split": 0.8,
-    "model_save_path": str(MODELS_DIR / "flower_model_finetuned.tflite"),
-    "dataset_dir": str(DATASETS_DIR / "training_flower"),
-    "min_samples_per_class": 10,
-}
-
-FINETUNING_FRUIT_CONFIG = {
-    "epochs": 10,
-    "batch_size": 16,
-    "learning_rate": 0.001,
-    "train_split": 0.8,
-    "model_save_path": str(MODELS_DIR / "fruit_model_finetuned.tflite"),
-    "dataset_dir": str(DATASETS_DIR / "training_fruit"),
-    "min_samples_per_class": 10,
-}
+FEATURE_FLAGS: dict = {}
 
 # ─────────────────────────────────────────────
 # API FLASK

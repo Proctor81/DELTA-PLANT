@@ -22,16 +22,12 @@ from core.config import (
     TELEGRAM_CONFIG,
     API_CONFIG,
     INPUT_IMAGES_DIR,
-    FINETUNING_CONFIG,
-    FINETUNING_FLOWER_CONFIG,
-    FINETUNING_FRUIT_CONFIG,
     MODEL_CONFIG,
     VISION_CONFIG,
     FLOWER_LABELS,
     FRUIT_LABELS,
     DATASETS_DIR,
     LEARNING_BY_DOING_DIR,
-    FEATURE_FLAGS,
 )
 
 try:
@@ -149,7 +145,6 @@ CMD_HEALTH = "CMD_HEALTH"
 CMD_EXPORT = "CMD_EXPORT"
 CMD_IMAGES = "CMD_IMAGES"
 CMD_PREFLIGHT = "CMD_PREFLIGHT"
-CMD_FINETUNE = "CMD_FINETUNE"
 CMD_ACADEMY = "CMD_ACADEMY"
 CMD_LICENSE = "CMD_LICENSE"
 CMD_BATCH = "CMD_BATCH"
@@ -518,10 +513,6 @@ def _learning_dirs() -> Tuple[Path, Path]:
     return images_dir, records_dir
 
 
-def _runtime_finetuning_enabled() -> bool:
-    return bool(FEATURE_FLAGS.get("enable_runtime_finetuning", False))
-
-
 def _store_learning_record(
     input_image: Path,
     plant_name: str,
@@ -559,31 +550,6 @@ def _resolve_organ(label: str) -> str:
     if label in FRUIT_LABELS:
         return "fruit"
     return "leaf"
-
-
-def _finetune_target(label: str) -> dict:
-    organ = _resolve_organ(label)
-    if organ == "flower":
-        return FINETUNING_FLOWER_CONFIG
-    if organ == "fruit":
-        return FINETUNING_FRUIT_CONFIG
-    return FINETUNING_CONFIG
-
-
-def _finetune_target_by_organ(organ: str) -> dict:
-    if organ == "flower":
-        return FINETUNING_FLOWER_CONFIG
-    if organ == "fruit":
-        return FINETUNING_FRUIT_CONFIG
-    return FINETUNING_CONFIG
-
-
-def _finetune_configs() -> Dict[str, dict]:
-    return {
-        "leaf": FINETUNING_CONFIG,
-        "flower": FINETUNING_FLOWER_CONFIG,
-        "fruit": FINETUNING_FRUIT_CONFIG,
-    }
 
 
 async def _guard(update: Update) -> bool:
@@ -2029,11 +1995,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await health(update, context)
     elif query.data == CMD_PREFLIGHT:
         await preflight(update, context)
-    elif query.data == CMD_FINETUNE:
-        if _runtime_finetuning_enabled():
-            await finetune(update, context)
-        else:
-            await _send(update, "Fine-tuning runtime disabilitato a livello di sistema.")
     elif query.data == CMD_ACADEMY:
         await academy_start(update, context)
     elif query.data == CMD_LICENSE:
@@ -2207,104 +2168,6 @@ async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Output shape: {report['output_shape']}"
     )
     await _send(update, msg)
-
-
-async def finetune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _guard(update):
-        return
-    if not _runtime_finetuning_enabled():
-        await _send(update, "Fine-tuning runtime disabilitato a livello di sistema.")
-        return
-    agent = _get_agent(context)
-    if not agent:
-        await _send(update, "Errore sistema: agent non disponibile.")
-        return
-    from ai.fine_tuning import FineTuner
-    lines = ["Seleziona il dataset per il fine-tuning:"]
-    configs = _finetune_configs()
-    for key, cfg in configs.items():
-        tuner = FineTuner(
-            agent.model_loader,
-            dataset_dir=cfg.get("dataset_dir"),
-            save_path=cfg.get("model_save_path"),
-            min_samples_per_class=cfg.get("min_samples_per_class"),
-        )
-        stats = tuner.get_dataset_stats()
-        lines.append(f"- {key}: {stats['total']} campioni ({len(stats['classes'])} classi)")
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Avvia foglia", callback_data="FINETUNE_RUN_LEAF")],
-        [InlineKeyboardButton("Avvia fiore", callback_data="FINETUNE_RUN_FLOWER")],
-        [InlineKeyboardButton("Avvia frutto", callback_data="FINETUNE_RUN_FRUIT")],
-    ])
-    await _send(update, "\n".join(lines), reply_markup=keyboard)
-
-
-async def finetune_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _guard(update):
-        return
-    if not _runtime_finetuning_enabled():
-        await _send(update, "Fine-tuning runtime disabilitato a livello di sistema.")
-        return
-    query = update.callback_query
-    if not query:
-        return
-    await query.answer()
-    agent = _get_agent(context)
-    if not agent:
-        await _send(update, "Errore sistema: agent non disponibile.")
-        return
-    data = query.data or ""
-    if not data.startswith("FINETUNE_RUN_"):
-        return
-    target_key = data.replace("FINETUNE_RUN_", "").lower()
-    cfg = _finetune_configs().get(target_key)
-    if not cfg:
-        await _send(update, "Target fine-tuning non valido.")
-        return
-    from ai.fine_tuning import FineTuner
-    tuner = FineTuner(
-        agent.model_loader,
-        dataset_dir=cfg.get("dataset_dir"),
-        save_path=cfg.get("model_save_path"),
-        min_samples_per_class=cfg.get("min_samples_per_class"),
-    )
-    await _send(update, "Fine-tuning in corso (potrebbero servire minuti)...")
-    success = await asyncio.to_thread(tuner.run_finetuning)
-    if not success:
-        await _send(update, "Fine-tuning fallito. Controllare i log.")
-        return
-    if target_key == "leaf":
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Carica nuovo modello", callback_data="FINETUNE_LOAD_LEAF")],
-        ])
-        await _send(update, "Fine-tuning completato ✅", reply_markup=keyboard)
-    else:
-        await _send(
-            update,
-            f"Fine-tuning {target_key} completato ✅\nModello salvato in {cfg.get('model_save_path')}",
-        )
-
-
-async def finetune_load_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _guard(update):
-        return
-    if not _runtime_finetuning_enabled():
-        await _send(update, "Fine-tuning runtime disabilitato a livello di sistema.")
-        return
-    query = update.callback_query
-    if not query:
-        return
-    await query.answer()
-    agent = _get_agent(context)
-    if not agent:
-        await _send(update, "Errore sistema: agent non disponibile.")
-        return
-    try:
-        agent.model_loader.reload(FINETUNING_CONFIG["model_save_path"])
-        await _send(update, "Nuovo modello caricato.")
-    except Exception as exc:
-        logger.error("Errore reload modello: %s", exc, exc_info=True)
-        await _send(update, f"Errore caricamento modello: {exc}")
 
 
 async def license_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2780,8 +2643,6 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("continua", continue_diagnosis_message))
     # Pulsante inline "Continua lettura" (CMD_CONTINUA) — stesso handler
     application.add_handler(CallbackQueryHandler(continue_diagnosis_message, pattern=r"^CMD_CONTINUA$"))
-    if _runtime_finetuning_enabled():
-        application.add_handler(CommandHandler("finetune", finetune))
     application.add_handler(CommandHandler("academy", academy_start))
     application.add_handler(CommandHandler("license", license_text))
     application.add_handler(CommandHandler("batch", batch_analyze))
@@ -2789,9 +2650,6 @@ def run_telegram_bot(agent=None):
     application.add_handler(upload_handler)
     application.add_handler(chat_conv_handler)
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
-    if _runtime_finetuning_enabled():
-        application.add_handler(CallbackQueryHandler(finetune_callback, pattern=r"^FINETUNE_RUN_"))
-        application.add_handler(CallbackQueryHandler(finetune_load_callback, pattern=r"^FINETUNE_LOAD_LEAF$"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
     application.add_handler(CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"))

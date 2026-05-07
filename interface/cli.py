@@ -1,12 +1,11 @@
 """
 DELTA - interface/cli.py
 Interfaccia a riga di comando per interazione utente.
-Gestisce menu principale, visualizzazione diagnosi e sessione fine-tuning.
+Gestisce menu principale e visualizzazione diagnosi.
 """
 
 import logging
 from typing import TYPE_CHECKING, Dict, Any, List
-from core.config import FEATURE_FLAGS
 
 if TYPE_CHECKING:
     from core.agent import DeltaAgent
@@ -52,13 +51,8 @@ class CLI:
         self._chat_started = False
 
         while True:
-            finetune_enabled = FEATURE_FLAGS.get("enable_runtime_finetuning", False)
             print(f"\n{BOLD}═══ MENU PRINCIPALE ═══{RESET}")
             print("  [1] Avvia diagnosi pianta")
-            if finetune_enabled:
-                print("  [2] Fine-tuning modello AI")
-            else:
-                print("  [2] Fine-tuning modello AI (disabilitato)")
             print("  [3] Mostra dati sensori correnti")
             print("  [4] Esporta dati in Excel")
             print("  [5] Visualizza ultime diagnosi")
@@ -74,11 +68,6 @@ class CLI:
 
             if scelta == "1":
                 self._run_diagnosis_flow()
-            elif scelta == "2":
-                if finetune_enabled:
-                    self._run_finetuning_flow()
-                else:
-                    print(f"{SYMBOL_INFO} Fine-tuning runtime disabilitato a livello di sistema.")
             elif scelta == "3":
                 self._show_sensor_data()
             elif scelta == "4":
@@ -464,42 +453,6 @@ rights and legal action.
             logger.info("Active learning: classe corretta '%s' fornita dall'utente.", label)
         else:
             print(f"{DIM}Nessuna etichetta fornita.{RESET}")
-
-    # ─────────────────────────────────────────────
-    # FLUSSO FINE-TUNING
-    # ─────────────────────────────────────────────
-
-    def _run_finetuning_flow(self):
-        """Gestisce la sessione di fine-tuning del modello."""
-        print(f"\n{BOLD}─── FINE-TUNING MODELLO ───{RESET}")
-
-        from ai.fine_tuning import FineTuner
-        tuner = FineTuner(self.agent.model_loader)
-
-        stats = tuner.get_dataset_stats()
-        print(f"\n{SYMBOL_INFO} Dataset attuale: {stats['total']} campioni")
-        for cls, cnt in stats["classes"].items():
-            print(f"  • {cls}: {cnt} immagini")
-
-        if stats["total"] == 0:
-            print(f"\n{SYMBOL_WARN} Nessun campione nel dataset.")
-            print("Esegui prima alcune diagnosi con etichettatura manuale.")
-            return
-
-        if not self._ask_yes_no("Avviare fine-tuning ora?", default=True):
-            return
-
-        print(f"\n{SYMBOL_INFO} Fine-tuning in corso (potrebbe richiedere alcuni minuti)...")
-        success = tuner.run_finetuning()
-
-        if success:
-            print(f"{SYMBOL_OK} Fine-tuning completato con successo!")
-            if self._ask_yes_no("Caricare il nuovo modello ora?", default=True):
-                from core.config import FINETUNING_CONFIG
-                self.agent.model_loader.reload(FINETUNING_CONFIG["model_save_path"])
-                print(f"{SYMBOL_OK} Nuovo modello caricato.")
-        else:
-            print(f"{SYMBOL_ERR} Fine-tuning fallito. Controllare il log per dettagli.")
 
     # ─────────────────────────────────────────────
     # VISUALIZZAZIONE DATI

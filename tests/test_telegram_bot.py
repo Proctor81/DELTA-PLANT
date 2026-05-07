@@ -25,12 +25,6 @@ def test_resolve_organ_uses_label_sets():
     assert tg._resolve_organ("Sano") == "leaf"
 
 
-def test_finetune_target_by_organ():
-    assert tg._finetune_target_by_organ("leaf") == tg.FINETUNING_CONFIG
-    assert tg._finetune_target_by_organ("flower") == tg.FINETUNING_FLOWER_CONFIG
-    assert tg._finetune_target_by_organ("fruit") == tg.FINETUNING_FRUIT_CONFIG
-
-
 def test_sanitize_label():
     assert tg._sanitize_label("A b/c") == "A_b_c"
 
