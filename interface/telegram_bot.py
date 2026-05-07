@@ -652,7 +652,7 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
     organ_results = record.get("organ_results", {})
     organ_analyses = dx.get("organ_analyses", {})
     quantum_risk = dx.get("quantum_risk", {})
-    sensor = record.get("sensor_snapshot", {})
+    sensor = record.get("sensor_snapshot", {}) or dx.get("sensor_snapshot", {})
     anomalies = sensor.get("_anomalies", [])
 
     def fmt(val, unit=None, ndash="N/D"):
@@ -1067,6 +1067,184 @@ def _format_sensor_text(sensor_data: dict) -> str:
     if not lines:
         return ""
     return "\nDati ambientali disponibili:\n" + "\n".join(lines)
+
+
+def _collapse_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())
+
+
+def _clip_text(text: str, limit: int = 280) -> str:
+    compact = _collapse_whitespace(text)
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."
+
+
+_PLANT_COMMON_NAMES_BY_GENUS = {
+    "Apple": "mela",
+    "Bell_pepper": "peperone",
+    "Blueberry": "mirtillo",
+    "Cherry": "ciliegio",
+    "Corn": "mais",
+    "Grape": "vite",
+    "Peach": "pesco",
+    "Potato": "patata",
+    "Squash": "zucca",
+    "Strawberry": "fragola",
+    "Tomato": "pomodoro",
+}
+
+_GENERIC_PLANT_NAME_TOKENS = {
+    "foglia", "foglie", "fogliee", "fogliare", "fogliame",
+    "frutto", "frutti", "fiore", "fiori", "macchia", "macchie",
+    "lesione", "lesioni", "bordo", "bordi", "margine", "margini",
+    "ramo", "rami", "stelo", "steli", "pianta",
+}
+
+
+def _plant_name_from_class(class_name: str) -> Optional[str]:
+    if not class_name:
+        return None
+    for genus, common_name in _PLANT_COMMON_NAMES_BY_GENUS.items():
+        if class_name == genus or class_name.startswith(f"{genus}_"):
+            return common_name
+    return None
+
+
+def _extract_plant_name_from_description(description: str) -> Optional[str]:
+    text = _collapse_whitespace(description)
+    if not text:
+        return None
+
+    detected_genus = _detect_genus_from_description(text)
+    if detected_genus:
+        return _PLANT_COMMON_NAMES_BY_GENUS.get(detected_genus, detected_genus.replace("_", " ").lower())
+
+    candidate = re.split(
+        r"\b(?:con|che|ha|presenta|mostra|mostrano|dalle|dalla|dai|dal|da|sulle|sulla|sui|sul|nelle|nella|nei|nel)\b|[,.;:]",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+
+    while True:
+        updated = re.sub(
+            r"^(?:questa|questo|quella|quello|la|il|lo|le|i|gli|un|una|uno|mia|mio|mie|miei|nostra|nostro|nostre|nostri)\s+",
+            "",
+            candidate,
+            flags=re.IGNORECASE,
+        )
+        updated = re.sub(r"^pianta\s+di\s+", "", updated, flags=re.IGNORECASE)
+        updated = re.sub(r"^pianta\s+", "", updated, flags=re.IGNORECASE)
+        if updated == candidate:
+            break
+        candidate = updated.strip()
+
+    candidate = candidate.strip(" '\"-_")
+    if not candidate:
+        return None
+
+    words = candidate.split()
+    if len(words) > 4:
+        return None
+
+    if words[0].lower() in _GENERIC_PLANT_NAME_TOKENS:
+        return None
+
+    return candidate
+
+
+def _resolve_plant_name_for_memory(user_description: str = "", record: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    described_plant = _extract_plant_name_from_description(user_description)
+    if described_plant:
+        return described_plant
+
+    if record:
+        ai_result = record.get("ai_result") or {}
+        return _plant_name_from_class(record.get("_corrected_class") or ai_result.get("class", ""))
+    return None
+
+
+def _build_diagnosis_memory_turn(
+    *,
+    user_description: str = "",
+    opinion: str,
+    record: Optional[Dict[str, Any]] = None,
+    qa_pairs: Optional[List[Tuple[str, str]]] = None,
+    followup_mode: str = "",
+    sensor_data: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, str]:
+    """Costruisce un turno memoria breve e leggibile per i follow-up successivi."""
+    request_lines = ["Ho chiesto una diagnosi della pianta."]
+
+    plant_name = _resolve_plant_name_for_memory(user_description, record)
+    if plant_name:
+        request_lines.append(f"Pianta: {plant_name}.")
+
+    if user_description:
+        request_lines.append(f"Descrizione iniziale: {_clip_text(user_description, 220)}")
+
+    if followup_mode == "class_mismatch":
+        request_lines.append("Modalità: diagnosi interattiva per mismatch tra classe AI e descrizione operatore.")
+    elif followup_mode == "fallback":
+        request_lines.append("Modalità: diagnosi conversazionale per pianta non riconosciuta dal database.")
+
+    if record:
+        ai_result = record.get("ai_result") or {}
+        diagnosis = record.get("diagnosis") or {}
+        ai_class = ai_result.get("class")
+        confidence = ai_result.get("confidence")
+        corrected_class = record.get("_corrected_class")
+        summary = diagnosis.get("summary")
+        risk = diagnosis.get("risk")
+        qdata = diagnosis.get("quantum_risk") or {}
+
+        if corrected_class and corrected_class != ai_class:
+            request_lines.append(
+                f"Classe AI corretta: {corrected_class} (iniziale: {ai_class or 'N/A'})."
+            )
+        elif ai_class:
+            if isinstance(confidence, (int, float)):
+                request_lines.append(
+                    f"Classe AI: {ai_class} ({confidence * 100:.1f}% confidenza)."
+                )
+            else:
+                request_lines.append(f"Classe AI: {ai_class}.")
+
+        if summary:
+            request_lines.append(f"Sintesi tecnica: {_clip_text(summary, 220)}")
+
+        risk_parts = []
+        if risk:
+            risk_parts.append(f"rischio={risk}")
+        qrs = qdata.get("qrs")
+        if isinstance(qrs, (int, float)):
+            risk_parts.append(f"QRS={qrs:.4f}")
+        dominant = qdata.get("dominant_event")
+        if dominant:
+            risk_parts.append(f"evento dominante={dominant}")
+        if risk_parts:
+            request_lines.append("Quadro rischio: " + ", ".join(risk_parts) + ".")
+
+        raw_report = re.sub(r"<[^>]+>", "", _format_diagnosis_full(record)).strip()
+        if raw_report:
+            request_lines.append("Elementi completi della diagnosi:")
+            request_lines.append(raw_report)
+
+    if sensor_data:
+        sensor_text = _clip_text(_format_sensor_text(sensor_data), 220)
+        if sensor_text:
+            request_lines.append(sensor_text)
+
+    if qa_pairs:
+        for idx, (question, answer) in enumerate(qa_pairs[-2:], 1):
+            request_lines.append(
+                f"Follow-up {idx}: D={_clip_text(question, 120)} | R={_clip_text(answer, 120)}"
+            )
+
+    memory_request = "\n".join(request_lines)
+    memory_response = (opinion or "").strip()
+    return memory_request, memory_response
 
 
 async def _operator_says_healthy(engine, description: str) -> bool:
@@ -1794,7 +1972,7 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         )
 
     def _ask():
-        return engine.chat(user_id, prompt)
+        return engine.chat_internal(prompt)
 
     try:
         opinion = await asyncio.to_thread(_ask)
@@ -1806,6 +1984,14 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
     opinion = _sanitize_diagnosis_opinion(opinion)
     if followup_mode == "class_mismatch":
         opinion = _strip_plantvillage_class_mentions(opinion)
+
+    memory_request, memory_response = _build_diagnosis_memory_turn(
+        user_description=user_description,
+        opinion=opinion,
+        qa_pairs=qa_pairs,
+        followup_mode=followup_mode,
+        sensor_data=sensor_data,
+    )
 
     title = "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>" if followup_mode == "class_mismatch" else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
 
@@ -1820,6 +2006,7 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
             f"{title}\n\n{opinion}",
             parse_mode="HTML",
         )
+        engine.remember_turn(user_id, memory_request, memory_response)
     finally:
         for key in _diag_cleanup_keys:
             context.user_data.pop(key, None)
@@ -1871,7 +2058,7 @@ async def _send_ai_diagnosis_opinion(
     prompt = _build_diagnosis_prompt(record, user_description)
 
     def _ask():
-        return engine.chat(user_id, prompt)
+        return engine.chat_internal(prompt)
 
     try:
         opinion = await asyncio.to_thread(_ask)
@@ -1881,6 +2068,12 @@ async def _send_ai_diagnosis_opinion(
         return ConversationHandler.END
 
     opinion = _sanitize_diagnosis_opinion(opinion)
+    memory_request, memory_response = _build_diagnosis_memory_turn(
+        user_description=user_description,
+        opinion=opinion,
+        record=record,
+        sensor_data=context.user_data.get("sensor_data", {}),
+    )
 
     _diag_cleanup_keys = (
         "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
@@ -1893,6 +2086,7 @@ async def _send_ai_diagnosis_opinion(
             f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
             parse_mode="HTML",
         )
+        engine.remember_turn(user_id, memory_request, memory_response)
     finally:
         # Pulizia garantita anche se _send_diagnosis_paginated lancia un'eccezione.
         # Senza questo, diagnosis_active rimarrebbe True e blockerebbe la chat libera.

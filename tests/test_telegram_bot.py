@@ -226,3 +226,115 @@ def test_continue_diagnosis_message_uses_chat_pending_when_no_diag(monkeypatch):
     assert calls == [("chat parte 2", None)]
     assert "chat_pending_chunks" not in context.user_data
     assert "chat_pending_parse_mode" not in context.user_data
+
+
+def test_build_diagnosis_memory_turn_keeps_context_conversational():
+    request, response = tg._build_diagnosis_memory_turn(
+        user_description="Foglie con macchie gialle e margini secchi da tre giorni.",
+        opinion="Esito tecnico: probabile stress combinato con rischio fungino.",
+        record={
+            "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.91},
+            "diagnosis": {
+                "plant_status": "Da monitorare",
+                "summary": "Probabile alternariosi in fase iniziale.",
+                "explanation": "Analisi foglia: 'Tomato_Early_blight' con confidenza 91.0%.",
+                "risk": "medio",
+                "overall_risk": "medio",
+                "quantum_risk": {
+                    "quantum_risk_score": 0.42,
+                    "risk_level": "medio",
+                    "dominant_description": "umidita_alta",
+                },
+                "sensor_snapshot": {"temperature_c": 26.4, "humidity_pct": 84.2},
+            },
+        },
+        sensor_data={"temperature_c": 26.4, "humidity_pct": 84.2},
+    )
+
+    assert request.startswith("Ho chiesto una diagnosi della pianta.")
+    assert "Pianta: pomodoro." in request
+    assert "Tomato_Early_blight" in request
+    assert "Probabile alternariosi in fase iniziale." in request
+    assert "Elementi completi della diagnosi:" in request
+    assert "Stato pianta:" in request
+    assert "Diagnosi:" in request
+    assert "Temperatura" in request
+    assert "QRS:           🟡 0.4200 [MEDIO]" in request
+    assert "Sei un agronomo esperto" not in request
+    assert response == "Esito tecnico: probabile stress combinato con rischio fungino."
+
+
+def test_build_diagnosis_memory_turn_extracts_non_catalog_plant_name_from_description():
+    request, _ = tg._build_diagnosis_memory_turn(
+        user_description="Dipladenia con foglie gialle e margini secchi.",
+        opinion="Valutazione preliminare.",
+        followup_mode="fallback",
+    )
+
+    assert "Pianta: Dipladenia." in request
+
+
+def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean_turn(monkeypatch):
+    sends = []
+    remembered = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat_internal(self, prompt):
+            assert "UNICO messaggio finale" in prompt
+            return "Diagnosi finale operativa"
+
+        def remember_turn(self, user_id, user_input, response):
+            remembered.append((user_id, user_input, response))
+
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(
+        tg,
+        "_reclassify_with_description",
+        lambda engine, ai_class, user_description: asyncio.sleep(0, result=ai_class),
+    )
+    monkeypatch.setattr(tg, "_sanitize_diagnosis_opinion", lambda opinion: opinion)
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=77),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(user_data={"diag_user_description": "Foglie con lesioni scure"})
+    record = {
+        "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.88},
+        "diagnosis": {
+            "plant_status": "Compromesso",
+            "summary": "Alternariosi probabile",
+            "overall_risk": "alto",
+            "explanation": "Analisi foglia: 'Tomato_Early_blight' con confidenza 88.0%.",
+            "sensor_snapshot": {"temperature_c": 25.0},
+        },
+        "recommendations": [
+            {"category": "fungo", "priority": 1, "problem": "lesioni fogliari", "action": "trattamento mirato"},
+        ],
+    }
+
+    result = asyncio.run(tg._send_ai_diagnosis_opinion(update, context, record))
+
+    assert result == tg.ConversationHandler.END
+    assert sends == [(
+        "🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\nDiagnosi finale operativa",
+        "HTML",
+    )]
+    assert remembered[0][0] == "77"
+    assert remembered[0][2] == "Diagnosi finale operativa"
+    assert "Sei un agronomo esperto" not in remembered[0][1]
+    assert "Ho chiesto una diagnosi della pianta." in remembered[0][1]
+    assert "Pianta: pomodoro." in remembered[0][1]
+    assert "Elementi completi della diagnosi:" in remembered[0][1]
+    assert "Raccomandazioni:" in remembered[0][1]

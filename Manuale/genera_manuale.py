@@ -902,14 +902,18 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "La chat libera Telegram, la modalità /chat e i flussi diagnostici che richiedono "
         "spiegazioni LLM usano ora lo stesso motore conversazionale condiviso. "
         "Questo elimina disallineamenti di contesto tra domanda libera, approfondimento della diagnosi "
-        "e richieste successive dell'utente."
+        "e richieste successive dell'utente. In più, DELTA salva localmente anche il referto "
+        "diagnostico strutturato più recente, così le richieste di follow-up restano ancorate "
+        "alla diagnosi effettivamente prodotta."
     )
     pdf._bullet([
         "Memoria persistente per utente: gli ultimi 20 turni sono salvati in memory/sessions/<user_id>.json e vengono ricaricati dopo ogni riavvio del bot.",
         "Coerenza del contesto: chat libera, /chat e diagnosi Telegram leggono e scrivono la stessa cronologia conversazionale.",
+        "Memoria diagnostica strutturata: dopo ogni diagnosi DELTA salva anche nome pianta, stato, classe AI, analisi organi, rischio, QRS, raccomandazioni, sensori e anomalie, per permettere approfondimenti mirati su ogni elemento del referto.",
+        "Ri-ancoraggio automatico: se l'utente scrive richieste ellittiche come 'approfondisci', 'spiega il rischio' o 'qual è il nome della pianta', il motore conversazionale riusa esplicitamente l'ultima diagnosi come contesto principale.",
         "Igiene della memoria: i messaggi di errore del backend LLM non vengono salvati nella cronologia, per evitare contaminazioni del contesto.",
         "Ripresa automatica: se l'invio della diagnosi fallisce lato Telegram, i flag interni di diagnosi vengono comunque ripuliti e la chat libera torna disponibile.",
-        "Uso operativo: dopo una diagnosi l'utente può chiedere 'approfondisci', 'spiegami il rischio' o 'dammi una ricetta' senza perdere il contesto recente.",
+        "Uso operativo: dopo una diagnosi l'utente può chiedere 'approfondisci', 'spiegami il rischio', 'qual è il nome della pianta' o 'spiegami la raccomandazione 2' senza perdere il contesto recente.",
     ])
     pdf._warning_box(
         "I file memory/sessions/*.json contengono cronologia conversazionale locale e sono dati runtime del dispositivo. "

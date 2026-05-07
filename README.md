@@ -15,6 +15,8 @@
 
 > 🧠 **v3.1 — DELTA ha imparato a generalizzare:** il sistema di Computer Vision ha evoluto la sua capacità di riconoscimento dalle specie specifiche verso un modello generalizzato su 33 classi PlantVillage, con genus-filter adattivo, rilevamento contestuale della salute e Q&A follow-up intelligente.
 
+> 💾 **Memoria Persistente Diagnostica:** DELTA Plant salva localmente per utente la cronologia conversazionale e il referto diagnostico strutturato più recente, così l'operatore può chiedere approfondimenti successivi su nome della pianta, rischio, raccomandazioni, sensori e anomalie anche dopo il riavvio del bot.
+
 ---
 
 ## 📋 Indice
@@ -41,6 +43,7 @@
 | **Genus-Filter adattivo** | Rileva automaticamente il genere della pianta dalla descrizione dell'operatore e filtra le classi diagnostiche in modo contestuale |
 | **Contextual Health Detection** | Il modello AI riconosce le piante sane non solo per classificazione diretta ma in modo contestuale, basandosi sul genere rilevato |
 | **Q&A Follow-up intelligente** | Dialogo bidirezionale post-diagnosi: DELTA pone domande specifiche per approfondire la diagnosi senza richiedere ulteriori foto |
+| **Memoria persistente diagnostica** | Il referto della diagnosi viene memorizzato localmente per consentire approfondimenti coerenti su ogni elemento del risultato |
 | **Anti-photo-loop fix** | Eliminato il loop di richiesta foto a fine diagnosi — il flusso è ora completamente lineare |
 | **Paginazione messaggi** | Messaggi lunghi paginati automaticamente con pulsante `/continua` per una UX fluida su mobile |
 | **PlantVillage Benchmark** | 83.9% top-1 / 96.1% top-3 su 660 immagini reali — la classe corretta appare nelle prime 3 predizioni nel 96% dei casi |
@@ -57,6 +60,7 @@
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
 | **7 sensori ambientali** | Temperatura, Umidità, Pressione, Luce, CO₂, pH, EC via I2C |
 | **DELTA Academy** | Formazione interattiva con quiz, simulazioni e badge |
+| **Memoria persistente** | Salva in locale ultimi turni e ultima diagnosi strutturata per follow-up coerenti anche dopo riavvio |
 | **Pannello Amministratore** | Protetto PBKDF2-SHA256 — backup, statistiche, pubblicazione GitHub |
 | **API REST opzionale** | Flask — 7 endpoint per integrazione esterna |
 | **Export Excel** | `.xlsx` aggiornato automaticamente ad ogni diagnosi |
