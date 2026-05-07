@@ -706,15 +706,31 @@ class AdminPanel:
                 print(f"{YELLOW}⚠ Errore parsing {lf.name}: {exc}{RESET}")
 
         # Costruisci righe per utente autorizzato
-        # Mappa username -> user_id inverso
-        uname_to_id: dict = {}
+        # Mappa username -> user_id inverso, con normalizzazione (rimuove _ . -)
+        # per tollerare differenze di scrittura (es. paolo_81_paolo vs paolo81paolo)
+        def _norm_uname(u: str) -> str:
+            return re.sub(r"[._\-]", "", (u or "").lstrip("@").lower())
+
+        # Mappe: forma normalizzata -> uid e -> username originale dal log
+        norm_to_uid: dict = {}
+        norm_to_logname: dict = {}
         for uid, uname in id_to_username.items():
-            uname_to_id[uname.lstrip("@").lower()] = uid
+            n = _norm_uname(uname)
+            if n:
+                norm_to_uid[n] = uid
+                norm_to_logname[n] = uname.lstrip("@").lower()
+
+        # Set degli autorizzati (forma normalizzata) per il check successivo
+        authorized_norm = {_norm_uname(u) for u in authorized}
 
         rows = []
+        matched_uids: set = set()
         for uname in authorized:
-            uid = uname_to_id.get(uname, "")
+            n = _norm_uname(uname)
+            uid = norm_to_uid.get(n, "")
             s = stats.get(uid, None) if uid else None
+            if uid:
+                matched_uids.add(uid)
             rows.append({
                 "username": "@" + uname,
                 "user_id":  uid or "—",
@@ -725,12 +741,16 @@ class AdminPanel:
                 "last":     s["last"] if s and s["last"] else "—",
             })
 
-        # Utenti non autorizzati che hanno comunque attività (riconosciuti via mapping ma non in scientists)
+        # Utenti non autorizzati che hanno comunque attività
+        # (riconosciuti via mapping ma non in scientists, oppure user_id senza mapping)
         extra_rows = []
         for uid, s in stats.items():
+            if uid in matched_uids:
+                continue
             uname = id_to_username.get(uid, "")
-            base_uname = uname.lstrip("@").lower() if uname else ""
-            if base_uname and base_uname in authorized:
+            n = _norm_uname(uname)
+            if n and n in authorized_norm:
+                # protezione extra: già coperto da rows ma non era nel matched_uids
                 continue
             extra_rows.append({
                 "username": uname or "(sconosciuto)",
