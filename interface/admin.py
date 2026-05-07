@@ -74,6 +74,7 @@ class AdminPanel:
             print(f"  {BOLD}[7]{RESET} {BLUE}Pubblica su GitHub{RESET}     (README, RELEASE, tag, push)")
             print(f"  {BOLD}[8]{RESET} Scientists Telegram (autorizzazioni)")
             print(f"  {BOLD}[9]{RESET} {YELLOW}Programmazione orario avvio/uscita{RESET} (cron)")
+            print(f"  {BOLD}[10]{RESET} {CYAN}Statistiche inferenza DELTAPLANO_bot{RESET}")
             print(f"  {BOLD}[0]{RESET} Esci dal pannello")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -96,6 +97,8 @@ class AdminPanel:
                 self._manage_scientists()
             elif scelta == "9":
                 self._schedule_manager()
+            elif scelta == "10":
+                self._bot_inference_stats()
             elif scelta == "0":
                 print(f"{DIM}Uscita dal pannello amministratore.{RESET}")
                 break
@@ -582,6 +585,251 @@ class AdminPanel:
         lines = self._cron_read_raw()
         lines.extend([tag, cmd])
         self._cron_write_raw(lines)
+
+    # ── Statistiche inferenza DELTAPLANO_bot ───────────────────
+
+    def _bot_inference_stats(self):
+        """Mostra statistiche di utilizzo dell'inferenza LLM per utente autorizzato.
+
+        - Parsa logs/delta.log per le righe di delta.deltaplano_bot e delta.chat_engine
+        - Conta richieste/risposte per user_id e errori HF
+        - Risolve user_id -> @username via data/telegram_user_map.json
+        - Stampa tabella per utente autorizzato + istogramma ASCII complessivo
+        """
+        import re
+        from collections import defaultdict
+
+        print(f"\n{BOLD}─── STATISTICHE INFERENZA DELTAPLANO_bot ───{RESET}")
+
+        log_dir = _ROOT / "logs"
+        log_files = []
+        for name in ("delta.log", "deltaplano_chat.log", "bot.log", "delta_runtime.log"):
+            p = log_dir / name
+            if p.exists():
+                log_files.append(p)
+        if not log_files:
+            print(f"{DIM}Nessun log disponibile in logs/.{RESET}")
+            return
+
+        # Mappa user_id -> @username (popolata da _guard nel bot Telegram)
+        map_path = _ROOT / "data" / "telegram_user_map.json"
+        id_to_username: dict = {}
+        if map_path.exists():
+            try:
+                raw = json.loads(map_path.read_text(encoding="utf-8")) or {}
+                for uid, entry in raw.items():
+                    uname = (entry or {}).get("username", "")
+                    if uname:
+                        id_to_username[str(uid)] = "@" + uname.lstrip("@").lower()
+            except Exception as exc:
+                print(f"{YELLOW}⚠ Impossibile leggere {map_path.name}: {exc}{RESET}")
+
+        # Lista usernames autorizzati
+        scientists_path = _ROOT / "data" / "telegram_scientists.json"
+        authorized: list = []
+        if scientists_path.exists():
+            try:
+                raw = json.loads(scientists_path.read_text(encoding="utf-8")) or []
+                authorized = [str(u).lstrip("@").lower() for u in raw if u]
+            except Exception:
+                authorized = []
+        if not authorized:
+            print(f"{YELLOW}⚠ Nessun username autorizzato in {scientists_path.name}.{RESET}")
+
+        # Pattern di parsing
+        rx_chat_ok = re.compile(
+            r"delta\.chat_engine: Risposta HF \[([^\]]+)\] per user (\d+)"
+        )
+        rx_chat_err = re.compile(r"delta\.chat_engine: HF ha restituito errore")
+        rx_bot_reply = re.compile(
+            r"delta\.deltaplano_bot: Chat LLM risposta per user (\d+)"
+        )
+        rx_hf_chars = re.compile(r"delta\.huggingface_llm: HF risposta generata .*\((\d+) chars\)")
+        rx_hf_err = re.compile(r"delta\.huggingface_llm: Errore HF")
+
+        stats = defaultdict(lambda: {
+            "requests": 0,      # risposte HF associate ad un user
+            "bot_replies": 0,   # log da deltaplano_bot
+            "errors": 0,        # errori HF nel contesto utente
+            "models": set(),
+            "first": None,
+            "last": None,
+        })
+        total_hf_chars = 0
+        total_hf_calls = 0
+        total_hf_errors = 0
+        last_user_seen: str = ""
+
+        ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
+
+        for lf in log_files:
+            try:
+                with lf.open("r", encoding="utf-8", errors="ignore") as fh:
+                    for line in fh:
+                        ts_m = ts_re.match(line)
+                        ts = ts_m.group(1) if ts_m else None
+
+                        m = rx_chat_ok.search(line)
+                        if m:
+                            model, uid = m.group(1), m.group(2)
+                            s = stats[uid]
+                            s["requests"] += 1
+                            s["models"].add(model)
+                            if ts:
+                                s["first"] = ts if not s["first"] or ts < s["first"] else s["first"]
+                                s["last"]  = ts if not s["last"]  or ts > s["last"]  else s["last"]
+                            last_user_seen = uid
+                            continue
+
+                        m = rx_bot_reply.search(line)
+                        if m:
+                            uid = m.group(1)
+                            stats[uid]["bot_replies"] += 1
+                            last_user_seen = uid
+                            continue
+
+                        m = rx_hf_chars.search(line)
+                        if m:
+                            total_hf_chars += int(m.group(1))
+                            total_hf_calls += 1
+                            continue
+
+                        if rx_hf_err.search(line):
+                            total_hf_errors += 1
+                            if last_user_seen:
+                                stats[last_user_seen]["errors"] += 1
+                            continue
+
+                        if rx_chat_err.search(line) and last_user_seen:
+                            stats[last_user_seen]["errors"] += 1
+            except Exception as exc:
+                print(f"{YELLOW}⚠ Errore parsing {lf.name}: {exc}{RESET}")
+
+        # Costruisci righe per utente autorizzato
+        # Mappa username -> user_id inverso
+        uname_to_id: dict = {}
+        for uid, uname in id_to_username.items():
+            uname_to_id[uname.lstrip("@").lower()] = uid
+
+        rows = []
+        for uname in authorized:
+            uid = uname_to_id.get(uname, "")
+            s = stats.get(uid, None) if uid else None
+            rows.append({
+                "username": "@" + uname,
+                "user_id":  uid or "—",
+                "requests": s["requests"] if s else 0,
+                "errors":   s["errors"] if s else 0,
+                "models":   ", ".join(sorted(s["models"])) if s and s["models"] else "—",
+                "first":    s["first"] if s and s["first"] else "—",
+                "last":     s["last"] if s and s["last"] else "—",
+            })
+
+        # Utenti non autorizzati che hanno comunque attività (riconosciuti via mapping ma non in scientists)
+        extra_rows = []
+        for uid, s in stats.items():
+            uname = id_to_username.get(uid, "")
+            base_uname = uname.lstrip("@").lower() if uname else ""
+            if base_uname and base_uname in authorized:
+                continue
+            extra_rows.append({
+                "username": uname or "(sconosciuto)",
+                "user_id":  uid,
+                "requests": s["requests"],
+                "errors":   s["errors"],
+                "models":   ", ".join(sorted(s["models"])) if s["models"] else "—",
+                "first":    s["first"] or "—",
+                "last":     s["last"] or "—",
+            })
+
+        # Tabella per utente autorizzato
+        print(f"\n{BOLD}Per singolo utente autorizzato:{RESET}")
+        col_w_user = max([len(r["username"]) for r in rows] + [len("username")])
+        col_w_id   = max([len(str(r["user_id"])) for r in rows] + [len("user_id")])
+        header = (
+            f"  {'username'.ljust(col_w_user)}  {'user_id'.ljust(col_w_id)}  "
+            f"{'req':>5}  {'err':>4}  {'first':<19}  {'last':<19}  models"
+        )
+        print(f"{DIM}{header}{RESET}")
+        print(f"{DIM}{'-' * (len(header))}{RESET}")
+        rows_sorted = sorted(rows, key=lambda r: r["requests"], reverse=True)
+        for r in rows_sorted:
+            color = GREEN if r["requests"] > 0 else DIM
+            print(
+                f"  {color}{r['username'].ljust(col_w_user)}  "
+                f"{str(r['user_id']).ljust(col_w_id)}  "
+                f"{r['requests']:>5}  {r['errors']:>4}  "
+                f"{r['first']:<19}  {r['last']:<19}  {r['models']}{RESET}"
+            )
+
+        if extra_rows:
+            print(f"\n{BOLD}Altri utenti rilevati nei log (non in scientists):{RESET}")
+            for r in sorted(extra_rows, key=lambda r: r["requests"], reverse=True):
+                print(
+                    f"  {YELLOW}{r['username']}  id={r['user_id']}  "
+                    f"req={r['requests']}  err={r['errors']}  "
+                    f"first={r['first']}  last={r['last']}  models={r['models']}{RESET}"
+                )
+
+        # Totali
+        total_authorized_req = sum(r["requests"] for r in rows)
+        total_other_req      = sum(r["requests"] for r in extra_rows)
+        print(f"\n{BOLD}Totali globali:{RESET}")
+        print(f"  Richieste LLM autorizzate:  {GREEN}{total_authorized_req}{RESET}")
+        print(f"  Richieste LLM altri utenti: {YELLOW}{total_other_req}{RESET}")
+        print(f"  Chiamate HF totali:         {total_hf_calls}")
+        print(f"  Errori HF totali:           {RED if total_hf_errors else GREEN}{total_hf_errors}{RESET}")
+        print(f"  Caratteri generati totali:  {total_hf_chars:,}".replace(",", "."))
+
+        # Istogramma ASCII di tutti gli autorizzati
+        print(f"\n{BOLD}Istogramma richieste LLM per utente autorizzato:{RESET}")
+        max_req = max((r["requests"] for r in rows), default=0)
+        if max_req == 0:
+            print(f"{DIM}  (nessuna richiesta registrata per gli utenti autorizzati){RESET}")
+        else:
+            bar_max = 40
+            for r in rows_sorted:
+                bars = int(round(r["requests"] / max_req * bar_max)) if max_req else 0
+                bar  = "█" * bars
+                color = CYAN if r["requests"] > 0 else DIM
+                print(
+                    f"  {r['username'].ljust(col_w_user)}  "
+                    f"{color}{bar}{RESET} {DIM}({r['requests']}){RESET}"
+                )
+
+        # Salva report su file
+        report_path = _ROOT / "logs" / "deltaplano_inference_stats.txt"
+        try:
+            with report_path.open("w", encoding="utf-8") as fh:
+                fh.write(f"DELTA — Statistiche inferenza DELTAPLANO_bot\n")
+                fh.write(f"Generato: {datetime.now().isoformat(timespec='seconds')}\n\n")
+                fh.write("Per utente autorizzato:\n")
+                for r in rows_sorted:
+                    fh.write(
+                        f"  {r['username']:<25}  id={r['user_id']:<12}  "
+                        f"req={r['requests']:<5}  err={r['errors']:<4}  "
+                        f"first={r['first']}  last={r['last']}  models={r['models']}\n"
+                    )
+                if extra_rows:
+                    fh.write("\nAltri utenti rilevati:\n")
+                    for r in extra_rows:
+                        fh.write(
+                            f"  {r['username']:<25}  id={r['user_id']:<12}  "
+                            f"req={r['requests']:<5}  err={r['errors']}\n"
+                        )
+                fh.write(f"\nTotali: req_autorizzati={total_authorized_req}  "
+                         f"req_altri={total_other_req}  hf_calls={total_hf_calls}  "
+                         f"hf_errors={total_hf_errors}  chars={total_hf_chars}\n")
+            print(f"\n{DIM}Report salvato in: {report_path}{RESET}")
+        except Exception as exc:
+            print(f"{YELLOW}⚠ Impossibile salvare report: {exc}{RESET}")
+
+        if not id_to_username:
+            print(
+                f"\n{YELLOW}ℹ Nessuna mappa user_id→username ancora popolata.{RESET}\n"
+                f"{DIM}  La mappa viene aggiornata automaticamente in {map_path}\n"
+                f"  ad ogni interazione di un utente autorizzato sul bot Telegram.{RESET}"
+            )
 
     # ── Helper ─────────────────────────────────────────────────
 

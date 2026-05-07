@@ -53,3 +53,4 @@ models/*.gguf
 # Modello Keras (troppo grande per GitHub: 21MB)
 models/dipladenia/*.keras
 # Solo il TFLite (2.7MB) viene committato
+data/telegram_user_map.json

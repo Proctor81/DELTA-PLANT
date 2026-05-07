@@ -27,9 +27,9 @@ class ChatEngine:
         self._hf_llm = HuggingFaceLLM(
             api_token=os.environ.get("HF_API_TOKEN", ""),
             model_name=os.environ.get("HF_MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct"),
-            max_tokens=512,
+            max_tokens=int(os.environ.get("HF_MAX_TOKENS", "1500")),
             temperature=0.65,
-            timeout=15,
+            timeout=int(os.environ.get("HF_TIMEOUT", "60")),
         )
         # Evita chiamate di rete sincrone in __init__: il bot Telegram deve
         # potersi istanziare subito e tentare HF solo quando arriva un messaggio.

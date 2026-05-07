@@ -892,7 +892,20 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("Reclassificazione LLM",    "Attiva solo se l'utente ha fornito una descrizione"),
         ("Diagnosi conversazionale", "Basata su descrizione + Q&A + dati sensori, senza immagine classificata"),
         ("Foto libera",              "Stessa procedura del flusso guidato: foto → descrizione → sensori → diagnosi"),
+        ("Diagnosi singolo msg",     "v3.1.2 — la diagnosi è inviata in un solo messaggio (split automatico a 4000 char)"),
+        ("Chiusura conversazione",   "v3.1.2 — dopo 'Posso fare qualcos'altro per te?' il bot resta in attesa, nessun messaggio non sollecitato"),
+        ("HF max_tokens",            "1500 (override via env HF_MAX_TOKENS); timeout 60s (HF_TIMEOUT)"),
     ])
+
+    pdf._subsection("5.4b Pannello amministratore — statistiche bot")
+    pdf._body(
+        "Dal pannello amministratore (interface/admin.py) la voce [10] 'Statistiche "
+        "inferenza DELTAPLANO_bot' produce un report per singolo utente autorizzato "
+        "con: numero richieste LLM, errori, lunghezza media risposta, modello usato e "
+        "ultimo accesso. Include un istogramma ASCII comparativo tra tutti gli utenti "
+        "autorizzati e una sezione 'Altri utenti' per quelli non in scientists.json. "
+        "Il report viene salvato in logs/deltaplano_inference_stats.txt."
+    )
 
     pdf._subsection("5.5 Output diagnosi — interpretazione")
     pdf._kv_table([

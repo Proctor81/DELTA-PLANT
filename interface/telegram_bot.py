@@ -81,6 +81,20 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if context.user_data.get("diag_qa_active"):
         logger.debug("free_chat_handler: Q&A follow-up in corso, inibito")
         return
+    # Guardia aggiuntiva: se è presente uno qualsiasi dei marker di un flusso
+    # diagnosi/upload/academy ancora in corso (anche se il flag attivo è stato
+    # appena azzerato dall'altro handler nel medesimo update), non inviare nulla
+    # all'LLM. Evita risposte non sollecitate dopo la chiusura della diagnosi.
+    _diag_keys = (
+        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
+        "diag_followup_last_question", "diag_user_description",
+        "diag_followup_mode", "diag_pending_chunks",
+    )
+    if any(context.user_data.get(k) for k in _diag_keys):
+        logger.debug(
+            "free_chat_handler: marker diagnosi presente, inibito"
+        )
+        return
     user_text = update.message.text.strip()
     user_id = update.effective_user.id if update.effective_user else None
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
@@ -308,27 +322,23 @@ async def _send_diagnosis_paginated(
     text: str,
     parse_mode: Optional[str] = None,
 ):
-    """Invia la diagnosi in pagine: usa /continua se il testo e lungo."""
-    chunks = _split_message(text)
+    """Invia la diagnosi in un singolo messaggio.
+
+    - Se il testo rientra nel limite Telegram (4096 char) viene spedito intero.
+    - Se eccede, viene comunque inviato in chunk consecutivi senza pulsante
+      "Continua": l'utente riceve l'intera diagnosi automaticamente.
+    """
     closing = "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂"
 
-    # Sovrascrive eventuale coda precedente per evitare pagine stale.
+    # Pulisci eventuale coda residua di vecchie versioni paginate
     context.user_data.pop("diag_pending_chunks", None)
     context.user_data.pop("diag_pending_parse_mode", None)
     context.user_data.pop("diag_pending_closing", None)
 
-    if len(chunks) == 1:
-        await _send(update, chunks[0], parse_mode=parse_mode)
-        await _send(update, closing)
-        return
-
-    context.user_data["diag_pending_chunks"] = chunks[1:]
-    context.user_data["diag_pending_parse_mode"] = parse_mode
-    context.user_data["diag_pending_closing"] = closing
-
-    await _send(update, chunks[0], parse_mode=parse_mode)
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("📄 Continua lettura", callback_data="CMD_CONTINUA")]])
-    await _send(update, f"📋 Il messaggio continua ({len(chunks)-1} parte/i rimaste).", reply_markup=kb)
+    chunks = _split_message(text, limit=4000)
+    for chunk in chunks:
+        await _send(update, chunk, parse_mode=parse_mode)
+    await _send(update, closing)
 
 
 async def _send_chat_paginated(
@@ -568,7 +578,34 @@ async def _guard(update: Update) -> bool:
         except Exception as exc:
             logger.warning(f"Impossibile loggare accesso negato: {exc}")
         return False
+    # Aggiorna mappa id<->username degli utenti autorizzati (best effort)
+    if user_id is not None and username:
+        try:
+            _record_user_mapping(user_id, username)
+        except Exception as exc:
+            logger.debug(f"_record_user_mapping fallito: {exc}")
     return True
+
+
+def _record_user_mapping(user_id: int, username: str) -> None:
+    """Persiste la corrispondenza user_id ↔ username degli utenti autorizzati."""
+    map_path = Path(__file__).resolve().parent.parent / "data" / "telegram_user_map.json"
+    map_path.parent.mkdir(parents=True, exist_ok=True)
+    data: dict = {}
+    if map_path.exists():
+        try:
+            data = json.loads(map_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+    key = str(user_id)
+    uname = username.lstrip("@").lower()
+    entry = data.get(key, {})
+    if entry.get("username") == uname:
+        return  # nessun cambiamento
+    entry["username"] = uname
+    entry["last_seen"] = datetime.now().isoformat(timespec="seconds")
+    data[key] = entry
+    map_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _api_url(path: str) -> str:
@@ -1771,7 +1808,6 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
     ):
         context.user_data.pop(key, None)
-    context.user_data["diagnosis_active"] = False
 
     title = "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>" if followup_mode == "class_mismatch" else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
 
@@ -1781,6 +1817,7 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         f"{title}\n\n{opinion}",
         parse_mode="HTML",
     )
+    context.user_data["diagnosis_active"] = False
 
 
 async def _send_ai_diagnosis_opinion(
@@ -1789,6 +1826,7 @@ async def _send_ai_diagnosis_opinion(
     record: Dict[str, Any],
 ) -> int:
     """Invia diagnosi completa se c'è match classe; altrimenti avvia follow-up interattivo."""
+    context.user_data["diagnosis_active"] = True
     try:
         await update.effective_chat.send_action("typing")
     except Exception:
@@ -1833,6 +1871,7 @@ async def _send_ai_diagnosis_opinion(
         opinion = await asyncio.to_thread(_ask)
     except Exception as exc:
         logger.warning("Errore opinione AI post-diagnosi: %s", exc)
+        context.user_data["diagnosis_active"] = False
         return ConversationHandler.END
 
     opinion = _sanitize_diagnosis_opinion(opinion)
@@ -1843,6 +1882,7 @@ async def _send_ai_diagnosis_opinion(
         f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
         parse_mode="HTML",
     )
+    context.user_data["diagnosis_active"] = False
     return ConversationHandler.END
 
 
