@@ -103,9 +103,9 @@ def test_run_runtime_interactive_with_telegram_polls_on_main_thread(monkeypatch)
     main._run_runtime(agent, args, telegram_app)
 
     assert calls == [
-        ("thread", "delta-cli", True),
-        ("cli", agent),
+        ("thread", "delta-telegram", True),
         ("poll", telegram_app),
+        ("cli", agent),
     ]
 
 

@@ -391,9 +391,10 @@ async def _continue_pending(
 async def continue_diagnosis_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Invia la pagina successiva di un messaggio lungo — via /continua o pulsante inline."""
     # Risponde alla callback query del pulsante inline se presente
-    if update.callback_query:
+    callback_query = getattr(update, "callback_query", None)
+    if callback_query:
         try:
-            await update.callback_query.answer()
+            await callback_query.answer()
         except Exception:
             pass
 
