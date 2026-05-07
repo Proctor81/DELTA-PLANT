@@ -40,7 +40,7 @@ def test_token_validity(token: str) -> bool:
     try:
         import httpx
         r = httpx.get(
-            "https://huggingface.co/api/whoami",
+            "https://huggingface.co/api/whoami-v2",
             headers={"Authorization": f"Bearer {token}"},
             timeout=15,
         )
