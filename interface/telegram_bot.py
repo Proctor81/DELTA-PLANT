@@ -96,30 +96,29 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         )
         return
     user_text = update.message.text.strip()
-    user_id = update.effective_user.id if update.effective_user else None
+    user_id = str(update.effective_user.id) if update.effective_user else "0"
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
-    # Se il testo è un comando, instrada a DELTAPLANOBot.handle_command
-    if user_text.startswith("/"):
-        from bot.deltaplano_bot import DELTAPLANOBot
-        deltachat_bot = context.application.bot_data.get("deltaplano_bot")
-        if not deltachat_bot:
-            deltachat_bot = DELTAPLANOBot()
-            context.application.bot_data["deltaplano_bot"] = deltachat_bot
-        logger.info(f"Instrado comando a DELTAPLANOBot: {user_text}")
-        response = await asyncio.to_thread(deltachat_bot.handle_command, user_id, user_text)
-        logger.info(f"Risposta DELTAPLANOBot: {response}")
-        await _send_long(update, response)
-        return
-    # Altrimenti, instrada a DELTAPLANOBot.handle_message
-    from bot.deltaplano_bot import DELTAPLANOBot
-    deltachat_bot = context.application.bot_data.get("deltaplano_bot")
-    if not deltachat_bot:
-        deltachat_bot = DELTAPLANOBot()
-        context.application.bot_data["deltaplano_bot"] = deltachat_bot
-    logger.info(f"Instrado messaggio a DELTAPLANOBot: {user_text}")
-    response = await asyncio.to_thread(deltachat_bot.handle_message, user_id, user_text)
-    logger.info(f"Risposta DELTAPLANOBot: {response}")
-    await _send_long(update, response)
+
+    # Usa lo stesso ChatEngine condiviso usato da tutto il bot
+    # (evita il problema del doppio engine con cache RAM separata).
+    engine = _get_chat_engine(context)
+
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    def _ask():
+        return engine.chat(user_id, user_text)
+
+    try:
+        response = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        logger.error(f"free_chat_handler: errore engine.chat: {exc}", exc_info=True)
+        response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
+
+    logger.info(f"free_chat_handler: risposta per {user_id}: {response[:80]}")
+    await _send_chat_paginated(update, context, response)
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -1808,21 +1807,23 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
     if followup_mode == "class_mismatch":
         opinion = _strip_plantvillage_class_mentions(opinion)
 
-    for key in (
-        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
-        "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
-    ):
-        context.user_data.pop(key, None)
-
     title = "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>" if followup_mode == "class_mismatch" else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
 
-    await _send_diagnosis_paginated(
-        update,
-        context,
-        f"{title}\n\n{opinion}",
-        parse_mode="HTML",
+    _diag_cleanup_keys = (
+        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
+        "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
     )
-    context.user_data["diagnosis_active"] = False
+    try:
+        await _send_diagnosis_paginated(
+            update,
+            context,
+            f"{title}\n\n{opinion}",
+            parse_mode="HTML",
+        )
+    finally:
+        for key in _diag_cleanup_keys:
+            context.user_data.pop(key, None)
+        context.user_data["diagnosis_active"] = False
 
 
 async def _send_ai_diagnosis_opinion(
@@ -1881,13 +1882,23 @@ async def _send_ai_diagnosis_opinion(
 
     opinion = _sanitize_diagnosis_opinion(opinion)
 
-    await _send_diagnosis_paginated(
-        update,
-        context,
-        f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
-        parse_mode="HTML",
+    _diag_cleanup_keys = (
+        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
+        "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
     )
-    context.user_data["diagnosis_active"] = False
+    try:
+        await _send_diagnosis_paginated(
+            update,
+            context,
+            f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
+            parse_mode="HTML",
+        )
+    finally:
+        # Pulizia garantita anche se _send_diagnosis_paginated lancia un'eccezione.
+        # Senza questo, diagnosis_active rimarrebbe True e blockerebbe la chat libera.
+        for key in _diag_cleanup_keys:
+            context.user_data.pop(key, None)
+        context.user_data["diagnosis_active"] = False
     return ConversationHandler.END
 
 
@@ -1990,6 +2001,7 @@ async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_
     # Salva la foto e poi chiede la descrizione utente (stesso flusso della diagnosi guidata)
     saved = await _download_telegram_image(update)
     if not saved:
+        context.user_data["diagnosis_active"] = False
         await _send(update, "Immagine non valida.")
         return ConversationHandler.END
     context.user_data["diag_image_path"] = str(saved)

@@ -897,7 +897,26 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("HF max_tokens",            "1500 (override via env HF_MAX_TOKENS); timeout 60s (HF_TIMEOUT)"),
     ])
 
-    pdf._subsection("5.4b Pannello amministratore — statistiche bot")
+    pdf._subsection("5.4b Chat libera Telegram — memoria persistente")
+    pdf._body(
+        "La chat libera Telegram, la modalità /chat e i flussi diagnostici che richiedono "
+        "spiegazioni LLM usano ora lo stesso motore conversazionale condiviso. "
+        "Questo elimina disallineamenti di contesto tra domanda libera, approfondimento della diagnosi "
+        "e richieste successive dell'utente."
+    )
+    pdf._bullet([
+        "Memoria persistente per utente: gli ultimi 20 turni sono salvati in memory/sessions/<user_id>.json e vengono ricaricati dopo ogni riavvio del bot.",
+        "Coerenza del contesto: chat libera, /chat e diagnosi Telegram leggono e scrivono la stessa cronologia conversazionale.",
+        "Igiene della memoria: i messaggi di errore del backend LLM non vengono salvati nella cronologia, per evitare contaminazioni del contesto.",
+        "Ripresa automatica: se l'invio della diagnosi fallisce lato Telegram, i flag interni di diagnosi vengono comunque ripuliti e la chat libera torna disponibile.",
+        "Uso operativo: dopo una diagnosi l'utente può chiedere 'approfondisci', 'spiegami il rischio' o 'dammi una ricetta' senza perdere il contesto recente.",
+    ])
+    pdf._warning_box(
+        "I file memory/sessions/*.json contengono cronologia conversazionale locale e sono dati runtime del dispositivo. "
+        "Vanno mantenuti sul Raspberry o sul PC locale e non devono essere pubblicati su GitHub."
+    )
+
+    pdf._subsection("5.4c Pannello amministratore — statistiche bot")
     pdf._body(
         "Dal pannello amministratore (interface/admin.py) la voce [10] 'Statistiche "
         "inferenza DELTAPLANO_bot' produce un report per singolo utente autorizzato "

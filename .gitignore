@@ -54,3 +54,6 @@ models/*.gguf
 models/dipladenia/*.keras
 # Solo il TFLite (2.7MB) viene committato
 data/telegram_user_map.json
+
+# Memoria conversazionale locale del bot Telegram
+memory/sessions/

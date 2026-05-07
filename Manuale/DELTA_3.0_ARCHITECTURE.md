@@ -294,6 +294,8 @@ When Class 39 appears:
 ### "Chat is disabled during diagnosis"
 **Solution:** Wait for diagnosis to complete, then use `/chat`
 
+From the persistent-memory patch line, DELTA now clears diagnosis flags even if Telegram fails while sending the final message. This prevents the free chat from remaining blocked after a failed diagnosis delivery.
+
 ### "Classe_39_NonClassificato"
 **Solution:** Improve photo quality or use `/chat` for guidance
 
@@ -426,6 +428,40 @@ The LLM was occasionally appending "send a photo for further analysis" to the di
 #### 6. Paginated Messages — Inline Button
 
 Long diagnosis messages (>4096 chars) are split into chunks. The continuation button is now an **inline keyboard button** (`📄 Continua lettura`) registered as a global handler — works even after `ConversationHandler.END`.
+
+#### 7. Shared Chat Engine + Persistent Conversation Memory
+
+Telegram free chat, `/chat`, and diagnosis-related LLM calls now share the same `ChatEngine` instance inside the bot application context. This removes context drift between handlers that previously maintained separate in-memory histories.
+
+Conversation history is now persisted on disk per user:
+
+```text
+memory/sessions/<user_id>.json
+```
+
+Operational characteristics:
+
+- Last 20 turns are retained per user (bounded growth)
+- History survives process restarts
+- Cache is refreshed if a newer session file exists on disk
+- `[DELTA] ...` service/error messages are excluded from memory
+
+This means an operator can complete a diagnosis, then continue with questions like:
+
+- "Why is the risk high?"
+- "Explain the diagnosis in simpler terms"
+- "Suggest an immediate treatment plan"
+
+without losing the immediate conversational context.
+
+#### 8. Diagnosis State Auto-Recovery
+
+Two Telegram failure paths were hardened:
+
+1. If `_send_diagnosis_paginated()` raises during final delivery, cleanup now runs in `finally`, ensuring `diagnosis_active=False` and removing transient `diag_*` markers.
+2. If an unprompted image upload is invalid, `diagnosis_active` is reset before returning.
+
+This guarantees that a failed Telegram send cannot leave the bot permanently mute in free chat.
 
 ---
 

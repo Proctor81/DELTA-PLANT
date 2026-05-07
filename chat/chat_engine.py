@@ -99,12 +99,19 @@ class ChatEngine:
                     history=hf_history,
                     system_prompt=DELTA_SYSTEM_PROMPT,
                 )
-                if response and not response.startswith("[DELTA] Impossibile"):
+                # Filtra risposte di errore: non salvarle in memoria per non
+                # inquinare la storia conversazionale con messaggi di servizio.
+                _is_error = not response or response.startswith("[DELTA]")
+                if not _is_error:
                     logger.info(f"Risposta HF [{model_used}] per user {user_id}")
                     self.memory.append(user_id, user_input, response)
                     return response
                 else:
-                    logger.warning(f"HF ha restituito errore: {response[:80]}")
+                    logger.warning(f"HF ha restituito errore/no-response: {response[:80]}")
+                    # Token non valido → disabilita per questa sessione
+                    if response and ("Token" in response or "401" in response or "non valido" in response.lower()):
+                        self._hf_available = False
+                    return response
             except Exception as e:
                 logger.warning(f"Eccezione HF chat: {e}")
                 # Se errore 401, disabilita HF per questa sessione
@@ -116,7 +123,6 @@ class ChatEngine:
             "Mi dispiace, al momento il backend LLM non e disponibile. "
             "Verifica connessione, HF_API_TOKEN e HF_MODEL_NAME nel file .env"
         )
-        self.memory.append(user_id, user_input, fallback_response)
         return fallback_response
 
     def reset(self, user_id: str) -> None:
