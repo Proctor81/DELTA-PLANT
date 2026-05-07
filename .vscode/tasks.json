@@ -65,7 +65,8 @@
       "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "main.py",
-        "--preflight"
+        "--preflight",
+        "--daemon"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

@@ -108,7 +108,7 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         logger.info(f"Instrado comando a DELTAPLANOBot: {user_text}")
         response = await asyncio.to_thread(deltachat_bot.handle_command, user_id, user_text)
         logger.info(f"Risposta DELTAPLANOBot: {response}")
-        await _send(update, response)
+        await _send_long(update, response)
         return
     # Altrimenti, instrada a DELTAPLANOBot.handle_message
     from bot.deltaplano_bot import DELTAPLANOBot
@@ -119,7 +119,7 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     logger.info(f"Instrado messaggio a DELTAPLANOBot: {user_text}")
     response = await asyncio.to_thread(deltachat_bot.handle_message, user_id, user_text)
     logger.info(f"Risposta DELTAPLANOBot: {response}")
-    await _send(update, response)
+    await _send_long(update, response)
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -322,12 +322,12 @@ async def _send_diagnosis_paginated(
     text: str,
     parse_mode: Optional[str] = None,
 ):
-    """Invia la diagnosi in un singolo messaggio.
+    """Invia la diagnosi come unico messaggio di massimo 3500 caratteri.
 
-    - Se il testo rientra nel limite Telegram (4096 char) viene spedito intero.
-    - Se eccede, viene comunque inviato in chunk consecutivi senza pulsante
-      "Continua": l'utente riceve l'intera diagnosi automaticamente.
+    Se il testo supera il limite viene troncato al confine di riga più vicino
+    e viene aggiunta una nota di sintesi.
     """
+    MAX_DIAG_CHARS = 3500
     closing = "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂"
 
     # Pulisci eventuale coda residua di vecchie versioni paginate
@@ -335,9 +335,14 @@ async def _send_diagnosis_paginated(
     context.user_data.pop("diag_pending_parse_mode", None)
     context.user_data.pop("diag_pending_closing", None)
 
-    chunks = _split_message(text, limit=4000)
-    for chunk in chunks:
-        await _send(update, chunk, parse_mode=parse_mode)
+    if len(text) > MAX_DIAG_CHARS:
+        # Tronca all'ultimo a-capo entro il limite
+        cutoff = text.rfind("\n", 0, MAX_DIAG_CHARS)
+        if cutoff == -1:
+            cutoff = MAX_DIAG_CHARS
+        text = text[:cutoff].rstrip() + "\n\n_(sintesi — testo completo disponibile su richiesta)_"
+
+    await _send(update, text, parse_mode=parse_mode)
     await _send(update, closing)
 
 
