@@ -124,6 +124,7 @@ info "Generazione /etc/systemd/system/${SERVICE_NAME}.service ..."
 
 sed \
     -e "s|DELTA_DIR|${DELTA_DIR}|g" \
+    -e "s|DELTA_PYTHON|${VENV_PYTHON}|g" \
     -e "s|DELTA_USER|${DELTA_USER}|g" \
     "$SERVICE_SRC" > "$SERVICE_DST"
 

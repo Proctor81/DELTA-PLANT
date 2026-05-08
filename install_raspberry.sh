@@ -208,6 +208,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 if [[ -f "${DELTA_DIR}/delta.service" ]]; then
     sed \
         -e "s|DELTA_DIR|${DELTA_DIR}|g" \
+        -e "s|DELTA_PYTHON|${VENV_PYTHON}|g" \
         -e "s|DELTA_USER|${DELTA_USER}|g" \
         "${DELTA_DIR}/delta.service" > "$SERVICE_FILE"
     info "Template delta.service applicato."
@@ -224,7 +225,7 @@ Wants=network-online.target
 Type=simple
 User=${DELTA_USER}
 WorkingDirectory=${DELTA_DIR}
-ExecStart=${VENV_DIR}/bin/python ${DELTA_DIR}/main.py
+ExecStart=${VENV_PYTHON} ${DELTA_DIR}/main.py --enable-api --enable-telegram --daemon
 Restart=on-failure
 RestartSec=15
 StandardOutput=journal

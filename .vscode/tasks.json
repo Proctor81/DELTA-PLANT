@@ -66,6 +66,8 @@
       "args": [
         "main.py",
         "--preflight",
+        "--enable-api",
+        "--enable-telegram",
         "--daemon"
       ],
       "options": {

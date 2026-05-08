@@ -56,6 +56,50 @@ except ImportError:
 logger = logging.getLogger("delta.interface.telegram")
 logger = logging.getLogger("delta.interface.telegram")
 
+_FREE_CHAT_TRANSIENT_MARKERS = (
+    "sensor_index",
+    "diag_image_path",
+    "diag_fallback_record",
+    "diag_followup_qa",
+    "diag_followup_count",
+    "diag_followup_last_question",
+    "diag_user_description",
+    "diag_followup_mode",
+    "diag_pending_chunks",
+)
+
+_DIAG_TRANSIENT_KEYS = (
+    *_FREE_CHAT_TRANSIENT_MARKERS,
+    "diag_pending_parse_mode",
+    "diag_pending_closing",
+)
+
+
+def _clear_user_data_keys(context: "ContextTypes.DEFAULT_TYPE", *keys: str) -> None:
+    for key in keys:
+        context.user_data.pop(key, None)
+
+
+def _clear_diagnosis_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
+    _clear_user_data_keys(context, *_DIAG_TRANSIENT_KEYS)
+    context.user_data.pop("diag_qa_active", None)
+    context.user_data["diagnosis_active"] = False
+
+
+def _free_chat_block_reason(context: "ContextTypes.DEFAULT_TYPE") -> str:
+    if context.user_data.get("diagnosis_active"):
+        return "diagnosis_active"
+    if context.user_data.get("diag_qa_active"):
+        return "diag_qa_active"
+    if context.user_data.get("chat_mode_active"):
+        return "chat_mode_active"
+    if context.user_data.get("upload_active"):
+        return "upload_active"
+    for key in _FREE_CHAT_TRANSIENT_MARKERS:
+        if key in context.user_data:
+            return key
+    return ""
+
 # ──────────────────────────────────────────────────────────────
 # Handler per chat libera (domanda/risposta non strutturata)
 async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
@@ -73,27 +117,9 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if not update.message or not update.message.text:
         logger.debug("free_chat_handler: messaggio vuoto o non testuale")
         return
-    # Inibisci la chat libera durante una diagnosi attiva (es. inserimento manuale sensori).
-    # I valori dei sensori non devono essere instradati all'LLM.
-    if context.user_data.get("diagnosis_active"):
-        logger.debug("free_chat_handler: diagnosi in corso, chat libera inibita")
-        return
-    if context.user_data.get("diag_qa_active"):
-        logger.debug("free_chat_handler: Q&A follow-up in corso, inibito")
-        return
-    # Guardia aggiuntiva: se è presente uno qualsiasi dei marker di un flusso
-    # diagnosi/upload/academy ancora in corso (anche se il flag attivo è stato
-    # appena azzerato dall'altro handler nel medesimo update), non inviare nulla
-    # all'LLM. Evita risposte non sollecitate dopo la chiusura della diagnosi.
-    _diag_keys = (
-        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
-        "diag_followup_last_question", "diag_user_description",
-        "diag_followup_mode", "diag_pending_chunks",
-    )
-    if any(context.user_data.get(k) for k in _diag_keys):
-        logger.debug(
-            "free_chat_handler: marker diagnosi presente, inibito"
-        )
+    block_reason = _free_chat_block_reason(context)
+    if block_reason:
+        logger.debug("free_chat_handler: flusso strutturato attivo (%s), inibito", block_reason)
         return
     user_text = update.message.text.strip()
     user_id = str(update.effective_user.id) if update.effective_user else "0"
@@ -227,6 +253,9 @@ def _load_allowed_usernames() -> Set[str]:
 
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔵 💬 Chiedi a DELTA Plant", callback_data=CMD_CHAT),
+        ],
         [
             InlineKeyboardButton("🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
         ],
@@ -804,6 +833,8 @@ async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "La chat è disabilitata durante l'acquisizione dati sensori per evitare interferenze.")
         return ConversationHandler.END
 
+    context.user_data["chat_mode_active"] = True
+
     engine = _get_chat_engine(context)
     status = engine.get_status()
     hf_ok = status.get("hf_token_valid", False)
@@ -886,6 +917,7 @@ async def chat_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Termina la sessione di chat e torna al menu principale."""
     if not await _guard(update):
         return ConversationHandler.END
+    _clear_user_data_keys(context, "chat_mode_active", "chat_pending_chunks", "chat_pending_parse_mode")
     query = update.callback_query
     if query:
         await query.answer("Chat terminata")
@@ -1286,6 +1318,8 @@ async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
 
+    _clear_diagnosis_state(context)
+
     # v3.1: Set diagnosis_active flag to inhibit chat during manual input
     context.user_data["diagnosis_active"] = True
 
@@ -1310,7 +1344,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
     if query.data == DIAG_IMAGE_LAST:
         latest = _get_latest_input_image()
         if not latest:
-            context.user_data["diagnosis_active"] = False
+            _clear_diagnosis_state(context)
             await _send(update, "Nessuna immagine in input_images. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = str(latest)
@@ -1318,12 +1352,12 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
     if query.data == DIAG_IMAGE_CAMERA:
         agent = _get_agent(context)
         if not agent or agent.camera._backend is None:
-            context.user_data["diagnosis_active"] = False
+            _clear_diagnosis_state(context)
             await _send(update, "Camera locale non disponibile. Usa 'Invia foto'.")
             return ConversationHandler.END
         context.user_data["diag_image_path"] = ""
         return await _ask_user_description(update, context)
-    context.user_data["diagnosis_active"] = False
+    _clear_diagnosis_state(context)
     await _send(update, "Scelta non valida.")
     return ConversationHandler.END
 
@@ -1396,6 +1430,7 @@ async def choose_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _send(update, f"Inserisci {SENSOR_FIELDS[0][1]} (digita x per saltare):")
         return STATE_DIAG_TEMP
     await _send(update, "Scelta non valida.")
+    _clear_diagnosis_state(context)
     return ConversationHandler.END
 
 
@@ -1978,6 +2013,7 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         opinion = await asyncio.to_thread(_ask)
     except Exception as exc:
         logger.warning("Errore diagnosi conversazionale: %s", exc)
+        _clear_diagnosis_state(context)
         await _send(update, "❌ Errore durante la diagnosi conversazionale.")
         return
 
@@ -1995,10 +2031,6 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
 
     title = "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>" if followup_mode == "class_mismatch" else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
 
-    _diag_cleanup_keys = (
-        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
-        "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
-    )
     try:
         await _send_diagnosis_paginated(
             update,
@@ -2008,9 +2040,7 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         )
         engine.remember_turn(user_id, memory_request, memory_response)
     finally:
-        for key in _diag_cleanup_keys:
-            context.user_data.pop(key, None)
-        context.user_data["diagnosis_active"] = False
+        _clear_diagnosis_state(context)
 
 
 async def _send_ai_diagnosis_opinion(
@@ -2064,7 +2094,7 @@ async def _send_ai_diagnosis_opinion(
         opinion = await asyncio.to_thread(_ask)
     except Exception as exc:
         logger.warning("Errore opinione AI post-diagnosi: %s", exc)
-        context.user_data["diagnosis_active"] = False
+        _clear_diagnosis_state(context)
         return ConversationHandler.END
 
     opinion = _sanitize_diagnosis_opinion(opinion)
@@ -2075,10 +2105,6 @@ async def _send_ai_diagnosis_opinion(
         sensor_data=context.user_data.get("sensor_data", {}),
     )
 
-    _diag_cleanup_keys = (
-        "diag_fallback_record", "diag_followup_qa", "diag_followup_count",
-        "diag_followup_last_question", "diag_user_description", "diag_followup_mode",
-    )
     try:
         await _send_diagnosis_paginated(
             update,
@@ -2089,10 +2115,8 @@ async def _send_ai_diagnosis_opinion(
         engine.remember_turn(user_id, memory_request, memory_response)
     finally:
         # Pulizia garantita anche se _send_diagnosis_paginated lancia un'eccezione.
-        # Senza questo, diagnosis_active rimarrebbe True e blockerebbe la chat libera.
-        for key in _diag_cleanup_keys:
-            context.user_data.pop(key, None)
-        context.user_data["diagnosis_active"] = False
+        # Senza questo, la chat potrebbe restare bloccata o ricevere marker residui.
+        _clear_diagnosis_state(context)
     return ConversationHandler.END
 
 
@@ -2104,7 +2128,7 @@ async def _run_diagnosis(
     # Restituisce un ConversationHandler state (END o STATE_DIAG_FOLLOWUP)
     agent = _get_agent(context)
     if not agent:
-        context.user_data["diagnosis_active"] = False
+        _clear_diagnosis_state(context)
         await _send(update, "Errore sistema: agent non disponibile.")
         return ConversationHandler.END
 
@@ -2113,19 +2137,16 @@ async def _run_diagnosis(
     if image_path:
         image = _load_image_from_path(Path(image_path))
         if image is None:
-            context.user_data["diagnosis_active"] = False
+            _clear_diagnosis_state(context)
             await _send(update, "Impossibile caricare l'immagine.")
             return ConversationHandler.END
     try:
         record = await asyncio.to_thread(agent.run_diagnosis, sensor_data=sensor_data, image=image)
     except Exception as exc:
         logger.error("Errore diagnosi Telegram: %s", exc, exc_info=True)
-        context.user_data["diagnosis_active"] = False
+        _clear_diagnosis_state(context)
         await _send(update, "❌ Errore durante la diagnosi. La chat è nuovamente disponibile.")
         return ConversationHandler.END
-
-    # Riattiva la chat prima di inviare i risultati
-    context.user_data["diagnosis_active"] = False
 
     # Propaga sensor_snapshot a user_data per renderlo disponibile nei flussi conversazionali
     if not context.user_data.get("sensor_data"):
@@ -2153,6 +2174,7 @@ def _labels_keyboard(prefix: str, labels: List[str]) -> InlineKeyboardMarkup:
 async def start_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    context.user_data["upload_active"] = True
     await _send(update, "Invia una foto (o file immagine) da salvare in input_images.")
     return STATE_UPLOAD_WAIT_PHOTO
 
@@ -2169,6 +2191,7 @@ async def receive_upload_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     if not saved:
         await _send(update, "Immagine non valida.")
         return STATE_UPLOAD_WAIT_PHOTO
+    context.user_data.pop("upload_active", None)
     await _send(update, f"Immagine salvata in input_images: {saved.name}")
     return ConversationHandler.END
 
@@ -2190,12 +2213,13 @@ async def pending_label_name_router(update: Update, context: ContextTypes.DEFAUL
 async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    _clear_diagnosis_state(context)
     context.user_data["diagnosis_active"] = True
     context.user_data.pop("diag_user_description", None)
     # Salva la foto e poi chiede la descrizione utente (stesso flusso della diagnosi guidata)
     saved = await _download_telegram_image(update)
     if not saved:
-        context.user_data["diagnosis_active"] = False
+        _clear_diagnosis_state(context)
         await _send(update, "Immagine non valida.")
         return ConversationHandler.END
     context.user_data["diag_image_path"] = str(saved)

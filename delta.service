@@ -28,7 +28,7 @@ WorkingDirectory=DELTA_DIR
 # --enable-api: abilita API REST (richiesta dal bot Telegram)
 # --enable-telegram: abilita bot Telegram (@DELTAPLANO_bot)
 # --daemon: disabilita interfaccia CLI interattiva in ambiente non-tty
-ExecStart=DELTA_DIR/.venv/bin/python3.12 DELTA_DIR/main.py --enable-api --enable-telegram --daemon
+ExecStart=DELTA_PYTHON DELTA_DIR/main.py --enable-api --enable-telegram --daemon
 # CRITICO: disabilita stdin per evitare EOFError in ambiente non interattivo
 StandardInput=null
 # Riavvio automatico in caso di crash (es. errore di rete, timeout Telegram)

@@ -909,6 +909,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
     pdf._bullet([
         "Memoria persistente per utente: gli ultimi 20 turni sono salvati in memory/sessions/<user_id>.json e vengono ricaricati dopo ogni riavvio del bot.",
         "Coerenza del contesto: chat libera, /chat e diagnosi Telegram leggono e scrivono la stessa cronologia conversazionale.",
+        "Isolamento dei flussi: la chat libera globale viene sospesa automaticamente durante diagnosi guidata, inserimento manuale sensori, upload immagine e sessione /chat dedicata, evitando risposte spurie ai valori numerici dei sensori o doppie risposte LLM.",
         "Memoria diagnostica strutturata: dopo ogni diagnosi DELTA salva anche nome pianta, stato, classe AI, analisi organi, rischio, QRS, raccomandazioni, sensori e anomalie, per permettere approfondimenti mirati su ogni elemento del referto.",
         "Ri-ancoraggio automatico: se l'utente scrive richieste ellittiche come 'approfondisci', 'spiega il rischio' o 'qual è il nome della pianta', il motore conversazionale riusa esplicitamente l'ultima diagnosi come contesto principale.",
         "Igiene della memoria: i messaggi di errore del backend LLM non vengono salvati nella cronologia, per evitare contaminazioni del contesto.",
@@ -1058,8 +1059,10 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         f"# Modifica .env e inserisci: {token_env}=<token>\n\n"
         "# Oppure variabile d'ambiente (sesssione corrente)\n"
         f"export {token_env}=\"TOKEN_BOT\"\n\n"
-        "# Avvio rapido con API + Telegram\n"
-        "python main.py --enable-api --enable-telegram"
+        "# Avvio rapido interattivo con API + Telegram\n"
+        "python main.py --enable-api --enable-telegram\n\n"
+        "# Avvio persistente/daemon (consigliato per servizio e test runtime)\n"
+        "python main.py --enable-api --enable-telegram --daemon"
     )
     pdf._body("Parametri principali di configurazione:")
     pdf._kv_table([
@@ -1082,6 +1085,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._bullet([
         "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
         "/export, /preflight, /academy, /license, /health, /batch",
+        "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
@@ -1095,6 +1099,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._bullet([
         "Esempi: 'Qual è la situazione attuale?', 'Spiega la diagnosi', 'Mostra le ultime raccomandazioni', 'Come si aggiorna il modello?'",
         "La chat libera è disponibile solo se l'orchestrator DELTA è attivo e il bot Telegram è correttamente configurato.",
+        "Durante diagnosi guidata, inserimento manuale dei sensori, upload o sessione /chat dedicata, la chat libera viene sospesa automaticamente per evitare interferenze tra i flussi.",
         "Per tornare ai comandi guidati, usa /menu o i pulsanti inline.",
     ])
 
@@ -1131,7 +1136,9 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "# 3. (Raspberry Pi) Installa l'autostart\n"
         "sudo bash install_service.sh\n\n"
         "# 4. (PC/sviluppo) Avvio manuale con API + Telegram\n"
-        "python main.py --enable-api --enable-telegram"
+        "python main.py --enable-api --enable-telegram\n\n"
+        "# 5. (Runtime persistente) Avvio daemon\n"
+        "python main.py --enable-api --enable-telegram --daemon"
     )
     pdf._subsection("Verifica operativa al boot (Raspberry Pi)")
     pdf._body(
@@ -2933,7 +2940,13 @@ def _add_raspberry_install(pdf: ManualePDF):
         "Lo script esegue automaticamente: verifica del file .env e del token "
         "Telegram, abilitazione di network-online.target (rete disponibile prima "
         "del bot), scrittura del file /etc/systemd/system/delta.service "
-        "con i percorsi reali, enable + start del servizio."
+        "con i percorsi reali, sostituzione dell'interprete effettivo del venv nel comando ExecStart, enable + start del servizio."
+    )
+    pdf._body(
+        "Nel workspace VS Code il task predefinito 'DELTA: Preflight + Avvia Sistema' "
+        "usa lo stesso comando validato del servizio: preflight iniziale, API attiva, "
+        "Telegram attivo e runtime in daemon. Questo evita avvii parziali in cui il modello "
+        "parte ma il bot Telegram resta disabilitato."
     )
     pdf._subsection("17.6 Configurazione token Telegram")
     pdf._body(

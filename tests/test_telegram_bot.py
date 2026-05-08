@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import types
 from pathlib import Path
@@ -309,7 +310,13 @@ def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean
         effective_user=types.SimpleNamespace(id=77),
         effective_chat=types.SimpleNamespace(send_action=fake_send_action),
     )
-    context = types.SimpleNamespace(user_data={"diag_user_description": "Foglie con lesioni scure"})
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_user_description": "Foglie con lesioni scure",
+            "sensor_index": 6,
+            "diag_image_path": "input_images/foglia.jpg",
+        }
+    )
     record = {
         "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.88},
         "diagnosis": {
@@ -338,3 +345,84 @@ def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean
     assert "Pianta: pomodoro." in remembered[0][1]
     assert "Elementi completi della diagnosi:" in remembered[0][1]
     assert "Raccomandazioni:" in remembered[0][1]
+    assert "sensor_index" not in context.user_data
+    assert "diag_image_path" not in context.user_data
+    assert context.user_data["diagnosis_active"] is False
+
+
+def test_free_chat_handler_ignores_sensor_collection_markers(monkeypatch):
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="70"),
+        effective_user=types.SimpleNamespace(id=88),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"sensor_index": 2},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+
+def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="ciao"),
+        effective_user=types.SimpleNamespace(id=99),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"chat_mode_active": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+
+def test_menu_keyboard_includes_chat_button():
+    keyboard = tg._menu_keyboard()
+    callback_data = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert tg.CMD_CHAT in callback_data
