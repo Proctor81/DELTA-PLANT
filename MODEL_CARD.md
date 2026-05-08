@@ -1,23 +1,30 @@
-# 🌿 DELTA Plant Disease Classifier - Model Card v3.0
+# 🌿 DELTA Plant Disease Classifier - Model Card
 
 ## Model Overview
 
-**Model Name:** plant_disease_model_39classes_v3_leafonly  
-**Version:** 3.0 (Leaf-Only Orchestrated AI)  
+**Model Name:** DELTA Plant Leaf Disease Stack  
+**Version:** 3.1 (Baseline MobileNetV2 + optional EfficientFormerV2-S1 backend)  
 **Release Date:** 2026-05-03  
 **License:** Creative Commons BY-SA 4.0 (Scientific Research)  
-**Citation:** DELTA Plant v3.0 | PlantVillage Dataset | MobileNetV2 Backbone (Leaf-Only)
+**Citation:** DELTA Plant v3.1 | PlantVillage Dataset | MobileNetV2 baseline + EfficientFormerV2-S1 hybrid backend
 
 ---
 
 ## Model Details
 
 ### Architecture
-- **Backbone:** MobileNetV2 (ImageNet pre-trained weights)
+- **Baseline Backbone:** MobileNetV2 (ImageNet pre-trained weights)
+- **Hybrid Backend:** EfficientFormerV2-S1 (optional, PyTorch->ONNX->TFLite)
 - **Input Shape:** 224×224×3 (RGB images)
 - **Preprocessing:** MobileNetV2 standard — `(x / 127.5) - 1.0` → range [-1, 1]
 - **Output:** 33-class softmax (disease classification)
-- **Model Size:** 14 MB (Keras) / 5.0 MB (TFLite float16)
+- **Explainability:** LayerCAM overlay (JET/Viridis) via reference PyTorch checkpoint
+- **Ensemble:** weighted probability averaging with MobileNetV2 baseline
+- **Model Size Baseline:** 14 MB (Keras) / 5.0 MB (TFLite float16)
+
+### Deployment Profiles
+- **Profile A - Production Baseline:** MobileNetV2 TFLite float16, benchmark reale pubblicato e stabile
+- **Profile B - Advanced Hybrid Edge:** EfficientFormerV2-S1 TFLite float16/int8, ensemble + explainability, attivabile via `MODELS_REGISTRY['efficientformer']`
 
 ### Training Configuration
 ```
@@ -33,7 +40,7 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 
 ## Performance Metrics
 
-### Benchmark Reale — PlantVillage (2026-05-03)
+### Benchmark Reale Pubblicato — MobileNetV2 Baseline (2026-05-03)
 | Metrica | Valore |
 |--------|-------|
 | **Accuratezza top-1** | **83.9%** (554/660 immagini) |
@@ -43,6 +50,14 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 | **Bassa confidenza (<50%)** | 7.6% delle predizioni |
 | **Velocità inferenza (TFLite RPi5)** | ~180ms (XNNPACK delegate) |
 | **Dataset benchmark** | 660 img PlantVillage (20/classe) |
+
+### EfficientFormerV2-S1 - Stato benchmark
+- **Repository support:** completo lato software (backend, export, benchmark harness, evaluation pipeline)
+- **Quantizzazione target:** float16 default, int8 fully quantized opzionale
+- **Benchmark on-device:** da eseguire sul Raspberry Pi 5 reale con `tools/benchmark_vision_models.py`
+- **Accuracy/F1/confusion matrix:** da produrre con `ai/evaluate_vision_backends.py` sul validation set effettivo
+
+> Il repository ora include la pipeline pronta per EfficientFormerV2-S1, ma i numeri finali di accuracy e latenza devono essere pubblicati solo dopo esecuzione sul modello fine-tuned reale e sul Raspberry Pi 5 target.
 
 ### Bell Pepper Classification (Priority Class)
 - **Samples:** 7,425 images (7.8% of training set)
@@ -132,6 +147,18 @@ interpreter.invoke()
 output = interpreter.get_tensor(output_details[0]['index'])  # shape [1, 33]
 ```
 
+### EfficientFormerV2-S1 via VisionService
+```python
+from vision.vision_service import VisionService
+
+service = VisionService("efficientformer")
+result = service.classify("input_images/sample_leaf.jpg")
+explanation = service.explain("input_images/sample_leaf.jpg")
+
+print(result["class"], result["confidence"])
+print(explanation.get("target_layer"), explanation.get("summary"))
+```
+
 ---
 
 ## Limitations & Known Issues
@@ -142,6 +169,8 @@ output = interpreter.get_tensor(output_details[0]['index'])  # shape [1, 33]
 4. **Thermal Constraints:** RPi5 thermal throttling may reduce inference speed in hot environments
 5. **Lighting Conditions:** Model trained on varied lighting but may struggle with extreme conditions
 6. **Inter-class confusion:** Tomato spot diseases (Bacterial_spot, Early_blight, Septoria, Target_Spot) are morphologically similar — top-3 accuracy (96.1%) recommended for clinical use
+7. **Explainability dependency:** LayerCAM richiede il checkpoint PyTorch fine-tuned oltre al file TFLite di inferenza
+8. **Hybrid backend metrics:** i numeri EfficientFormer vanno considerati "pending validation" finche non vengono generati con gli script inclusi nel repository
 
 ---
 
@@ -160,8 +189,27 @@ output = interpreter.get_tensor(output_details[0]['index'])  # shape [1, 33]
 ```bash
 Python 3.12
 TensorFlow 2.21.0
+PyYAML 6.x
 Hardware: Raspberry Pi 5 (4-core, 16GB RAM)
 Dataset: PlantVillage v2.0 (spMohanty/PlantVillage-Dataset)
+```
+
+### EfficientFormer export / evaluation
+```bash
+pip install -r requirements-efficientformer.txt
+
+python ai/export_efficientformer_tflite.py \
+  --dataset-root datasets/training \
+  --output-dir models \
+  --mode all --quantization both
+
+python tools/benchmark_vision_models.py \
+  --model-keys generale efficientformer \
+  --image models/validation_sample.jpg
+
+python ai/evaluate_vision_backends.py \
+  --dataset-root datasets/training/validation \
+  --model-keys generale efficientformer
 ```
 
 ### Citation
@@ -173,7 +221,7 @@ Dataset: PlantVillage v2.0 (spMohanty/PlantVillage-Dataset)
   url={https://github.com/Proctor81/DELTA-PLANT},
   dataset={PlantVillage Dataset (spMohanty/PlantVillage-Dataset)},
   license={Proprietary (Scientific Research Use)},
-  note={33-class MobileNetV2 TFLite float16; top-1 83.9\%, top-3 96.1\% on 660-image benchmark}
+  note={33-class MobileNetV2 TFLite float16 baseline; optional EfficientFormerV2-S1 hybrid backend with LayerCAM and ensemble support in repository}
 }
 ```
 
@@ -184,8 +232,8 @@ Dataset: PlantVillage v2.0 (spMohanty/PlantVillage-Dataset)
 - **Repository:** [https://github.com/Proctor81/DELTA-PLANT](https://github.com/Proctor81/DELTA-PLANT)
 - **Dataset Source:** [PlantVillage GitHub](https://github.com/spMohanty/PlantVillage-Dataset)
 - **License:** Proprietary (Scientific Research Use — see LICENSE)
-- **Last Updated:** 2026-05-03 (benchmark reale 33 classi, 660 immagini)
+- **Last Updated:** 2026-05-08 (EfficientFormer backend, export pipeline, LayerCAM integration)
 
 ---
 
-**Status:** ✅ Production Ready | 📊 Research Grade | 🚀 Edge Deployment Optimized
+**Status:** ✅ MobileNet baseline production ready | 🧪 EfficientFormer hybrid backend integrated in codebase | 🚀 Edge deployment optimized

@@ -1,0 +1,22 @@
+ACTIVE_MODEL: generale
+
+MODELS_REGISTRY:
+  efficientformer:
+    quantization: float16
+    enable_ensemble: true
+    ensemble_model_key: generale
+    ensemble_weights: [0.7, 0.3]
+    enable_explainability: true
+    explainability_method: layercam
+    colormap: jet
+    overlay_alpha: 0.42
+
+VISION_CONFIG:
+  explainability:
+    enabled: true
+    method: layercam
+    save_overlay: true
+    save_heatmap: true
+    output_dir: exports/explanations
+    send_original: true
+    send_overlay: true

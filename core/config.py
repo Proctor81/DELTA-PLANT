@@ -6,6 +6,34 @@ Tutti i parametri operativi, soglie e percorsi sono definiti qui.
 
 import os
 from pathlib import Path
+from typing import Any
+from pathlib import Path
+
+try:
+    import yaml  # type: ignore
+except ImportError:
+    yaml = None
+
+
+def _deep_update(target: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+    """Merge ricorsivo per override opzionali da config.yaml."""
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_update(target[key], value)
+        else:
+            target[key] = value
+    return target
+
+
+def _load_yaml_overrides(config_path: Path) -> dict[str, Any]:
+    """Carica override runtime da config.yaml se disponibile."""
+    if yaml is None or not config_path.exists():
+        return {}
+    try:
+        payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 # ─────────────────────────────────────────────
 # PERCORSI BASE
@@ -48,23 +76,59 @@ MODEL_CONFIG = {
 # Usare la chiave come identificatore (es. "dipladenia", "generale").
 MODELS_REGISTRY: dict = {
     "generale": {
+        "backend":      "mobilenet",
         "model_path":   str(MODELS_DIR / "plant_disease_model_39classes.tflite"),
         "labels_path":  str(MODELS_DIR / "labels_33classes_correct.txt"),
         "description":  "Classificatore generale fogliare PlantVillage (33 classi)",
         "input_size":   (224, 224),
         "num_classes":  33,
+        "quantization": "float16",
     },
     "dipladenia": {
+        "backend":      "mobilenet",
         "model_path":   str(MODELS_DIR / "dipladenia" / "dipladenia_model.tflite"),
         "labels_path":  str(MODELS_DIR / "dipladenia" / "labels.txt"),
         "description":  "Classificatore specializzato Dipladenia/Mandevilla (3 classi)",
         "input_size":   (224, 224),
         "num_classes":  3,
+        "quantization": "float16",
         "classes": [
             "Dipladenia_Malata",
             "Dipladenia_Parassiti",
             "Dipladenia_Sano",
         ],
+    },
+    "efficientformer": {
+        "backend": "efficientformer",
+        "display_name": "EfficientFormerV2-S1",
+        "description": "Classificatore ibrido CNN/ViT EfficientFormerV2-S1 per 33 classi PlantVillage",
+        "labels_path": str(MODELS_DIR / "labels_33classes_correct.txt"),
+        "input_size": (224, 224),
+        "num_classes": 33,
+        "num_threads": 6,
+        "quantization": "float16",
+        "top_k": 3,
+        "enable_delegate": True,
+        "enable_ensemble": True,
+        "ensemble_model_key": "generale",
+        "ensemble_weights": [0.70, 0.30],
+        "enable_explainability": True,
+        "explainability_method": "layercam",
+        "torch_model_name": "efficientformerv2_s1",
+        "pytorch_checkpoint": str(MODELS_DIR / "efficientformer_v2_s1_33classes.pth"),
+        "torch_input_mean": [0.5, 0.5, 0.5],
+        "torch_input_std": [0.5, 0.5, 0.5],
+        "colormap": "jet",
+        "overlay_alpha": 0.42,
+        "variants": {
+            "float16": {
+                "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_float16.tflite"),
+            },
+            "int8": {
+                "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_int8.tflite"),
+            },
+        },
+        "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_float16.tflite"),
     },
 }
 
@@ -215,6 +279,15 @@ VISION_CONFIG = {
     # ── Input manuale da cartella (alternativa camera) ────────
     "input_images_dir": str(INPUT_IMAGES_DIR),
     "input_image_extensions": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"],
+    "explainability": {
+        "enabled": True,
+        "method": "layercam",
+        "save_overlay": True,
+        "save_heatmap": True,
+        "output_dir": str(EXPORTS_DIR / "explanations"),
+        "send_original": True,
+        "send_overlay": True,
+    },
 }
 
 # ─────────────────────────────────────────────
@@ -366,4 +439,29 @@ MODELS_REGISTRY_RESEARCH = {
         "tflite_size_kb": 5000,
     },
 }
+
+CONFIG_YAML_PATH = Path(os.environ.get("DELTA_CONFIG_YAML", str(BASE_DIR / "config.yaml")))
+CONFIG_YAML_OVERRIDES = _load_yaml_overrides(CONFIG_YAML_PATH)
+
+_SECTION_OVERRIDES = (
+    ("MODEL_CONFIG", MODEL_CONFIG),
+    ("MODELS_REGISTRY", MODELS_REGISTRY),
+    ("VISION_CONFIG", VISION_CONFIG),
+    ("ORGAN_CONFIG", ORGAN_CONFIG),
+    ("QUANTUM_CONFIG", QUANTUM_CONFIG),
+    ("DATABASE_CONFIG", DATABASE_CONFIG),
+    ("LOGGING_CONFIG", LOGGING_CONFIG),
+    ("FEATURE_FLAGS", FEATURE_FLAGS),
+    ("API_CONFIG", API_CONFIG),
+    ("TELEGRAM_CONFIG", TELEGRAM_CONFIG),
+    ("MODELS_REGISTRY_RESEARCH", MODELS_REGISTRY_RESEARCH),
+)
+
+for section_name, target in _SECTION_OVERRIDES:
+    section_override = CONFIG_YAML_OVERRIDES.get(section_name)
+    if isinstance(section_override, dict):
+        _deep_update(target, section_override)
+
+if not os.environ.get("DELTA_ACTIVE_MODEL") and isinstance(CONFIG_YAML_OVERRIDES.get("ACTIVE_MODEL"), str):
+    ACTIVE_MODEL = CONFIG_YAML_OVERRIDES["ACTIVE_MODEL"]
 

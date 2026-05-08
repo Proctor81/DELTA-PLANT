@@ -17,6 +17,8 @@
 
 > 💾 **Memoria Persistente Diagnostica:** DELTA Plant salva localmente per utente la cronologia conversazionale e il referto diagnostico strutturato più recente, così l'operatore può chiedere approfondimenti successivi su nome della pianta, rischio, raccomandazioni, sensori e anomalie anche dopo il riavvio del bot.
 
+> 🔥 **Hybrid Vision Backend pronto all'attivazione:** il repository include ora un backend opzionale **EfficientFormerV2-S1** con export PyTorch→ONNX→TFLite, ensemble con MobileNetV2 e explainability LayerCAM per overlay visuali inviabili anche su Telegram.
+
 ---
 
 ## 📋 Indice
@@ -55,6 +57,7 @@
 | Funzionalità | Descrizione |
 |---|---|
 | **Analisi fogliare generalizzata** | Diagnostica 33 classi di malattie/patologie fogliari via MobileNetV2 transfer learning con genus-filter adattivo |
+| **Backend ibrido CNN/ViT** | EfficientFormerV2-S1 opzionale in float16/int8, attivabile via `MODELS_REGISTRY` o `config.yaml` |
 | **Input sensori manuale** | Utente invia foto + 7 dati sensori (TEMP, UMID, PRESS, LUMI, CO₂, pH, EC) |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
@@ -63,6 +66,7 @@
 | **Memoria persistente** | Salva in locale ultimi turni e ultima diagnosi strutturata per follow-up coerenti anche dopo riavvio |
 | **Pannello Amministratore** | Protetto PBKDF2-SHA256 — backup, statistiche, pubblicazione GitHub |
 | **API REST opzionale** | Flask — 7 endpoint per integrazione esterna |
+| **Explainable AI** | LayerCAM con heatmap JET/Viridis e overlay pronta per invio su Telegram |
 | **Export Excel** | `.xlsx` aggiornato automaticamente ad ogni diagnosi |
 | **Installazione automatica** | Script Bash + systemd per avvio al boot |
 | **Privacy dati** | Tutte le diagnosi e i dati operativi rimangono esclusivamente in locale |
@@ -88,16 +92,29 @@ main.py ──► DeltaAgent
 
 | Parametro | Valore |
 |---|---|
-| Formato | TensorFlow Lite float16 (MobileNetV2 transfer learning) |
+| Baseline produzione | TensorFlow Lite float16 (MobileNetV2 transfer learning) |
+| Backend avanzato opzionale | EfficientFormerV2-S1 TFLite float16 con variante int8 fully quantized |
 | Dimensione Keras | 14 MB |
-| Dimensione TFLite | 5.0 MB (float16) |
+| Dimensione TFLite baseline | 5.0 MB (float16) |
 | Input shape | `(224, 224, 3)` — preprocessing MobileNetV2: `(x/127.5)−1.0` |
 | Classi output | 33 classi PlantVillage |
-| Accuracy top-1 | **83.9%** (554/660 img, benchmark PlantVillage) |
-| Accuracy top-3 | **96.1%** (634/660 img, benchmark PlantVillage) |
-| Inferenza (RPi5) | ~180ms (XNNPACK delegate) |
+| Accuracy baseline top-1 | **83.9%** (554/660 img, benchmark PlantVillage) |
+| Accuracy baseline top-3 | **96.1%** (634/660 img, benchmark PlantVillage) |
+| Inferenza baseline (RPi5) | ~180ms (XNNPACK delegate) |
 | Soglia confidenza | 50% (fallback Classe_NonClassificato) |
-| Thread inferenza | 4 |
+| Thread inferenza | 4 per baseline, 4-6 per EfficientFormer |
+
+### Backend EfficientFormerV2-S1
+
+- Backend: `vision/efficientformer_classifier.py`
+- Configurazione: `MODELS_REGISTRY['efficientformer']` + override opzionali in `config.yaml`
+- Quantizzazione: `float16` di default, `int8` opzionale via `variants`
+- Ensemble: media pesata delle probabilita con MobileNetV2 (`VisionService`)
+- Explainability: `LayerCAM` con overlay PNG salvabile in `exports/explanations`
+- Telegram: invio foto originale + foto con heatmap + referto testuale nella stessa diagnosi
+- MLOps: `ai/export_efficientformer_tflite.py`, `ai/evaluate_vision_backends.py`, `tools/benchmark_vision_models.py`
+
+> ℹ️ Il repository contiene gia la pipeline software completa per EfficientFormer. I benchmark on-device vanno eseguiti sul Raspberry Pi 5 reale con `tools/benchmark_vision_models.py` dopo l'export dei pesi finali.
 
 ### Classi diagnostiche — 33 classi PlantVillage
 
@@ -159,6 +176,9 @@ cd DELTA-PLANT
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Stack opzionale per EfficientFormer, fine-tuning, export e LayerCAM
+pip install -r requirements-efficientformer.txt
 ```
 
 > ⚠️ **Nota RPi5 aarch64:** usare `ai-edge-litert==1.2.0` — versioni ≥ 1.3.0 causano segfault su BCM2712.
@@ -179,6 +199,41 @@ python main.py --preflight-only
 
 # Avvio rapido (se installato via install_raspberry.sh)
 delta
+```
+
+### Attivazione EfficientFormer via config.yaml
+
+```yaml
+ACTIVE_MODEL: efficientformer
+
+MODELS_REGISTRY:
+    efficientformer:
+        quantization: float16
+        enable_ensemble: true
+        enable_explainability: true
+```
+
+### Pipeline EfficientFormer PyTorch -> TFLite
+
+```bash
+# 1. Fine-tuning + export ONNX/SavedModel/TFLite
+python ai/export_efficientformer_tflite.py \
+    --dataset-root datasets/training \
+    --output-dir models \
+    --mode all \
+    --quantization both
+
+# 2. Benchmark edge locale
+python tools/benchmark_vision_models.py \
+    --model-keys generale efficientformer \
+    --image models/validation_sample.jpg \
+    --runs 100 --warmup 10
+
+# 3. Valutazione accuracy/F1/confusion matrix sul validation set
+python ai/evaluate_vision_backends.py \
+    --dataset-root datasets/training/validation \
+    --model-keys generale efficientformer \
+    --output-dir logs/vision_eval
 ```
 
 ### Autostart su Raspberry Pi (systemd)
@@ -235,9 +290,20 @@ Raspberry Pi 5 + AI HAT 2+ (opzionale, per accelerazione NPU)
 - `fpdf2>=2.7.0`
 - `scikit-learn>=1.3.0`
 - `ai-edge-litert==1.2.0`
+- `PyYAML>=6.0`
 - `flask>=3.0.0`
 - `python-telegram-bot[job-queue]>=20.7`
 - `requests>=2.31.0`
+
+### Stack opzionale EfficientFormer
+
+- `torch>=2.3.0`
+- `torchvision>=0.18.0`
+- `timm>=1.0.3`
+- `onnx>=1.16.0`
+- `onnxsim>=0.4.36`
+- `onnx2tf>=1.26.3`
+- `tensorflow>=2.16.0`
 
 ---
 

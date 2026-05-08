@@ -641,10 +641,12 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("3.1 Modello di classificazione")
     pdf._body(
-        "DELTA v3.0 utilizza un modello TensorFlow Lite float16 (input float32) "
-        "ottimizzato per inferenza edge su Raspberry Pi 5 (XNNPACK CPU delegate "
-        "e AI HAT quando disponibile). Il modello principale classifica le immagini "
-        "di foglie in 33 classi fitosanitarie PlantVillage."
+        "DELTA utilizza una stack multi-backend per la classificazione fogliare edge. "
+        "Il profilo baseline resta MobileNetV2 in TensorFlow Lite float16, mentre il "
+        "profilo avanzato introduce EfficientFormerV2-S1 come backend ibrido CNN/ViT, "
+        "attivabile da MODELS_REGISTRY o config.yaml, con ensemble probabilistico e "
+        "spiegabilita LayerCAM. Entrambi i backend lavorano su input 224x224 con "
+        "preprocessing MobileNet-like nel range [-1, 1]."
     )
     if mc:
         pdf._kv_table([
@@ -656,6 +658,28 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
             ("Soglia active learning",f"{mc.get('low_confidence_threshold', '?') * 100:.0f}%"),
             ("Thread inferenza",      str(mc.get("num_threads", "?"))),
             ("Edge TPU / AI HAT",     "Abilitato" if mc.get("use_edge_tpu") else "Disabilitato"),
+        ])
+
+    registry = cfg.get("MODELS_REGISTRY", {})
+    ef_cfg = registry.get("efficientformer", {}) if isinstance(registry, dict) else {}
+    if ef_cfg:
+        pdf._subsection("3.1b Backend avanzato EfficientFormerV2-S1")
+        pdf._body(
+            "Il backend EfficientFormerV2-S1 e progettato per portare DELTA verso un "
+            "profilo edge-AI piu spiegabile e piu robusto su classi morfologicamente "
+            "simili. Il backend supporta float16 come default su Raspberry Pi 5, variante "
+            "int8 fully quantized, ensemble con MobileNetV2 e generazione di heatmap "
+            "LayerCAM pronte per Telegram."
+        )
+        pdf._kv_table([
+            ("Backend", ef_cfg.get("backend", "?")),
+            ("Display name", ef_cfg.get("display_name", "?")),
+            ("Quantizzazione default", ef_cfg.get("quantization", "?")),
+            ("Thread target", str(ef_cfg.get("num_threads", "?"))),
+            ("Ensemble", "Sì" if ef_cfg.get("enable_ensemble") else "No"),
+            ("Modello ensemble", ef_cfg.get("ensemble_model_key", "?")),
+            ("Explainability", ef_cfg.get("explainability_method", "?")),
+            ("Checkpoint PyTorch", ef_cfg.get("pytorch_checkpoint", "?")),
         ])
 
     pdf._subsection("3.2 Classi diagnostiche")
@@ -1087,6 +1111,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "/export, /preflight, /academy, /license, /health, /batch",
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
+        "Diagnosi spiegabile: con backend EfficientFormer attivo il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
 
@@ -3159,6 +3184,56 @@ def _add_mlops_operatore(pdf: ManualePDF):
         ("int8",     "Quantizzazione intera INT8 — opzionale, utile in pipeline NPU dedicate"),
     ])
 
+    pdf._subsection("18.4b Pipeline EfficientFormerV2-S1 — export_efficientformer_tflite.py")
+    pdf._body(
+        "Per il backend ibrido CNN/ViT, DELTA include una pipeline completa PyTorch -> ONNX -> "
+        "SavedModel -> TFLite. Lo script ai/export_efficientformer_tflite.py puo eseguire "
+        "fine-tuning, export ONNX, conversione float16 e conversione int8 fully quantized "
+        "nello stesso flusso."
+    )
+    pdf._code_block(
+        "# Stack opzionale per EfficientFormer\n"
+        "pip install -r requirements-efficientformer.txt\n\n"
+        "# Fine-tuning + export completo\n"
+        "python ai/export_efficientformer_tflite.py \\\n"
+        "  --dataset-root datasets/training \\\n"
+        "  --output-dir models \\\n"
+        "  --mode all \\\n"
+        "  --quantization both\n\n"
+        "# Solo export da checkpoint esistente\n"
+        "python ai/export_efficientformer_tflite.py \\\n"
+        "  --mode export \\\n"
+        "  --checkpoint models/efficientformer_v2_s1_33classes.pth \\\n"
+        "  --quantization float16",
+        label="EFFICIENTFORMER EXPORT",
+    )
+    pdf._bullet([
+        "Output principali: efficientformer_v2_s1_33classes.pth, .onnx, SavedModel, TFLite float16, TFLite int8 e file labels.",
+        "Preprocessing training/export allineato al runtime edge: mean/std = 0.5, equivalente a normalizzazione [-1, 1].",
+        "Per INT8 serve un representative dataset reale; lo script usa di default datasets/training.",
+        "LayerCAM richiede il checkpoint PyTorch oltre al file TFLite di inferenza.",
+    ])
+
+    pdf._subsection("18.4c Benchmark ed evaluation backend multipli")
+    pdf._code_block(
+        "# Benchmark latency su device target\n"
+        "python tools/benchmark_vision_models.py \\\n"
+        "  --model-keys generale efficientformer \\\n"
+        "  --image models/validation_sample.jpg \\\n"
+        "  --runs 100 --warmup 10\n\n"
+        "# Accuracy, macro-F1 e confusion matrix su validation set\n"
+        "python ai/evaluate_vision_backends.py \\\n"
+        "  --dataset-root datasets/training/validation \\\n"
+        "  --model-keys generale efficientformer \\\n"
+        "  --output-dir logs/vision_eval",
+        label="BENCHMARK + EVAL",
+    )
+    pdf._body(
+        "Questi script producono report JSON/CSV con accuracy top-1, accuracy top-3, macro-F1, "
+        "classification report e confusion matrix. I numeri EfficientFormer vanno pubblicati "
+        "solo dopo esecuzione sul Raspberry Pi 5 reale e sul validation set finale."
+    )
+
     pdf._subsection("18.5 Validazione Preflight — Gate di Deploy")
     pdf._body(
         "Prima di distribuire un nuovo modello in produzione, il sistema esegue "
@@ -3211,6 +3286,12 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "  --quantization float16\n\n"
         "# 4. Valida il modello (gate di deploy)\n"
         "python main.py --preflight-only\n\n"
+        "# 4b. In alternativa, pipeline EfficientFormer completa\n"
+        "python ai/export_efficientformer_tflite.py \\\n"
+        "  --dataset-root datasets/training --output-dir models --mode all --quantization both\n\n"
+        "# 4c. Benchmark ed evaluation backend multipli\n"
+        "python tools/benchmark_vision_models.py --model-keys generale efficientformer --image models/validation_sample.jpg\n"
+        "python ai/evaluate_vision_backends.py --dataset-root datasets/training/validation --model-keys generale efficientformer\n\n"
         "# 5. Avvia DELTA con il nuovo modello\n"
         "python main.py",
         label="PIPELINE COMPLETA",

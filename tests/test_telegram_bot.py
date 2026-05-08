@@ -148,6 +148,29 @@ def test_send_diagnosis_paginated_short_closes_with_smile(monkeypatch):
     assert context.user_data == {}
 
 
+def test_send_diagnosis_visuals_sends_original_and_overlay(tmp_path):
+    original = tmp_path / "original.png"
+    overlay = tmp_path / "overlay.png"
+    original.write_bytes(b"original-bytes")
+    overlay.write_bytes(b"overlay-bytes")
+
+    calls = []
+
+    class FakeChat:
+        async def send_photo(self, photo, caption=None):
+            calls.append(caption)
+
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+    context = types.SimpleNamespace(user_data={"diag_image_path": str(original)})
+    record = {"explainability": {"overlay_path": str(overlay), "summary": "lesione evidenziata"}}
+
+    asyncio.run(tg._send_diagnosis_visuals(update, context, record))
+
+    assert len(calls) == 2
+    assert calls[0] == "Foto originale acquisita per la diagnosi DELTA Plant."
+    assert "Heatmap di attenzione LayerCAM" in calls[1]
+
+
 def test_continue_diagnosis_message_sends_next_and_final_smile(monkeypatch):
     calls = []
 

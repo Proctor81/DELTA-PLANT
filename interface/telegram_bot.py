@@ -2043,6 +2043,52 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         _clear_diagnosis_state(context)
 
 
+async def _send_diagnosis_visuals(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    record: Dict[str, Any],
+) -> None:
+    """Invia foto originale + overlay explainability se disponibili."""
+    chat = update.effective_chat
+    if chat is None:
+        return
+
+    explain_cfg = VISION_CONFIG.get("explainability", {})
+    artifact = record.get("explainability") or {}
+
+    image_path = context.user_data.get("diag_image_path")
+    if explain_cfg.get("send_original", True) and image_path:
+        original_path = Path(str(image_path))
+        if original_path.exists():
+            try:
+                with original_path.open("rb") as photo_file:
+                    await chat.send_photo(
+                        photo=photo_file,
+                        caption="Foto originale acquisita per la diagnosi DELTA Plant.",
+                    )
+            except Exception as exc:
+                logger.warning("Invio foto originale Telegram fallito: %s", exc)
+
+    overlay_path = artifact.get("overlay_path")
+    if not explain_cfg.get("send_overlay", True) or not overlay_path:
+        return
+
+    overlay_file = Path(str(overlay_path))
+    if not overlay_file.exists():
+        logger.warning("Overlay explainability non trovato: %s", overlay_file)
+        return
+
+    caption = "Heatmap di attenzione LayerCAM generata da DELTA Plant."
+    if artifact.get("summary"):
+        caption = f"{caption}\n{_clip_text(str(artifact['summary']), 220)}"
+
+    try:
+        with overlay_file.open("rb") as photo_file:
+            await chat.send_photo(photo=photo_file, caption=caption)
+    except Exception as exc:
+        logger.warning("Invio overlay explainability Telegram fallito: %s", exc)
+
+
 async def _send_ai_diagnosis_opinion(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -2106,6 +2152,7 @@ async def _send_ai_diagnosis_opinion(
     )
 
     try:
+        await _send_diagnosis_visuals(update, context, record)
         await _send_diagnosis_paginated(
             update,
             context,

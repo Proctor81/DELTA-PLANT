@@ -8,11 +8,12 @@ import threading
 import time
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 import numpy as np
 
-from core.config import SENSOR_CONFIG, MODEL_CONFIG, ORGAN_CONFIG
+from core.config import SENSOR_CONFIG, MODEL_CONFIG, ORGAN_CONFIG, ACTIVE_MODEL, MODELS_REGISTRY, VISION_CONFIG
 from sensors.reader import SensorReader
 from sensors.filtering import SensorFilter
 from sensors.anomaly_detection import AnomalyDetector
@@ -20,6 +21,7 @@ from vision.camera import CameraModule
 from vision.preprocessing import Preprocessor
 from vision.segmentation import LeafSegmentor, FlowerSegmentor, FruitSegmentor
 from vision.organ_detector import PlantOrganDetector
+from vision.vision_service import VisionService
 from ai.model_loader import ModelLoader
 from ai.inference import PlantInference
 from diagnosis.engine import DiagnosisEngine
@@ -51,12 +53,15 @@ class DeltaAgent:
         self.flower_segmentor = FlowerSegmentor()
         self.fruit_segmentor = FruitSegmentor()
         self.organ_detector = PlantOrganDetector()
+        self.vision_service = VisionService()
         self.model_loader = ModelLoader()
         self.inference_engine = PlantInference(self.model_loader)
         self.diagnosis_engine = DiagnosisEngine()
         self.agronomy_engine = AgronomyEngine()
         self.database = Database()
         self.exporter = ExcelExporter()
+        self._vision_backend_name = str(MODELS_REGISTRY.get(ACTIVE_MODEL, {}).get("backend", "mobilenet")).lower()
+        self._use_advanced_leaf_backend = self._vision_backend_name == "efficientformer" and self.vision_service.is_ready
 
         # ── Stato interno ────────────────────────────────────
         self._running = False
@@ -193,11 +198,12 @@ class DeltaAgent:
                     logger.info("Analisi frutto: %s (%.1f%%)",
                                 fruit_ai.get("class"), fruit_ai.get("confidence", 0) * 100)
 
-        # ── 7. Preprocessing foglia ───────────────────────────
-        processed = self.preprocessor.prepare_for_inference(target_image)
-
-        # ── 8. Inferenza AI foglia ────────────────────────────
-        ai_result = self.inference_engine.predict(processed, sensor_data)
+        # ── 7. Inferenza AI foglia ────────────────────────────
+        if self._use_advanced_leaf_backend:
+            ai_result = self.vision_service.classify_image(target_image)
+        else:
+            processed = self.preprocessor.prepare_for_inference(target_image)
+            ai_result = self.inference_engine.predict(processed, sensor_data)
         logger.info("Inferenza AI foglia: %s (%.1f%%)",
                     ai_result["class"], ai_result["confidence"] * 100)
 
@@ -246,6 +252,9 @@ class DeltaAgent:
             "recommendations": recommendations,
         }
 
+        if self._use_advanced_leaf_backend:
+            record["explainability"] = self._build_explainability_artifact(target_image, timestamp)
+
         # ── 13. Persistenza ───────────────────────────────────
         try:
             self.database.save_record(record)
@@ -255,6 +264,52 @@ class DeltaAgent:
 
         logger.info("Diagnosi completata: %s", diagnosis.get("summary", "N/A"))
         return record
+
+    def _build_explainability_artifact(self, image: np.ndarray, timestamp: str) -> Dict[str, Any]:
+        explain_cfg = VISION_CONFIG.get("explainability", {})
+        if not explain_cfg.get("enabled", True):
+            return {"available": False, "error": "Explainability disabilitata da configurazione"}
+
+        explanation = self.vision_service.explain_image(image)
+        if explanation.get("error"):
+            return {
+                "available": False,
+                "error": explanation["error"],
+                "model": explanation.get("model", self.vision_service.active_model),
+            }
+
+        artifact = {
+            "available": True,
+            "model": explanation.get("model", self.vision_service.active_model),
+            "method": explanation.get("method", "layercam"),
+            "summary": explanation.get("summary", ""),
+            "class": explanation.get("class"),
+            "confidence": explanation.get("confidence"),
+            "target_layer": explanation.get("target_layer"),
+        }
+
+        try:
+            import cv2  # type: ignore
+        except ImportError:
+            artifact["available"] = False
+            artifact["error"] = "OpenCV non disponibile per salvataggio overlay"
+            return artifact
+
+        output_dir = Path(explain_cfg.get("output_dir", "exports/explanations"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        stem = timestamp.replace(":", "-").replace(".", "-")
+
+        if explain_cfg.get("save_overlay", True) and explanation.get("overlay") is not None:
+            overlay_path = output_dir / f"delta_explain_{stem}_overlay.png"
+            if cv2.imwrite(str(overlay_path), explanation["overlay"]):
+                artifact["overlay_path"] = str(overlay_path)
+
+        if explain_cfg.get("save_heatmap", True) and explanation.get("heatmap") is not None:
+            heatmap_path = output_dir / f"delta_explain_{stem}_heatmap.png"
+            if cv2.imwrite(str(heatmap_path), explanation["heatmap"]):
+                artifact["heatmap_path"] = str(heatmap_path)
+
+        return artifact
 
     # ─────────────────────────────────────────────
     # UTILITÀ

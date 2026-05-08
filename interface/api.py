@@ -125,6 +125,7 @@ def create_app(agent: "DeltaAgent"):
     @app.get("/model/info")
     def model_info():
         """Informazioni sul modello AI caricato."""
+        vision_service = getattr(agent, "vision_service", None)
         return jsonify({
             "ready": agent.model_loader.is_ready(),
             "labels": agent.model_loader.labels,
@@ -132,6 +133,9 @@ def create_app(agent: "DeltaAgent"):
             "backend": agent.model_loader._backend if hasattr(
                 agent.model_loader, "_backend"
             ) else "unknown",
+            "active_model": vision_service.active_model if vision_service else "legacy",
+            "vision_backend": vision_service.backend_type if vision_service else "legacy",
+            "explainability": vision_service.can_explain if vision_service else False,
         })
 
     return app
