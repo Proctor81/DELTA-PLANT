@@ -93,6 +93,8 @@ Campionamento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` 
 | Tomato_healthy | 18 | 88.89% | 92.45% |
 | Tomato_mosaic_virus | 18 | 88.89% | 92.45% |
 
+> **Nota sul campionamento:** le **600 immagini** sono il totale dell'intero benchmark, non il numero di immagini per singola classe. La colonna `Supporto` indica quante immagini di quella specifica classe sono state effettivamente valutate. Il campione e stato costruito con selezione round-robin deterministica sul validation set: **20 classi x 19 immagini + 12 classi x 18 immagini + Corn_healthy x 4 immagini = 600**. `Corn_healthy` mostra solo `4` perche nel validation set pubblico erano disponibili soltanto 4 immagini per quella classe.
+
 Riferimenti tecnici:
 
 - Report sorgente: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
