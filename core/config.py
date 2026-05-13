@@ -428,7 +428,7 @@ TELEGRAM_CONFIG = {
     "token_env": "DELTA_TELEGRAM_TOKEN",
     "authorized_users": [],            # Lista ID Telegram (vuota = accesso aperto)
     "authorized_usernames": [],        # Lista nickname (con @) (vuota = accesso aperto)
-    "authorized_usernames_file": str(BASE_DIR / "data" / "telegram_scientists.json"),
+    "authorized_usernames_file": str(BASE_DIR / "data" / "telegram_scientists.local.json"),
     "api_base_url": "http://localhost:5000",
     "request_timeout_sec": 5,
     "conversation_timeout_sec": 300,   # 5 minuti

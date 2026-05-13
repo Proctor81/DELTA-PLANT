@@ -49,6 +49,8 @@ input_images/
 
 # Credenziali
 data/auth.json
+data/telegram_scientists.json
+data/telegram_scientists.local.json
 .venv312/
 # Modello GGUF llama.cpp (troppo grande per GitHub)
 models/*.gguf

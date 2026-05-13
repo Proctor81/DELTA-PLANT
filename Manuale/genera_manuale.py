@@ -1129,7 +1129,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     tg_enabled = tc.get("enable_telegram", False)
     token_env = tc.get("token_env", "DELTA_TELEGRAM_TOKEN")
     api_base = tc.get("api_base_url", "http://localhost:5000")
-    auth_file = tc.get("authorized_usernames_file", "data/telegram_scientists.json")
+    auth_file = tc.get("authorized_usernames_file", "data/telegram_scientists.local.json")
 
     pdf._body(
         "DELTA integra un bot Telegram per l'utilizzo conversazionale. "
@@ -1166,7 +1166,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._body(
         "Gli utenti autorizzati possono essere gestiti dal Pannello Amministratore "
         "nella sezione 'Scientists Telegram'. La lista e salvata in "
-        f"{auth_file} (nickname con @)."
+        f"{auth_file} (nickname con @, file locale non tracciato dal repository)."
     )
 
     pdf._bullet([
@@ -3477,7 +3477,7 @@ def _add_security(pdf: ManualePDF):
          "Vedi sezione 15.6 per i dettagli."),
         ("[8] Scientists Telegram",
          "Gestisce i nickname Telegram autorizzati a usare il bot (lista "
-         "in data/telegram_scientists.json).\n"
+         "in data/telegram_scientists.local.json, file locale non tracciato).\n"
          "\nNovità 2026:\n"
          "- Log automatico degli accessi negati (file logs/telegram_denied.log).\n"
          "- Dal pannello admin puoi vedere gli accessi negati e aggiungere rapidamente utenti bloccati alla whitelist.\n"

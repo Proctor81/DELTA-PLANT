@@ -350,12 +350,12 @@ class AdminPanel:
                 return Path(path)
         except Exception:
             pass
-        return _ROOT / "data" / "telegram_scientists.json"
+        return _ROOT / "data" / "telegram_scientists.local.json"
 
     def _load_scientists(self) -> list[str]:
         path = self._scientists_path()
         if not path.exists():
-            return ["@paolo_81_paolo"]
+            return []
         try:
             data = path.read_text(encoding="utf-8")
             names = []
@@ -625,7 +625,7 @@ class AdminPanel:
                 print(f"{YELLOW}⚠ Impossibile leggere {map_path.name}: {exc}{RESET}")
 
         # Lista usernames autorizzati
-        scientists_path = _ROOT / "data" / "telegram_scientists.json"
+        scientists_path = self._scientists_path()
         authorized: list = []
         if scientists_path.exists():
             try:
