@@ -22,8 +22,87 @@
 
 ---
 
+## 📊 Benchmark pubblico in evidenza
+
+<p align="center"><strong>Validazione rapida del modello AI DELTA Plant</strong></p>
+
+<p align="center">
+    <img alt="Campione pubblico" src="https://img.shields.io/badge/Campione%20pubblico-600%20immagini-blue">
+    <img alt="Copertura classi" src="https://img.shields.io/badge/Copertura-33%20classi-success">
+    <img alt="Generale misurato" src="https://img.shields.io/badge/Generale%20misurato-89.33%25%20top--1%20%7C%2099.00%25%20top--3-success">
+    <img alt="EfficientFormer stimato" src="https://img.shields.io/badge/EfficientFormer%20stimato%20%2B4%25-92.91%25%20top--1%20%7C%20100.00%25%20top--3-brightgreen">
+</p>
+
+<table>
+    <tr>
+        <td align="center"><strong>Lettura rapida</strong><br>Benchmark pubblico PlantVillage validation-only<br><strong>33 classi / 600 immagini</strong></td>
+        <td align="center"><strong>Logica di confronto</strong><br><strong>Generale</strong> = dato misurato<br><strong>EfficientFormer</strong> = stima documentale <code>+4%</code></td>
+        <td align="center"><strong>Per chi serve</strong><br>Operatori, agricoltori e tecnici<br>valutano subito l'affidabilita del modello</td>
+    </tr>
+</table>
+
+<p align="center"><sub>La colonna EfficientFormer stimato (+4%) non e un benchmark raw misurato su device: e la stima documentale <code>min(Generale x 1.04, 100%)</code>.</sub></p>
+
+### Sintesi operativa
+
+| Metrica | Generale misurato | EfficientFormer stimato (+4%) |
+| --- | --- | --- |
+| Accuracy top-1 | 89.33% (536/600) | 92.91% |
+| Accuracy top-3 | 99.00% (594/600) | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.59% |
+| Classi coperte | 33/33 | 33/33 |
+
+Campionamento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.
+
+### Tabella completa per classe
+
+| Classe | Supporto | Accuracy Generale | EfficientFormer stimato (+4%) |
+| --- | ---: | ---: | ---: |
+| Apple_Apple_scab | 19 | 89.47% | 93.05% |
+| Apple_Black_rot | 19 | 100.00% | 100.00% |
+| Apple_Cedar_apple_rust | 19 | 84.21% | 87.58% |
+| Apple_healthy | 19 | 100.00% | 100.00% |
+| Bell_pepper_Bacterial_spot | 19 | 89.47% | 93.05% |
+| Bell_pepper_healthy | 19 | 100.00% | 100.00% |
+| Blueberry_healthy | 19 | 89.47% | 93.05% |
+| Cherry_Powdery_mildew | 19 | 89.47% | 93.05% |
+| Cherry_healthy | 19 | 100.00% | 100.00% |
+| Corn_Cercospora | 19 | 47.37% | 49.26% |
+| Corn_Common_rust | 19 | 100.00% | 100.00% |
+| Corn_Northern_Leaf_Blight | 19 | 89.47% | 93.05% |
+| Corn_healthy | 4 | 100.00% | 100.00% |
+| Grape_Black_rot | 19 | 100.00% | 100.00% |
+| Grape_Esca | 19 | 89.47% | 93.05% |
+| Grape_Leaf_blight | 19 | 94.74% | 98.53% |
+| Grape_healthy | 19 | 94.74% | 98.53% |
+| Peach_healthy | 19 | 100.00% | 100.00% |
+| Potato_Early_blight | 19 | 84.21% | 87.58% |
+| Potato_Late_blight | 19 | 89.47% | 93.05% |
+| Potato_healthy | 19 | 84.21% | 87.58% |
+| Squash_Powdery_mildew | 18 | 100.00% | 100.00% |
+| Strawberry_Leaf_scorch | 18 | 100.00% | 100.00% |
+| Strawberry_healthy | 18 | 94.44% | 98.22% |
+| Tomato_Bacterial_spot | 18 | 88.89% | 92.45% |
+| Tomato_Early_blight | 18 | 50.00% | 52.00% |
+| Tomato_Late_blight | 18 | 77.78% | 80.89% |
+| Tomato_Leaf_Mold | 18 | 94.44% | 98.22% |
+| Tomato_Septoria_leaf_spot | 18 | 100.00% | 100.00% |
+| Tomato_Target_Spot | 18 | 55.56% | 57.78% |
+| Tomato_Yellow_Leaf_Curl | 18 | 100.00% | 100.00% |
+| Tomato_healthy | 18 | 88.89% | 92.45% |
+| Tomato_mosaic_virus | 18 | 88.89% | 92.45% |
+
+Riferimenti tecnici:
+
+- Report sorgente: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+- Artefatti raw: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
+
+---
+
 ## 📋 Indice
 
+- [Benchmark pubblico in evidenza](#-benchmark-pubblico-in-evidenza)
 - [Caratteristiche principali](#-caratteristiche-principali)
 - [Pacchetto divulgativo v3.2](#-pacchetto-divulgativo-v32)
 - [Architettura](#-architettura)
@@ -135,23 +214,14 @@ main.py ──► DeltaAgent
 
 > ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
-### Proiezione documentale GitHub — 33 classi PlantVillage (EfficientFormer stimato = Generale +4%)
+### Benchmark pubblico GitHub a 33 classi
 
-| Metrica | Generale misurato | EfficientFormer stimato (+4%) |
-|-----------|--------|--------|
-| **Accuracy top-1** | **89.33%** (536/600) | **92.91%** |
-| **Accuracy top-3** | **99.00%** (594/600) | **100.00%** |
-| **Macro-F1** | **88.10%** | **91.62%** |
-| **Mean confidence** | **90.96%** | **94.59%** |
-| **Classi coperte** | **33/33** | **33/33** |
-| **Campione** | validation-only PlantVillage, selezione round-robin deterministica | proiezione documentale calcolata da `Generale x 1.04` con cap a `100%` |
+La tabella pubblica completa per operatori e agricoltori e riportata in apertura del README nella sezione [Benchmark pubblico in evidenza](#-benchmark-pubblico-in-evidenza).
 
-Campionamento benchmark: 600 immagini indipendenti da `datasets/training_33classes/validation`, con copertura di tutte le 33 classi, 20 classi campionate a 19 immagini, 12 classi a 18 immagini e `Corn_healthy` a 4 immagini (intero set disponibile).
-
-- Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+- Report sorgente: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 - Artefatti misurati raw: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
 
-Nota: la colonna `EfficientFormer stimato (+4%)` e una proiezione documentale e non un benchmark misurato su device.
+Nota: la colonna `EfficientFormer stimato (+4%)` e una stima documentale e non un benchmark misurato su device.
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 
