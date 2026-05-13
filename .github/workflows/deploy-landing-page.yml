@@ -1,0 +1,47 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - index.html
+      - .nojekyll
+      - robots.txt
+      - sitemap.xml
+      - assets/social-preview.svg
+      - assets/social-preview.png
+      - .github/workflows/deploy-landing-page.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-landing-page
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare minimal Pages bundle
+        run: |
+          mkdir -p site-dist/assets
+          cp index.html site-dist/
+          cp .nojekyll site-dist/
+          cp robots.txt site-dist/
+          cp sitemap.xml site-dist/
+          cp assets/social-preview.svg site-dist/assets/
+          cp assets/social-preview.png site-dist/assets/
+
+      - name: Publish gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./site-dist
+          force_orphan: true
