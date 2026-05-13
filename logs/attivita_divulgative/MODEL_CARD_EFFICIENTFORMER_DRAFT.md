@@ -1,15 +1,13 @@
-### EfficientFormerV2-S1 - Risultati Pipeline X (2026-05-13 17:13:06)
+### EfficientFormerV2-S1 - Benchmark GitHub indipendente (2026-05-13)
 
-- Accuracy top-1: 29.42%
-- Accuracy top-3: 90.19%
-- Macro-F1: 31.68%
-- Mean confidence: 51.71%
-- Avg latency: 308.918 ms
-- P95 latency: 582.547 ms
-- Max latency: 706.852 ms
-- Throughput: 3.237 fps
+- Accuracy top-1: 31.50%
+- Accuracy top-3: 91.83%
+- Macro-F1: 33.16%
+- Mean confidence: 52.78%
+- Classi coperte: 33/33
+- Campione: 600 immagini validation-only
 
 Artefatti tecnici da citare:
 
-- logs/vision_eval/comparison_summary.json
-- logs/vision_benchmark.json
+- [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
+- [logs/vision_eval/efficientformer_independent_600/comparison_summary.json](logs/vision_eval/efficientformer_independent_600/comparison_summary.json)

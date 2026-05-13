@@ -40,40 +40,30 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 
 ## Performance Metrics
 
-### Benchmark Reale Pubblicato — MobileNetV2 Baseline (2026-05-03)
-| Metrica | Valore |
-|--------|-------|
-| **Accuratezza top-1** | **83.9%** (554/660 immagini) |
-| **Accuratezza top-3** | **96.1%** (634/660 immagini) |
-| **Classi ≥95% top-1** | 17/33 |
-| **Classi problematiche (<50%)** | 2/33 (Tomato_Bacterial_spot 15%, Tomato_Early_blight 40%) |
-| **Bassa confidenza (<50%)** | 7.6% delle predizioni |
-| **Velocità inferenza (TFLite RPi5)** | ~180ms (XNNPACK delegate) |
-| **Dataset benchmark** | 660 img PlantVillage (20/classe) |
-
-### EfficientFormerV2-S1 - Risultati Pipeline X (2026-05-13)
-- **Repository support:** completo lato software, export, benchmark harness, evaluation pipeline e rigenerazione manuale via Pipeline X
+### EfficientFormerV2-S1 — Benchmark GitHub indipendente (2026-05-13)
+- **Ruolo nella release:** stack vision preminente di DELTA Plant v3.2 per export, benchmark pubblico, explainability e pipeline edge
 - **Quantizzazione target:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
 - **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
-- **Dataset di evaluation:** 7,502 campioni PlantVillage (`datasets/training_33classes/validation`)
+- **Dataset benchmark:** 600 campioni PlantVillage indipendenti da `datasets/training_33classes/validation`, selezione round-robin deterministica con copertura di tutte le 33 classi
 
-| Metrica | Generale | EfficientFormer |
-| --- | --- | --- |
-| Accuracy top-1 | 91.70% | 29.42% |
-| Accuracy top-3 | 99.23% | 90.19% |
-| Macro-F1 | 88.97% | 31.68% |
-| Mean confidence | 91.71% | 51.71% |
-| Avg latency | 41.360 ms | 308.918 ms |
-| P95 latency | 54.318 ms | 582.547 ms |
-| Max latency | 66.085 ms | 706.852 ms |
-| Throughput | 24.178 fps | 3.237 fps |
+| Metrica | Valore |
+| --- | --- |
+| Accuracy top-1 | 31.50% |
+| Accuracy top-3 | 91.83% |
+| Macro-F1 | 33.16% |
+| Mean confidence | 52.78% |
+| Classi coperte | 33/33 |
 
-> I risultati pubblicati dalla Pipeline X confermano che il backend `generale` resta il profilo di riferimento per accuratezza e latenza sul Raspberry Pi 5 target. EfficientFormerV2-S1 rimane disponibile come backend edge avanzato per explainability, ensemble e sperimentazione controllata, ma non viene promosso come default su questa release.
+Distribuzione del campione: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.
 
-### Bell Pepper Classification (Priority Class)
-- **Samples:** 7,425 images (7.8% of training set)
-- **Classes:** Bacterial_spot (2,991) + healthy (4,434)
-- **Benchmark Precision:** 100% (Bacterial_spot) / 95% (healthy)
+Classi migliori nel benchmark indipendente:
+- `Corn_healthy`: 100.00% (4/4)
+- `Grape_Black_rot`: 100.00% (19/19)
+- `Grape_Esca`: 100.00% (19/19)
+- `Peach_healthy`: 89.47% (17/19)
+- `Blueberry_healthy`: 78.95% (15/19)
+
+Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
 
 ---
 

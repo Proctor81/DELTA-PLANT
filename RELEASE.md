@@ -1,8 +1,8 @@
 # Release v3.2 — 13 maggio 2026
 
-## 🚀 DELTA Plant consolida la pipeline edge: runtime int8 validato, documentazione allineata, manuale rigenerato in automatico
+## 🚀 DELTA Plant porta in primo piano EfficientFormerV2-S1: benchmark GitHub indipendente, runtime int8 validato, documentazione allineata
 
-Questa release trasforma le novita introdotte nelle versioni precedenti in una catena di deploy coerente: il backend EfficientFormerV2-S1 non e piu solo presente nel repository, ma ha ora una variante int8 realmente eseguibile su questo hardware, una strategia di fallback runtime robusta e una Pipeline X che aggiorna anche manuale e artefatti divulgativi senza passaggi manuali esterni.
+Questa release consolida EfficientFormerV2-S1 come stack vision preminente di DELTA Plant per benchmark pubblico, export, explainability e pipeline edge. La catena v3.2 include runtime int8 realmente eseguibile, fallback robusto, benchmark indipendente GitHub su 600 immagini e Pipeline X in grado di aggiornare anche manuale e artefatti divulgativi.
 
 ### Highlights v3.2
 
@@ -12,20 +12,20 @@ Questa release trasforma le novita introdotte nelle versioni precedenti in una c
 - **Manuale utente revisionato**: aggiornati cover, flussi diagnostici, sezione MLOps, Pipeline X, licenza e release corrente
 - **Documentazione coerente**: README, MODEL_CARD, RELEASE e LICENSE allineati alla versione 3.2
 
-### Risultati validati dalla Pipeline X
+### EfficientFormerV2-S1 — Benchmark GitHub indipendente
 
-Validation set: 7,502 campioni PlantVillage su Raspberry Pi 5.
+Benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica.
 
-| Metrica | Generale | EfficientFormer |
-| --- | --- | --- |
-| Accuracy top-1 | 91.70% | 29.42% |
-| Accuracy top-3 | 99.23% | 90.19% |
-| Macro-F1 | 88.97% | 31.68% |
-| Avg latency | 41.360 ms | 308.918 ms |
-| P95 latency | 54.318 ms | 582.547 ms |
-| Throughput | 24.178 fps | 3.237 fps |
+| Metrica | EfficientFormer |
+| --- | --- |
+| Accuracy top-1 | 31.50% |
+| Accuracy top-3 | 91.83% |
+| Macro-F1 | 33.16% |
+| Mean confidence | 52.78% |
 
-Questi risultati confermano che il backend `generale` rimane il profilo raccomandato per produzione nella release 3.2. EfficientFormerV2-S1 resta invece parte della stack edge per explainability, export, ensemble e sperimentazione comparativa, ma non viene promosso come backend predefinito sulla base delle metriche correnti.
+Classi piu solide nel benchmark indipendente: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%.
+
+Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
 
 ### Changelog v3.2
 

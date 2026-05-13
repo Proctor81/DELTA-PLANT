@@ -1,10 +1,9 @@
-## EfficientFormer - Benchmark ed evaluation validati
+## EfficientFormer - Benchmark GitHub indipendente validato
 
-- Accuracy top-1 EfficientFormer: 29.42%
-- Accuracy top-3 EfficientFormer: 90.19%
-- Macro-F1 EfficientFormer: 31.68%
-- Avg latency on-device: 308.918 ms
-- P95 latency on-device: 582.547 ms
-- Throughput on-device: 3.237 fps
+- Accuracy top-1 EfficientFormer: 31.50%
+- Accuracy top-3 EfficientFormer: 91.83%
+- Macro-F1 EfficientFormer: 33.16%
+- Mean confidence EfficientFormer: 52.78%
+- Copertura benchmark: 33 classi / 600 immagini validation-only
 
-Report completi: logs/vision_eval/comparison_summary.json e logs/vision_benchmark.json
+Report completi: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md) e [logs/vision_eval/efficientformer_independent_600/comparison_summary.json](logs/vision_eval/efficientformer_independent_600/comparison_summary.json)

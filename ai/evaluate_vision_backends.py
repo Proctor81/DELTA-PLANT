@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset-root", default="datasets/training/validation", help="Validation set ImageFolder")
     parser.add_argument("--model-keys", nargs="+", default=["generale", "efficientformer"], help="Model keys da confrontare")
     parser.add_argument("--limit-per-class", type=int, default=0, help="Limita il numero di immagini per classe (0 = tutte)")
+    parser.add_argument(
+        "--max-total",
+        type=int,
+        default=0,
+        help="Limita il campione totale con selezione deterministica round-robin su tutte le classi (0 = tutte)",
+    )
     parser.add_argument("--output-dir", default="logs/vision_eval", help="Directory report")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
@@ -79,15 +85,66 @@ def _normalize_folder_name(folder_name: str) -> str:
     return FOLDER_TO_CLASS.get(folder_name, folder_name.replace("___", "_").replace(" ", "_"))
 
 
-def _iter_validation_images(dataset_root: Path, limit_per_class: int):
+def _class_image_map(dataset_root: Path, limit_per_class: int) -> dict[str, list[Path]]:
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
+    class_files: dict[str, list[Path]] = {}
     for class_dir in sorted(path for path in dataset_root.iterdir() if path.is_dir()):
         gt_label = _normalize_folder_name(class_dir.name)
         files = [path for path in sorted(class_dir.iterdir()) if path.suffix.lower() in exts]
         if limit_per_class > 0:
             files = files[:limit_per_class]
-        for image_path in files:
-            yield gt_label, image_path
+        class_files[gt_label] = files
+    return class_files
+
+
+def _select_evaluation_samples(dataset_root: Path, limit_per_class: int, max_total: int):
+    class_files = _class_image_map(dataset_root, limit_per_class)
+    total_candidates = sum(len(files) for files in class_files.values())
+    if max_total <= 0 or total_candidates <= max_total:
+        for gt_label, files in class_files.items():
+            for image_path in files:
+                yield gt_label, image_path
+        return
+
+    class_positions = {label: 0 for label in class_files}
+    selected = 0
+    ordered_labels = sorted(class_files)
+    while selected < max_total:
+        progressed = False
+        for gt_label in ordered_labels:
+            files = class_files[gt_label]
+            position = class_positions[gt_label]
+            if position >= len(files):
+                continue
+            yield gt_label, files[position]
+            class_positions[gt_label] = position + 1
+            selected += 1
+            progressed = True
+            if selected >= max_total:
+                break
+        if not progressed:
+            break
+
+
+def _build_per_class_rows(y_true: list[str], y_pred: list[str], report: dict[str, Any]) -> list[list[Any]]:
+    per_class_rows: list[list[Any]] = []
+    labels = sorted(set(y_true) | set(y_pred))
+    for label in labels:
+        support = sum(1 for item in y_true if item == label)
+        correct = sum(1 for gt, pred in zip(y_true, y_pred) if gt == label and pred == label)
+        metrics = report.get(label, {}) if isinstance(report.get(label), dict) else {}
+        per_class_rows.append(
+            [
+                label,
+                support,
+                correct,
+                round((correct / support) if support else 0.0, 6),
+                round(float(metrics.get("precision", 0.0)), 6),
+                round(float(metrics.get("recall", 0.0)), 6),
+                round(float(metrics.get("f1-score", 0.0)), 6),
+            ]
+        )
+    return per_class_rows
 
 
 def _write_csv(path: Path, headers: list[str], rows: list[list[Any]]) -> None:
@@ -98,7 +155,7 @@ def _write_csv(path: Path, headers: list[str], rows: list[list[Any]]) -> None:
         writer.writerows(rows)
 
 
-def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, output_dir: Path) -> dict[str, Any]:
+def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, max_total: int, output_dir: Path) -> dict[str, Any]:
     service = VisionService(model_key=model_key)
     if not service.is_ready:
         raise RuntimeError(f"Backend non pronto per {model_key}")
@@ -109,7 +166,8 @@ def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, out
     top3_hits = 0
     prediction_rows: list[list[Any]] = []
 
-    for gt_label, image_path in _iter_validation_images(dataset_root, limit_per_class):
+    sample_counts: dict[str, int] = {}
+    for gt_label, image_path in _select_evaluation_samples(dataset_root, limit_per_class, max_total):
         result = service.classify(str(image_path))
         predicted = str(result.get("class", "errore"))
         confidence = float(result.get("confidence", 0.0))
@@ -120,6 +178,7 @@ def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, out
         y_pred.append(predicted)
         confidences.append(confidence)
         top3_hits += int(top3_hit)
+        sample_counts[gt_label] = sample_counts.get(gt_label, 0) + 1
         prediction_rows.append([
             image_path.name,
             gt_label,
@@ -134,15 +193,19 @@ def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, out
     macro_f1 = f1_score(y_true, y_pred, average="macro", zero_division=0) if y_true else 0.0
     matrix = confusion_matrix(y_true, y_pred, labels=labels)
     report = classification_report(y_true, y_pred, labels=labels, output_dict=True, zero_division=0)
+    per_class_rows = _build_per_class_rows(y_true, y_pred, report)
     summary = {
         "model_key": model_key,
         "active_model": service.active_model,
         "backend": service.backend_type,
         "samples": len(y_true),
+        "limit_per_class": limit_per_class,
+        "max_total": max_total,
         "accuracy_top1": accuracy,
         "accuracy_top3": (top3_hits / len(y_true)) if y_true else 0.0,
         "macro_f1": macro_f1,
         "mean_confidence": (sum(confidences) / len(confidences)) if confidences else 0.0,
+        "sample_counts": sample_counts,
     }
 
     _write_csv(
@@ -155,8 +218,31 @@ def evaluate_model(model_key: str, dataset_root: Path, limit_per_class: int, out
         ["ground_truth\\prediction", *labels],
         [[label, *row.tolist()] for label, row in zip(labels, matrix)],
     )
+    _write_csv(
+        output_dir / f"{model_key}_per_class_accuracy.csv",
+        ["class", "support", "correct_top1", "accuracy_top1", "precision", "recall", "f1_score"],
+        per_class_rows,
+    )
     (output_dir / f"{model_key}_classification_report.json").write_text(
         json.dumps(report, indent=2),
+        encoding="utf-8",
+    )
+    (output_dir / f"{model_key}_per_class_accuracy.json").write_text(
+        json.dumps(
+            [
+                {
+                    "class": row[0],
+                    "support": row[1],
+                    "correct_top1": row[2],
+                    "accuracy_top1": row[3],
+                    "precision": row[4],
+                    "recall": row[5],
+                    "f1_score": row[6],
+                }
+                for row in per_class_rows
+            ],
+            indent=2,
+        ),
         encoding="utf-8",
     )
     (output_dir / f"{model_key}_summary.json").write_text(
@@ -183,7 +269,7 @@ def main() -> int:
 
     for model_key in args.model_keys:
         LOGGER.info("Valutazione backend %s...", model_key)
-        comparison.append(evaluate_model(model_key, dataset_root, args.limit_per_class, output_dir))
+        comparison.append(evaluate_model(model_key, dataset_root, args.limit_per_class, args.max_total, output_dir))
 
     comparison_path = output_dir / "comparison_summary.json"
     comparison_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")

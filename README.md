@@ -134,27 +134,24 @@ main.py ──► DeltaAgent
 
 > ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
-### Classi diagnostiche — 33 classi PlantVillage
+### EfficientFormerV2-S1 — Accuracy Benchmark GitHub (indipendente, 600 immagini)
 
-| Crop Type | Classi | Accuracy benchmark | Priorità |
-|-----------|--------|--------------------|----------|
-| **Bell Pepper** | 2 (Bacterial Spot, Healthy) | 100% / 95% | 🔴 **HIGH** |
-| **Tomato** | 9 (Bacterial Spot, Early Blight, Late Blight, Leaf Mold, Mosaic Virus, Septoria, Target Spot, Yellow Leaf Curl, Healthy) | 15%–100% | 🟡 Medium |
-| **Grape** | 4 (Black Rot, Esca, Leaf Blight, Healthy) | 65%–100% | 🟡 Medium |
-| **Apple** | 4 (Apple Scab, Black Rot, Cedar Rust, Healthy) | 55%–90% | 🟢 Low |
-| **Corn** | 4 (Cercospora, Common Rust, Northern Leaf Blight, Healthy) | 70%–95% | 🟢 Low |
-| **Potato** | 3 (Early Blight, Late Blight, Healthy) | 85%–90% | 🟡 Medium |
-| **Strawberry** | 2 (Leaf Scorch, Healthy) | 100% | 🟢 Low |
-| **Squash** | 1 (Powdery Mildew) | 100% | 🟢 Low |
-| **Blueberry** | 1 (Healthy) | 100% | 🟢 Low |
-| **Cherry** | 2 (Powdery Mildew, Healthy) | 95% | 🟢 Low |
-| **Peach** | 1 (Healthy) | 100% | 🟢 Low |
+EfficientFormerV2-S1 e la stack vision preminente della release DELTA Plant v3.2 per benchmark pubblico, export, explainability e pipeline edge.
 
-**Totale:** 33 classi — benchmark reale su 660 immagini PlantVillage (20/classe, 2026-05-03)
+| Metrica | Valore |
+|-----------|--------|
+| **Accuracy top-1** | **31.50%** (189/600 immagini) |
+| **Accuracy top-3** | **91.83%** (551/600 immagini) |
+| **Macro-F1** | **33.16%** |
+| **Mean confidence** | **52.78%** |
+| **Classi coperte** | **33/33** |
+| **Campione** | validation-only PlantVillage, selezione round-robin deterministica |
 
-> ℹ️ Le classi con bassa accuratezza (es. Tomato_Bacterial_spot 15%, Tomato_Early_blight 40%) presentano
-> confusioni morfologiche inter-classe tipiche di macchie fogliari visivamente simili.
-> L'accuratezza top-3 è **96.1%** — la classe corretta appare quasi sempre tra le prime 3 predizioni.
+Campionamento benchmark: 600 immagini indipendenti da `datasets/training_33classes/validation`, con copertura di tutte le 33 classi, 20 classi campionate a 19 immagini, 12 classi a 18 immagini e `Corn_healthy` a 4 immagini (intero set disponibile).
+
+- Classi migliori: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
+- Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
+- Artefatti machine-readable: [logs/vision_eval/efficientformer_independent_600/efficientformer_summary.json](logs/vision_eval/efficientformer_independent_600/efficientformer_summary.json), [logs/vision_eval/efficientformer_independent_600/efficientformer_per_class_accuracy.json](logs/vision_eval/efficientformer_independent_600/efficientformer_per_class_accuracy.json)
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 
