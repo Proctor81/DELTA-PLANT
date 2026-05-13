@@ -35,6 +35,9 @@
     <filter id="softBlur" x="0" y="0" width="1200" height="630" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feGaussianBlur stdDeviation="34"/>
     </filter>
+    <clipPath id="logoClip">
+      <rect x="82" y="82" width="136" height="136" rx="28"/>
+    </clipPath>
   </defs>
 
   <rect width="1200" height="630" rx="0" fill="url(#bg)"/>
@@ -46,17 +49,14 @@
 
   <rect x="34" y="34" width="1132" height="562" rx="34" fill="rgba(5,16,28,0.62)" stroke="url(#cardStroke)" stroke-width="1.4"/>
   <rect x="70" y="70" width="160" height="160" rx="36" fill="#07101B" stroke="#79E7FF" stroke-opacity="0.18"/>
-  <path d="M150 104C124 124 118 146 118 164C118 196 137 221 150 240C163 221 182 196 182 164C182 146 176 124 150 104Z" stroke="#79E7FF" stroke-width="3.2"/>
-  <path d="M150 129V212" stroke="#9BFF83" stroke-width="2.8" stroke-linecap="round"/>
-  <path d="M150 158C139 151 131 143 127 135" stroke="#19F5C1" stroke-width="2.8" stroke-linecap="round"/>
-  <path d="M150 173C163 167 171 159 176 149" stroke="#19F5C1" stroke-width="2.8" stroke-linecap="round"/>
+  <image x="82" y="82" width="136" height="136" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
 
   <rect x="264" y="82" width="236" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
   <circle cx="294" cy="102" r="7.5" fill="#19F5C1"/>
   <text x="316" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.22em">AI PLANT HEALTH</text>
 
   <rect x="516" y="82" width="220" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
-  <text x="544" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.14em">AGRITECH / DEEP TECH</text>
+  <text x="548" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.14em">DEEP AGRITECH</text>
 
   <rect x="754" y="82" width="182" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
   <text x="786" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.14em">LAYERCAM / XAI</text>
