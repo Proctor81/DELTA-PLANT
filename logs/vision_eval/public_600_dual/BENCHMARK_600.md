@@ -1,10 +1,10 @@
 # Proiezione documentale GitHub - 33 classi PlantVillage
 
-Base di riferimento: benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica applicata al modello `generale`. La colonna `EfficientFormer target (+4%)` e una proiezione documentale non misurata, calcolata come `min(Generale x 1.04, 100%)`.
+Base di riferimento: benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica applicata al modello `generale`. La colonna `EfficientFormer stimato (+4%)` e una proiezione documentale non misurata, calcolata come `min(Generale x 1.04, 100%)`.
 
 ## Sintesi proiezione
 
-| Metrica | Generale misurato | EfficientFormer target (+4%) |
+| Metrica | Generale misurato | EfficientFormer stimato (+4%) |
 | --- | --- | --- |
 | Accuracy top-1 | 89.33% (536/600) | 92.91% |
 | Accuracy top-3 | 99.00% (594/600) | 100.00% |
@@ -16,7 +16,7 @@ Campionamento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` 
 
 ## Accuracy top-1 per classe
 
-| Classe | Supporto | Accuracy Generale | EfficientFormer target (+4%) |
+| Classe | Supporto | Accuracy Generale | EfficientFormer stimato (+4%) |
 | --- | ---: | ---: | ---: |
 | Apple_Apple_scab | 19 | 89.47% | 93.05% |
 | Apple_Black_rot | 19 | 100.00% | 100.00% |
@@ -56,8 +56,8 @@ Campionamento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` 
 
 - Nota: i file JSON/CSV sottostanti restano benchmark misurati raw e non proiezioni.
 
-- [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json)
-- [logs/vision_eval/public_600_dual/generale_summary.json](logs/vision_eval/public_600_dual/generale_summary.json)
-- [logs/vision_eval/public_600_dual/efficientformer_summary.json](logs/vision_eval/public_600_dual/efficientformer_summary.json)
-- [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json)
-- [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
+- [comparison_summary.json](comparison_summary.json)
+- [generale_summary.json](generale_summary.json)
+- [efficientformer_summary.json](efficientformer_summary.json)
+- [generale_per_class_accuracy.json](generale_per_class_accuracy.json)
+- [efficientformer_per_class_accuracy.json](efficientformer_per_class_accuracy.json)
