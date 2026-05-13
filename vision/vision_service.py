@@ -22,9 +22,11 @@ LOGGER = logging.getLogger("delta.vision.service")
 class VisionService:
     """Router minimale dei backend vision in base al MODELS_REGISTRY."""
 
-    def __init__(self, model_key: Optional[str] = None):
+    def __init__(self, model_key: Optional[str] = None, *, ensemble_enabled: Optional[bool] = None):
         self._model_key = model_key or ACTIVE_MODEL
         self._cfg = dict(MODELS_REGISTRY.get(self._model_key, {}))
+        if ensemble_enabled is not None:
+            self._cfg["enable_ensemble"] = bool(ensemble_enabled)
         self.backend: VisionBackend = self._build_backend(self._model_key, self._cfg)
 
     @property

@@ -8,10 +8,169 @@
       "args": [
         "ai/train_keras_classifier.py",
         "--dataset", "datasets/training",
-        "--output", "models"
+        "--output", "models",
+        "--resume"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Pipeline AI Resume + Convert + Preflight",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "DELTA: Train Keras Classifier",
+        "DELTA: Convert to TFLite INT8",
+        "DELTA: Preflight Only"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Export EfficientFormer TFLite",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "ai/export_efficientformer_tflite.py",
+        "--dataset-root", "datasets/training",
+        "--output-dir", "models",
+        "--mode", "all",
+        "--quantization", "both"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Benchmark Vision Backends",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "tools/benchmark_vision_models.py",
+        "--model-keys", "generale", "efficientformer",
+        "--image", "models/validation_sample.jpg",
+        "--runs", "100",
+        "--warmup", "10"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Evaluate Vision Backends",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "ai/evaluate_vision_backends.py",
+        "--dataset-root", "datasets/training/validation",
+        "--model-keys", "generale", "efficientformer",
+        "--output-dir", "logs/vision_eval"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Pipeline EfficientFormer Export + Benchmark + Evaluate",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "DELTA: Export EfficientFormer TFLite",
+        "DELTA: Benchmark Vision Backends",
+        "DELTA: Evaluate Vision Backends"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Pipeline X",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "tools/pipeline_x.py",
+        "--resume"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: Monitor Pipeline X",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "tools/monitor_pipeline_x.py",
+        "--watch"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DELTA: ATTIVITA' DIVULGATIVE",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "tools/prepare_dissemination_artifacts.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+        }
       },
       "group": "build",
       "presentation": {

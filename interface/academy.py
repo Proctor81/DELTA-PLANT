@@ -325,7 +325,7 @@ SCENARIOS = [
             "Abbassare l'umidita relativa sotto il 75% con ventilazione",
         ],
         "spiegazione_finale": (
-            "INNOVAZIONE v3.1 — DELTA ora riconosce il genere della pianta dalla descrizione "
+            "INNOVAZIONE v3.2 — DELTA ora riconosce il genere della pianta dalla descrizione "
             "dell'operatore (es. 'peperone', 'pomodoro', 'uva'). Questo gli permette di filtrare "
             "le classi PlantVillage al solo genere corretto prima di chiedere all'LLM la diagnosi. "
             "Senza questo filtro, 'Bell_pepper_Bacterial_spot' e 'Tomato_Bacterial_spot' hanno "
@@ -378,7 +378,7 @@ SCENARIOS = [
             "Documentare i parametri attuali come baseline stagionale",
         ],
         "spiegazione_finale": (
-            "INNOVAZIONE v3.1 — Il rilevamento contestuale della salute non si basa piu "
+            "INNOVAZIONE v3.2 — Il rilevamento contestuale della salute non si basa piu "
             "sulla sola parola 'sano' ma su valutazione LLM dell'intera frase dell'operatore. "
             "Frasi come 'sta benone', 'sembra in forma', 'nessun problema visibile' "
             "vengono ora interpretate correttamente come stato di salute positivo. "
@@ -509,7 +509,7 @@ QUIZ_QUESTIONS = [
     # ── QUIZ v3.1 — Generalizzazione PlantVillage ─────────────────────────────
     {
         "domanda": (
-            "v3.1 — Perche DELTA identifica il genere della pianta dalla descrizione "
+            "v3.2 — Perche DELTA identifica il genere della pianta dalla descrizione "
             "dell'operatore prima di interrogare l'LLM sulla malattia?"
         ),
         "opzioni": [
@@ -530,7 +530,7 @@ QUIZ_QUESTIONS = [
     },
     {
         "domanda": (
-            "v3.1 — Perche il rilevamento contestuale della salute usa una chiamata "
+            "v3.2 — Perche il rilevamento contestuale della salute usa una chiamata "
             "LLM 'stateless' (senza memoria) invece del metodo chat() normale?"
         ),
         "opzioni": [
@@ -551,7 +551,7 @@ QUIZ_QUESTIONS = [
     },
     {
         "domanda": (
-            "v3.1 — Durante il flusso Q&A follow-up (max 5 domande), quale flag "
+            "v3.2 — Durante il flusso Q&A follow-up (max 5 domande), quale flag "
             "blocca il free_chat_handler dal rispondere in parallelo?"
         ),
         "opzioni": [
@@ -765,7 +765,7 @@ class DeltaAcademy:
                 "  Pressione    :  980 - 1020 hPa  (indicatore meteorologico)",
             ),
             (
-                "PASSO 6 — DELTA impara dalla tua descrizione (v3.1)",
+                "PASSO 6 — DELTA impara dalla tua descrizione (v3.2)",
                 "Quando avvii una diagnosi DELTA ti chiede:\n"
                 "  'Di che pianta si tratta? Descrivimi l'anomalia riscontrata.'\n\n"
                 "Cosa fa DELTA con la tua risposta:\n\n"

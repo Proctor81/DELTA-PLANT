@@ -2,7 +2,7 @@ ACTIVE_MODEL: generale
 
 MODELS_REGISTRY:
   efficientformer:
-    quantization: float16
+    quantization: int8
     enable_ensemble: true
     ensemble_model_key: generale
     ensemble_weights: [0.7, 0.3]

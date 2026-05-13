@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--img-size", type=int, default=224, help="Dimensione immagine input")
     parser.add_argument("--num-samples", type=int, default=200, help="Campioni representative dataset")
     parser.add_argument("--allow-float-fallback", action="store_true", help="Permette fallback float se alcune ops non sono INT8")
-    parser.add_argument("--labels", default="models/labels_33classes_correct.txt", help="Path labels da validare/copiare")
+    parser.add_argument("--labels", default="models/labels.txt", help="Path labels da validare/copiare")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 

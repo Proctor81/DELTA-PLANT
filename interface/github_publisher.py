@@ -16,7 +16,7 @@ NOTA PRIVACY: i dati operativi locali (diagnosi, statistiche DB, timestamps)
 Aggiorna (o crea):
   - README.md    — descrizione, funzionalità, installazione, badge
   - RELEASE.md   — changelog automatico dall'ultimo commit
-  - Tag git      — es. v2.0.1 con timestamp
+    - Tag git      — es. v3.2.1 con timestamp
   - git commit + push → GitHub
 
 Accesso: Pannello Amministratore → [7] Pubblica su GitHub
@@ -578,7 +578,7 @@ class GitHubPublisher:
         ).strip() or suggested_version
 
         if not re.match(r'^v?\d+\.\d+(\.\d+)?(-\w+)?$', version):
-            print(f"{RED}✘ Formato versione non valido (es. v2.0.1).{RESET}")
+            print(f"{RED}✘ Formato versione non valido (es. v3.2.1).{RESET}")
             return
 
         if not version.startswith("v"):
@@ -603,7 +603,7 @@ class GitHubPublisher:
         print(f"\n{BOLD}Raccolta dati dal software...{RESET}")
         data = self._collect_all()
         self._do_publish(
-            version=self._git.get("last_tag", "v2.0"),
+            version=self._git.get("last_tag", "v3.2"),
             data=data,
             create_tag=False,
         )
@@ -833,10 +833,10 @@ class GitHubPublisher:
     def _suggest_version(last_tag: str) -> str:
         """Incrementa il patch number dell'ultimo tag."""
         if not last_tag:
-            return "v2.0.0"
+            return "v3.2.0"
         m = re.match(r"v?(\d+)\.(\d+)(?:\.(\d+))?", last_tag)
         if not m:
-            return "v2.0.0"
+            return "v3.2.0"
         major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
         return f"v{major}.{minor}.{patch + 1}"
 

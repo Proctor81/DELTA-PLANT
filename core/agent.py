@@ -62,6 +62,8 @@ class DeltaAgent:
         self.exporter = ExcelExporter()
         self._vision_backend_name = str(MODELS_REGISTRY.get(ACTIVE_MODEL, {}).get("backend", "mobilenet")).lower()
         self._use_advanced_leaf_backend = self._vision_backend_name == "efficientformer" and self.vision_service.is_ready
+        self._explainability_service: Optional[VisionService] = None
+        self._explainability_service_attempted = False
 
         # ── Stato interno ────────────────────────────────────
         self._running = False
@@ -70,6 +72,45 @@ class DeltaAgent:
         self._sensor_thread: Optional[threading.Thread] = None
 
         logger.info("DELTA Agent inizializzato correttamente.")
+
+    def _resolve_explainability_service(self) -> Optional[VisionService]:
+        if self.vision_service.can_explain:
+            return self.vision_service
+        if self._explainability_service_attempted:
+            return self._explainability_service
+
+        self._explainability_service_attempted = True
+        explain_cfg = VISION_CONFIG.get("explainability", {})
+        fallback_model_key = str(explain_cfg.get("fallback_model_key", "efficientformer")).strip()
+        if not fallback_model_key or fallback_model_key == ACTIVE_MODEL:
+            return None
+
+        fallback_cfg = MODELS_REGISTRY.get(fallback_model_key) or {}
+        if str(fallback_cfg.get("backend", "")).lower() != "efficientformer":
+            return None
+
+        try:
+            service = VisionService(model_key=fallback_model_key, ensemble_enabled=False)
+        except Exception as exc:
+            logger.warning(
+                "Explainability fallback %s non disponibile: %s",
+                fallback_model_key,
+                exc,
+            )
+            return None
+
+        if not service.is_ready or not service.can_explain:
+            logger.info(
+                "Explainability fallback %s non pronto: ready=%s can_explain=%s",
+                fallback_model_key,
+                service.is_ready,
+                service.can_explain,
+            )
+            return None
+
+        self._explainability_service = service
+        logger.info("Explainability fallback attivo: %s", fallback_model_key)
+        return service
 
     # ─────────────────────────────────────────────
     # CICLO SENSORI (background thread)
@@ -252,8 +293,13 @@ class DeltaAgent:
             "recommendations": recommendations,
         }
 
-        if self._use_advanced_leaf_backend:
-            record["explainability"] = self._build_explainability_artifact(target_image, timestamp)
+        explainability_service = self._resolve_explainability_service()
+        if explainability_service is not None:
+            record["explainability"] = self._build_explainability_artifact(
+                target_image,
+                timestamp,
+                explainability_service,
+            )
 
         # ── 13. Persistenza ───────────────────────────────────
         try:
@@ -265,22 +311,29 @@ class DeltaAgent:
         logger.info("Diagnosi completata: %s", diagnosis.get("summary", "N/A"))
         return record
 
-    def _build_explainability_artifact(self, image: np.ndarray, timestamp: str) -> Dict[str, Any]:
+    def _build_explainability_artifact(
+        self,
+        image: np.ndarray,
+        timestamp: str,
+        explainability_service: Optional[VisionService] = None,
+    ) -> Dict[str, Any]:
         explain_cfg = VISION_CONFIG.get("explainability", {})
         if not explain_cfg.get("enabled", True):
             return {"available": False, "error": "Explainability disabilitata da configurazione"}
 
-        explanation = self.vision_service.explain_image(image)
+        service = explainability_service or self._resolve_explainability_service() or self.vision_service
+        explanation = service.explain_image(image)
         if explanation.get("error"):
             return {
                 "available": False,
                 "error": explanation["error"],
-                "model": explanation.get("model", self.vision_service.active_model),
+                "model": explanation.get("model", service.active_model),
             }
 
         artifact = {
             "available": True,
-            "model": explanation.get("model", self.vision_service.active_model),
+            "model": explanation.get("model", service.active_model),
+            "classification_model": self.vision_service.active_model,
             "method": explanation.get("method", "layercam"),
             "summary": explanation.get("summary", ""),
             "class": explanation.get("class"),

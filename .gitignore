@@ -35,6 +35,7 @@ Icon
 # Dataset captures (generati a runtime)
 datasets/captures/
 datasets/training/
+datasets/training_33classes/
 datasets/training_flower/
 datasets/training_fruit/
 datasets/learning_by_doing/
@@ -52,6 +53,10 @@ data/auth.json
 models/*.gguf
 # Modello Keras (troppo grande per GitHub: 21MB)
 models/dipladenia/*.keras
+models/efficientformer_v2_s1_33classes*
+models/efficientformer_v2_s1_int8_export/
+models/efficientformer_v2_s1_saved_model/
+models/pipeline_x_state.json
 # Solo il TFLite (2.7MB) viene committato
 data/telegram_user_map.json
 

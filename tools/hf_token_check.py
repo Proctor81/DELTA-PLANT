@@ -1,6 +1,6 @@
 """
 DELTA - tools/hf_token_check.py
-Verifica e aggiorna il token HuggingFace in .env.
+Verifica e aggiorna il token HuggingFace in .env per DELTA e Hugging Face Hub.
 
 Uso:
     python tools/hf_token_check.py            # solo verifica
@@ -43,25 +43,28 @@ def load_dotenv() -> dict:
     return env
 
 
+def _upsert_env_var(content: str, key: str, value: str) -> str:
+    pattern = rf"^{re.escape(key)}\s*=.*$"
+    replacement = f"{key}={value}"
+    if re.search(pattern, content, re.MULTILINE):
+        return re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    suffix = "" if not content or content.endswith("\n") else "\n"
+    return f"{content}{suffix}{replacement}\n"
+
+
 def update_env_token(new_token: str) -> None:
-    """Aggiorna HF_API_TOKEN nel file .env."""
+    """Aggiorna il token HF in .env per app e Hugging Face Hub."""
+    keys = ("HF_API_TOKEN", "HF_TOKEN", "HUGGINGFACE_HUB_TOKEN")
     if not ENV_FILE.exists():
-        ENV_FILE.write_text(f"HF_API_TOKEN={new_token}\n", encoding="utf-8")
+        ENV_FILE.write_text("".join(f"{key}={new_token}\n" for key in keys), encoding="utf-8")
         print(f"  ✓ Creato .env con il nuovo token.")
         return
 
     content = ENV_FILE.read_text(encoding="utf-8")
-    pattern = r"^HF_API_TOKEN\s*=.*$"
-    replacement = f"HF_API_TOKEN={new_token}"
-
-    if re.search(pattern, content, re.MULTILINE):
-        new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
-        ENV_FILE.write_text(new_content, encoding="utf-8")
-        print(f"  ✓ HF_API_TOKEN aggiornato in {ENV_FILE}")
-    else:
-        with ENV_FILE.open("a", encoding="utf-8") as f:
-            f.write(f"\n{replacement}\n")
-        print(f"  ✓ HF_API_TOKEN aggiunto in {ENV_FILE}")
+    for key in keys:
+        content = _upsert_env_var(content, key, new_token)
+    ENV_FILE.write_text(content, encoding="utf-8")
+    print(f"  ✓ Token HF aggiornato in {ENV_FILE}")
 
 
 def validate_token(token: str) -> tuple[bool, str]:
@@ -147,10 +150,17 @@ def main():
     # Solo verifica del token attuale
     env = load_dotenv()
     # Carica anche da variabili d'ambiente di sistema
-    token = os.environ.get("HF_API_TOKEN") or env.get("HF_API_TOKEN", "")
+    token = (
+        os.environ.get("HF_API_TOKEN")
+        or os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        or env.get("HF_API_TOKEN", "")
+        or env.get("HF_TOKEN", "")
+        or env.get("HUGGINGFACE_HUB_TOKEN", "")
+    )
 
     if not token:
-        print("  ✗ HF_API_TOKEN non configurato in .env\n")
+        print("  ✗ Token HuggingFace non configurato in .env\n")
         print(HELP_MSG)
         print(f"  Per aggiornare: python tools/hf_token_check.py --set hf_IL_TUO_TOKEN\n")
         sys.exit(1)
