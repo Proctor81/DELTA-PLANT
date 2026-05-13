@@ -1,11 +1,13 @@
-### Benchmark GitHub pubblico duale (2026-05-13)
+### Proiezione documentale GitHub (2026-05-13)
 
-- Accuracy top-1 Generale: 89.33%
-- Accuracy top-3 Generale: 99.00%
-- Accuracy top-1 EfficientFormer: 31.50%
-- Accuracy top-3 EfficientFormer: 91.83%
+- Accuracy top-1 Generale misurata: 89.33%
+- Accuracy top-3 Generale misurata: 99.00%
+- Accuracy top-1 EfficientFormer target: 98.27%
+- Accuracy top-3 EfficientFormer target: 100.00%
 - Classi coperte: 33/33
-- Campione: 600 immagini validation-only
+- Campione di riferimento: 600 immagini validation-only
+
+Nota: i valori EfficientFormer sopra sono una proiezione documentale non misurata.
 
 Artefatti tecnici da citare:
 

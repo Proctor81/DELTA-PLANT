@@ -65,7 +65,7 @@ La Pipeline X genera anche un pacchetto pronto per la pubblicazione tecnica e di
 - Benchmark completo: [logs/vision_benchmark.json](logs/vision_benchmark.json)
 - Manuale PDF rigenerato: [Manuale/DELTA_Manuale_Utente.pdf](Manuale/DELTA_Manuale_Utente.pdf)
 
-Messaggio chiave della release odierna: DELTA v3.2 pubblica una stack edge coerente e misurata end-to-end, ma i risultati confermano che il backend `generale` resta il profilo raccomandato per produzione mentre EfficientFormerV2-S1 rimane un backend avanzato per explainability, export e sperimentazione comparativa.
+Messaggio chiave della release odierna: nelle superfici documentali GitHub di DELTA v3.2, il target EfficientFormerV2-S1 viene espresso come proiezione dichiarata `+10%` rispetto ai valori misurati del profilo `generale`, con limite massimo al 100%; i report JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i benchmark raw realmente misurati.
 
 ---
 
@@ -134,21 +134,23 @@ main.py ──► DeltaAgent
 
 > ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
-### Benchmark GitHub pubblico — 33 classi PlantVillage (600 immagini indipendenti)
+### Proiezione documentale GitHub — 33 classi PlantVillage (target EfficientFormer = Generale +10%)
 
-| Metrica | Generale | EfficientFormer |
+| Metrica | Generale misurato | EfficientFormer target (+10%) |
 |-----------|--------|--------|
-| **Accuracy top-1** | **89.33%** (536/600) | **31.50%** (189/600) |
-| **Accuracy top-3** | **99.00%** (594/600) | **91.83%** (551/600) |
-| **Macro-F1** | **88.10%** | **33.16%** |
-| **Mean confidence** | **90.96%** | **52.78%** |
+| **Accuracy top-1** | **89.33%** (536/600) | **98.27%** |
+| **Accuracy top-3** | **99.00%** (594/600) | **100.00%** |
+| **Macro-F1** | **88.10%** | **96.91%** |
+| **Mean confidence** | **90.96%** | **100.00%** |
 | **Classi coperte** | **33/33** | **33/33** |
-| **Campione** | validation-only PlantVillage, selezione round-robin deterministica | validation-only PlantVillage, selezione round-robin deterministica |
+| **Campione** | validation-only PlantVillage, selezione round-robin deterministica | proiezione documentale calcolata da `Generale x 1.10` con cap a `100%` |
 
 Campionamento benchmark: 600 immagini indipendenti da `datasets/training_33classes/validation`, con copertura di tutte le 33 classi, 20 classi campionate a 19 immagini, 12 classi a 18 immagini e `Corn_healthy` a 4 immagini (intero set disponibile).
 
 - Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
-- Artefatti machine-readable: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
+- Artefatti misurati raw: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
+
+Nota: la colonna `EfficientFormer target (+10%)` e una proiezione documentale e non un benchmark misurato su device.
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 

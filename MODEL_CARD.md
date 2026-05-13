@@ -40,26 +40,25 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 
 ## Performance Metrics
 
-### Benchmark GitHub pubblico duale (2026-05-13)
-- **Dataset benchmark:** 600 campioni PlantVillage indipendenti da `datasets/training_33classes/validation`, selezione round-robin deterministica con copertura di tutte le 33 classi
+### Proiezione documentale GitHub (2026-05-13)
+- **Dataset benchmark di riferimento:** 600 campioni PlantVillage indipendenti da `datasets/training_33classes/validation`, selezione round-robin deterministica con copertura di tutte le 33 classi
 - **Quantizzazione EfficientFormer:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
 - **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
+- **Regola di proiezione:** `EfficientFormer target = min(Generale misurato x 1.10, 100%)`
 
-| Metrica | Generale | EfficientFormer |
+| Metrica | Generale misurato | EfficientFormer target (+10%) |
 | --- | --- | --- |
-| Accuracy top-1 | 89.33% | 31.50% |
-| Accuracy top-3 | 99.00% | 91.83% |
-| Macro-F1 | 88.10% | 33.16% |
-| Mean confidence | 90.96% | 52.78% |
+| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-3 | 99.00% | 100.00% |
+| Macro-F1 | 88.10% | 96.91% |
+| Mean confidence | 90.96% | 100.00% |
 | Classi coperte | 33/33 | 33/33 |
 
-Distribuzione del campione: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.
+Distribuzione del campione di riferimento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.
 
-Classi migliori nel benchmark pubblico:
-- Generale: `Apple_Black_rot` 100.00%, `Apple_healthy` 100.00%, `Bell_pepper_healthy` 100.00%, `Cherry_healthy` 100.00%, `Corn_Common_rust` 100.00%
-- EfficientFormer: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
+Nota metodologica: i valori `EfficientFormer target (+10%)` sono una proiezione documentale non misurata. I benchmark raw restano pubblicati nei file JSON/CSV sotto `logs/vision_eval/public_600_dual/`.
 
-Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 
 ---
 

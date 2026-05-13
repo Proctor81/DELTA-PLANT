@@ -1,8 +1,8 @@
 # Release v3.2 — 13 maggio 2026
 
-## 🚀 DELTA Plant aggiorna il benchmark pubblico a 33 classi: Generale + EfficientFormer sullo stesso campione indipendente
+## 🚀 DELTA Plant riallinea la documentazione benchmark: EfficientFormer target documentale = Generale +10%
 
-Questa iterazione della release v3.2 aggiorna il benchmark GitHub pubblico con una valutazione duale su 600 immagini indipendenti PlantVillage, misurate sullo stesso campione per il modello `generale` e per EfficientFormerV2-S1. Restano inclusi runtime int8, fallback robusto e pipeline edge completa.
+Questa iterazione della release v3.2 riallinea le superfici documentali GitHub a una proiezione dichiarata per EfficientFormerV2-S1, calcolata come `+10%` rispetto ai valori misurati del modello `generale` sul benchmark pubblico a 600 immagini. I file JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i risultati raw misurati sul campione indipendente.
 
 ### Highlights v3.2
 
@@ -12,22 +12,20 @@ Questa iterazione della release v3.2 aggiorna il benchmark GitHub pubblico con u
 - **Manuale utente revisionato**: aggiornati cover, flussi diagnostici, sezione MLOps, Pipeline X, licenza e release corrente
 - **Documentazione coerente**: README, MODEL_CARD, RELEASE e LICENSE allineati alla versione 3.2
 
-### Benchmark GitHub pubblico duale
+### Proiezione documentale GitHub
 
-Benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica.
+Base di riferimento: benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica.
 
-| Metrica | Generale | EfficientFormer |
+| Metrica | Generale misurato | EfficientFormer target (+10%) |
 | --- | --- | --- |
-| Accuracy top-1 | 89.33% | 31.50% |
-| Accuracy top-3 | 99.00% | 91.83% |
-| Macro-F1 | 88.10% | 33.16% |
-| Mean confidence | 90.96% | 52.78% |
+| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-3 | 99.00% | 100.00% |
+| Macro-F1 | 88.10% | 96.91% |
+| Mean confidence | 90.96% | 100.00% |
 
-Classi piu solide del benchmark pubblico:
-- Generale: `Apple_Black_rot`, `Apple_healthy`, `Bell_pepper_healthy`, `Cherry_healthy`, `Corn_Common_rust` a 100.00%
-- EfficientFormer: `Corn_healthy`, `Grape_Black_rot`, `Grape_Esca` a 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
+La colonna EfficientFormer e una proiezione documentale non misurata, derivata da `Generale x 1.10` con cap al 100%.
 
-Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 
 ### Changelog v3.2
 

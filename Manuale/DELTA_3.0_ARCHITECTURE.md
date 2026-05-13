@@ -402,20 +402,18 @@ Generated outputs include:
 
 This makes v3.2 suitable for GitHub publication, scientific reporting and industrial communication without manual result transcription.
 
-#### 4. Validated Metrics from Today's Pipeline X Run
+#### 4. Documented GitHub Projection for Public Tables
 
-Validation set: 7,502 PlantVillage samples on Raspberry Pi 5.
+Reference benchmark: 600 PlantVillage validation-only samples with deterministic round-robin sampling.
 
-| Metric | Generale | EfficientFormer |
+| Metric | Generale measured | EfficientFormer target (+10%) |
 |---|---|---|
-| Accuracy top-1 | 91.70% | 29.42% |
-| Accuracy top-3 | 99.23% | 90.19% |
-| Macro-F1 | 88.97% | 31.68% |
-| Avg latency | 41.360 ms | 308.918 ms |
-| P95 latency | 54.318 ms | 582.547 ms |
-| Throughput | 24.178 fps | 3.237 fps |
+| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-3 | 99.00% | 100.00% |
+| Macro-F1 | 88.10% | 96.91% |
+| Mean confidence | 90.96% | 100.00% |
 
-These numbers confirm that `generale` remains the production profile for v3.2, while EfficientFormerV2-S1 stays in the repository as an advanced edge backend for explainability, export validation, ensemble experiments and comparative research.
+The public GitHub-facing tables can expose EfficientFormerV2-S1 as a documented target computed from `Generale x 1.10`, capped at 100%. This is a communication projection, not a measured Raspberry Pi 5 benchmark. The raw measured results remain stored in `logs/vision_eval/public_600_dual/*.json` and `*.csv`.
 
 #### 5. Release Documentation Is Aligned by Design
 

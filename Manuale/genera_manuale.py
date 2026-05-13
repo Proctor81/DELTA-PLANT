@@ -3297,7 +3297,10 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._body(
         "Questi script producono report JSON/CSV con accuracy top-1, accuracy top-3, macro-F1, "
         "classification report e confusion matrix. I numeri EfficientFormer vanno pubblicati "
-        "solo dopo esecuzione sul Raspberry Pi 5 reale e sul validation set finale."
+        "solo dopo esecuzione sul Raspberry Pi 5 reale e sul validation set finale. "
+        "Se nelle superfici documentali si usa una proiezione target EfficientFormer, va "
+        "etichettata esplicitamente come non misurata e derivata dal profilo Generale con "
+        "un cap massimo al 100%."
     )
 
     pdf._subsection("18.5 Validazione Preflight — Gate di Deploy")
