@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DELTA Plant | AI Plant Health and Robotics Orchestrator</title>
+  <meta name="description" content="DELTA Plant is a premium AI Plant Health and Robotics Orchestrator for precision agriculture, leaf disease detection, explainable edge vision, DELTAPLANO operations, and deep-tech agritech storytelling." />
+  <meta name="keywords" content="DELTA Plant, DELTAPLANO, AI Plant Health, Robotics Orchestrator, Leaf Disease Detection, Precision Agriculture, Agritech, Deep Tech, Edge AI, LayerCAM, EfficientFormer, Space Biology, Raspberry Pi 5" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#07111d" />
+  <link rel="canonical" href="https://proctor81.github.io/delta-plant/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="DELTA Plant" />
+  <meta property="og:url" content="https://proctor81.github.io/delta-plant/" />
+  <meta property="og:title" content="DELTA Plant | AI Plant Health and Robotics Orchestrator" />
+  <meta property="og:description" content="A cinematic GitHub Pages experience for AI plant health, leaf disease detection, DELTAPLANO access, explainable edge vision, and precision agriculture deep tech." />
+  <meta property="og:image" content="https://proctor81.github.io/delta-plant/assets/social-preview.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="DELTA Plant cinematic preview with AI plant health, DELTAPLANO access, LayerCAM, and edge benchmark highlights" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DELTA Plant | AI Plant Health and Robotics Orchestrator" />
+  <meta name="twitter:description" content="Premium deep-tech landing page for AI plant health, DELTAPLANO operations, explainable edge vision, and precision agriculture." />
+  <meta name="twitter:image" content="https://proctor81.github.io/delta-plant/assets/social-preview.png" />
+  <meta name="twitter:image:alt" content="DELTA Plant cinematic preview with AI plant health, DELTAPLANO access, LayerCAM, and edge benchmark highlights" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Space Grotesk', 'sans-serif'],
+            body: ['Manrope', 'sans-serif']
+          },
+          colors: {
+            space: {
+              950: '#02070d',
+              900: '#06111c',
+              850: '#081722',
+              800: '#0d2230'
+            },
+            cyanedge: '#79e7ff',
+            neonleaf: '#19f5c1',
+            bioglow: '#9bff83'
+          },
+          boxShadow: {
+            halo: '0 0 0 1px rgba(121, 231, 255, 0.16), 0 20px 80px rgba(4, 13, 24, 0.55)',
+            pulse: '0 0 48px rgba(25, 245, 193, 0.22)',
+            panel: '0 18px 80px rgba(2, 7, 13, 0.55)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --space-950: #02070d;
+      --space-900: #06111c;
+      --space-850: #081722;
+      --space-800: #0d2230;
+      --neonleaf: #19f5c1;
+      --cyanedge: #79e7ff;
+      --bioglow: #9bff83;
+      --text-main: #edf7ff;
+      --text-soft: rgba(220, 236, 246, 0.78);
+      --panel: rgba(7, 17, 29, 0.7);
+      --panel-strong: rgba(8, 23, 34, 0.84);
+      --stroke: rgba(121, 231, 255, 0.14);
+      --glow: rgba(25, 245, 193, 0.24);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text-main);
+      font-family: 'Manrope', sans-serif;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(25, 245, 193, 0.16), transparent 34%),
+        radial-gradient(circle at 82% 12%, rgba(121, 231, 255, 0.14), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(155, 255, 131, 0.08), transparent 26%),
+        linear-gradient(180deg, #02070d 0%, #05111b 36%, #041723 68%, #02070d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 90px 90px;
+      mask-image: radial-gradient(circle at center, black, transparent 88%);
+    }
+
+    ::selection {
+      background: rgba(25, 245, 193, 0.28);
+      color: white;
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(10, 24, 36, 0.84), rgba(6, 17, 29, 0.6));
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      box-shadow: 0 18px 80px rgba(2, 7, 13, 0.52);
+      backdrop-filter: blur(18px);
+    }
+
+    .glass-soft {
+      background: linear-gradient(180deg, rgba(9, 24, 35, 0.58), rgba(5, 16, 27, 0.36));
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      box-shadow: 0 14px 48px rgba(2, 7, 13, 0.4);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-shell {
+      min-height: 100vh;
+    }
+
+    .aurora {
+      position: absolute;
+      inset: -18% -12% auto;
+      height: 78vh;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 38%, rgba(25, 245, 193, 0.22), transparent 28%),
+        radial-gradient(circle at 72% 20%, rgba(121, 231, 255, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 60%, rgba(155, 255, 131, 0.12), transparent 20%);
+      filter: blur(48px);
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .hero-fade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(2, 7, 13, 0.35) 0%, rgba(2, 7, 13, 0.62) 44%, rgba(2, 7, 13, 0.92) 100%),
+        radial-gradient(circle at center, transparent 0%, rgba(2, 7, 13, 0.12) 56%, rgba(2, 7, 13, 0.74) 100%);
+    }
+
+    .hero-noise {
+      position: absolute;
+      inset: 0;
+      opacity: 0.13;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.15) 0 0.6px, transparent 0.7px),
+        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.12) 0 0.55px, transparent 0.65px),
+        radial-gradient(circle at 55% 75%, rgba(255, 255, 255, 0.1) 0 0.5px, transparent 0.6px);
+      background-size: 170px 170px, 210px 210px, 250px 250px;
+      mix-blend-mode: screen;
+    }
+
+    .scan-beam {
+      position: absolute;
+      inset: 12% 10% auto;
+      height: 280px;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0), rgba(121, 231, 255, 0.14), rgba(25, 245, 193, 0));
+      filter: blur(8px);
+      animation: scan 9s ease-in-out infinite;
+    }
+
+    .hero-ring,
+    .hero-ring::before,
+    .hero-ring::after {
+      position: absolute;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      content: '';
+    }
+
+    .hero-ring {
+      inset: 14% auto auto 58%;
+      width: 420px;
+      height: 420px;
+      opacity: 0.38;
+      animation: spin 36s linear infinite;
+    }
+
+    .hero-ring::before {
+      inset: 36px;
+      border-style: dashed;
+      animation: spinReverse 22s linear infinite;
+    }
+
+    .hero-ring::after {
+      inset: 94px;
+      border-color: rgba(25, 245, 193, 0.24);
+      box-shadow: 0 0 48px rgba(25, 245, 193, 0.1);
+    }
+
+    .bio-leaf {
+      position: absolute;
+      width: 148px;
+      height: 230px;
+      border-radius: 100% 0 100% 0;
+      transform-origin: center center;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0.2), rgba(25, 245, 193, 0.05));
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      box-shadow: inset 0 0 24px rgba(121, 231, 255, 0.08), 0 0 64px rgba(25, 245, 193, 0.08);
+      filter: blur(0.2px);
+      opacity: 0.42;
+      overflow: hidden;
+    }
+
+    .bio-leaf::before,
+    .bio-leaf::after {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: inherit;
+    }
+
+    .bio-leaf::before {
+      border-left: 1px solid rgba(155, 255, 131, 0.22);
+      border-bottom: 1px solid rgba(121, 231, 255, 0.12);
+      transform: skewX(-10deg);
+    }
+
+    .bio-leaf::after {
+      inset: 54px 62px 54px 62px;
+      background: linear-gradient(180deg, rgba(155, 255, 131, 0.32), rgba(121, 231, 255, 0));
+      filter: blur(12px);
+    }
+
+    .leaf-a {
+      top: 18%;
+      right: 8%;
+      transform: rotate(22deg);
+      animation: floatLeaf 16s ease-in-out infinite;
+    }
+
+    .leaf-b {
+      bottom: 6%;
+      left: 4%;
+      width: 124px;
+      height: 188px;
+      transform: rotate(-26deg);
+      animation: floatLeaf 19s ease-in-out infinite reverse;
+    }
+
+    .leaf-c {
+      top: 34%;
+      left: 48%;
+      width: 90px;
+      height: 142px;
+      opacity: 0.28;
+      transform: rotate(18deg);
+      animation: floatLeaf 14s ease-in-out infinite;
+    }
+
+    .chip {
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background: rgba(7, 17, 29, 0.52);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(14px);
+    }
+
+    .headline-glow {
+      text-shadow: 0 0 32px rgba(25, 245, 193, 0.12), 0 0 18px rgba(121, 231, 255, 0.1);
+    }
+
+    .gradient-text {
+      background: linear-gradient(90deg, #f6fdff 0%, #79e7ff 42%, #19f5c1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .section-kicker {
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-size: 0.74rem;
+      color: rgba(121, 231, 255, 0.78);
+    }
+
+    .feature-card,
+    .docs-card,
+    .impact-card,
+    .tech-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .feature-card:hover,
+    .docs-card:hover,
+    .impact-card:hover,
+    .tech-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(25, 245, 193, 0.26);
+      box-shadow: 0 24px 84px rgba(2, 7, 13, 0.48), 0 0 36px rgba(25, 245, 193, 0.08);
+    }
+
+    .feature-card::after,
+    .docs-card::after,
+    .impact-card::after,
+    .tech-card::after {
+      content: '';
+      position: absolute;
+      inset: auto -20% -54% auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(25, 245, 193, 0.12), rgba(25, 245, 193, 0));
+      pointer-events: none;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 700ms ease, transform 700ms ease;
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .nav-blur {
+      background: rgba(4, 12, 22, 0.42);
+      border-bottom: 1px solid rgba(121, 231, 255, 0.08);
+      backdrop-filter: blur(16px);
+      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .nav-solid {
+      background: rgba(4, 12, 22, 0.84);
+      border-color: rgba(121, 231, 255, 0.14);
+      box-shadow: 0 12px 60px rgba(2, 7, 13, 0.36);
+    }
+
+    .audio-dock {
+      background: linear-gradient(180deg, rgba(8, 23, 34, 0.9), rgba(4, 12, 22, 0.76));
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      box-shadow: 0 18px 60px rgba(2, 7, 13, 0.42), 0 0 32px rgba(25, 245, 193, 0.08);
+      backdrop-filter: blur(16px);
+    }
+
+    .audio-panel {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    input[type='range'] {
+      accent-color: var(--neonleaf);
+    }
+
+    .stat-line {
+      background: linear-gradient(90deg, rgba(121, 231, 255, 0), rgba(121, 231, 255, 0.62), rgba(25, 245, 193, 0));
+      height: 1px;
+      opacity: 0.7;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(18px);
+      opacity: 0.48;
+    }
+
+    .orb-a {
+      width: 240px;
+      height: 240px;
+      top: 10%;
+      right: 14%;
+      background: radial-gradient(circle, rgba(121, 231, 255, 0.2), rgba(121, 231, 255, 0));
+      animation: drift 17s ease-in-out infinite alternate;
+    }
+
+    .orb-b {
+      width: 180px;
+      height: 180px;
+      bottom: 14%;
+      left: 12%;
+      background: radial-gradient(circle, rgba(25, 245, 193, 0.16), rgba(25, 245, 193, 0));
+      animation: drift 14s ease-in-out infinite alternate-reverse;
+    }
+
+    .orb-c {
+      width: 130px;
+      height: 130px;
+      top: 44%;
+      left: 52%;
+      background: radial-gradient(circle, rgba(155, 255, 131, 0.14), rgba(155, 255, 131, 0));
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    .cta-primary {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      color: #04131c;
+      box-shadow: 0 0 0 1px rgba(121, 231, 255, 0.18), 0 20px 48px rgba(25, 245, 193, 0.2);
+    }
+
+    .cta-secondary {
+      background: rgba(9, 24, 35, 0.58);
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      color: #edf7ff;
+    }
+
+    .footer-grid a,
+    .doc-link,
+    .nav-link {
+      transition: color 160ms ease, opacity 160ms ease;
+    }
+
+    .footer-grid a:hover,
+    .doc-link:hover,
+    .nav-link:hover {
+      color: #19f5c1;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      100% {
+        transform: translate3d(22px, -18px, 0) scale(1.06);
+      }
+    }
+
+    @keyframes scan {
+      0%, 100% {
+        transform: translateY(0) scaleY(0.92);
+        opacity: 0.32;
+      }
+      50% {
+        transform: translateY(160px) scaleY(1.08);
+        opacity: 0.86;
+      }
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spinReverse {
+      from {
+        transform: rotate(360deg);
+      }
+      to {
+        transform: rotate(0deg);
+      }
+    }
+
+    @keyframes floatLeaf {
+      0%, 100% {
+        transform: translateY(0) rotate(18deg);
+      }
+      50% {
+        transform: translateY(-14px) rotate(24deg);
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .hero-ring {
+        inset: auto auto 12% 52%;
+        width: 300px;
+        height: 300px;
+      }
+
+      .leaf-a,
+      .leaf-c {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .audio-dock {
+        width: min(290px, calc(100vw - 1rem));
+        left: auto;
+        right: 0.5rem;
+        bottom: 1rem;
+      }
+
+      .hero-ring {
+        left: auto;
+        right: -24px;
+        bottom: 20%;
+        width: 220px;
+        height: 220px;
+      }
+
+      .leaf-b {
+        left: -20px;
+        bottom: 18%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "DELTA Plant",
+          "url": "https://proctor81.github.io/delta-plant/",
+          "description": "DELTA Plant is an AI Plant Health and Robotics Orchestrator for precision agriculture, leaf disease detection, explainable edge vision, and DELTAPLANO operations.",
+          "keywords": [
+            "DELTA Plant",
+            "DELTAPLANO",
+            "AI Plant Health",
+            "Robotics Orchestrator",
+            "Leaf Disease Detection",
+            "Precision Agriculture",
+            "Agritech",
+            "Deep Tech",
+            "Space Biology",
+            "LayerCAM",
+            "EfficientFormer"
+          ],
+          "publisher": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          }
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "DELTA Plant",
+          "codeRepository": "https://github.com/proctor81/delta-plant",
+          "programmingLanguage": ["Python", "HTML", "JavaScript"],
+          "runtimePlatform": "Raspberry Pi 5",
+          "applicationCategory": "AgriculturalTechnology",
+          "description": "Open repository for AI plant health workflows, edge deployment, public benchmarking, DELTAPLANO bot access, and explainable plant disease diagnostics.",
+          "license": "https://github.com/proctor81/delta-plant/blob/main/LICENSE"
+        },
+        {
+          "@type": "Organization",
+          "name": "DELTA Plant",
+          "url": "https://github.com/proctor81/delta-plant",
+          "sameAs": [
+            "https://github.com/proctor81/delta-plant",
+            "https://t.me/DELTAPLANO_bot"
+          ],
+          "knowsAbout": [
+            "AI Plant Health",
+            "Precision Agriculture",
+            "Leaf Disease Detection",
+            "Explainable AI",
+            "Edge Inference",
+            "Agritech",
+            "Deep Tech"
+          ]
+        }
+      ]
+    }
+  </script>
+</head>
+<body class="font-body text-slate-100 antialiased">
+  <a href="#content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-slate-950">Skip to content</a>
+
+  <header id="site-header" class="nav-blur fixed inset-x-0 top-0 z-50">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
+      <a href="#home" class="flex items-center gap-3">
+        <span class="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-slate-950/70 shadow-halo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2C8 5 7 8.2 7 10.8C7 15.5 9.8 19 12 22C14.2 19 17 15.5 17 10.8C17 8.2 16 5 12 2Z" stroke="#79e7ff" stroke-width="1.4" />
+            <path d="M12 5.5V18.2" stroke="#9bff83" stroke-width="1.3" stroke-linecap="round" />
+            <path d="M12 10C10.5 9.2 9.4 8.2 8.8 7.1" stroke="#19f5c1" stroke-width="1.3" stroke-linecap="round" />
+            <path d="M12 12.3C13.8 11.5 15 10.6 15.8 9.2" stroke="#19f5c1" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span>
+          <span class="block font-display text-lg font-semibold tracking-wide text-white">DELTA Plant</span>
+          <span class="block text-xs uppercase tracking-[0.28em] text-cyan-200/60">Deep Tech Agritech</span>
+        </span>
+      </a>
+
+      <nav class="hidden items-center gap-8 text-sm text-slate-200/80 lg:flex">
+        <a class="nav-link" href="#home">Home</a>
+        <a class="nav-link" href="#features">Features</a>
+        <a class="nav-link" href="#technology">Technology</a>
+        <a class="nav-link" href="#demo">Demo</a>
+        <a class="nav-link" href="#docs">Docs</a>
+        <a class="nav-link" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+
+      <button id="menu-toggle" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/15 bg-slate-950/60 text-cyan-100 lg:hidden" aria-expanded="false" aria-controls="mobile-menu" aria-label="Toggle navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 7H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M4 12H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M4 17H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div id="mobile-menu" class="mx-4 mb-4 hidden rounded-3xl border border-cyan-300/10 bg-slate-950/88 p-4 shadow-panel lg:hidden">
+      <div class="flex flex-col gap-3 text-sm text-slate-200/80">
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#home">Home</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#features">Features</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#technology">Technology</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#demo">Demo</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#docs">Docs</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="content">
+    <section id="home" class="hero-shell relative flex items-center overflow-hidden pt-24">
+      <canvas id="cosmos-canvas" class="absolute inset-0 h-full w-full"></canvas>
+      <div class="aurora"></div>
+      <div class="hero-fade"></div>
+      <div class="hero-noise"></div>
+      <div class="scan-beam"></div>
+      <div class="hero-ring hidden xl:block"></div>
+      <div class="bio-leaf leaf-a hidden lg:block"></div>
+      <div class="bio-leaf leaf-b"></div>
+      <div class="bio-leaf leaf-c hidden xl:block"></div>
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+
+      <div class="relative z-10 mx-auto grid w-full max-w-7xl gap-14 px-6 pb-24 pt-10 lg:grid-cols-[1.2fr_0.88fr] lg:px-10 lg:pb-28">
+        <div class="max-w-3xl">
+          <div class="reveal flex flex-wrap gap-3">
+            <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
+              <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
+              AI Plant Health
+            </span>
+            <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Precision Agriculture</span>
+            <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Space Biology Aesthetic</span>
+          </div>
+
+          <h1 class="reveal headline-glow mt-8 font-display text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
+            <span class="gradient-text">AI Plant Health</span><br />
+            Orchestration for the next era of precision agriculture.
+          </h1>
+
+          <p class="reveal mt-7 max-w-2xl text-lg leading-8 text-slate-200/78 sm:text-xl">
+            DELTA Plant fuses edge AI, leaf disease detection, explainable vision, sensor intelligence, and conversational operations into a single deep-tech platform built for agritech teams, research labs, biotech pilots, and venture-scale deployment narratives.
+          </p>
+
+          <div class="reveal mt-9 flex flex-col gap-4 sm:flex-row">
+            <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em] sm:text-lg">
+              🚀 Access DELTAPLANO
+            </a>
+            <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer" class="cta-secondary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold">
+              Explore GitHub Repository
+            </a>
+            <a href="#docs" class="cta-secondary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold">
+              Open Documentation Hub
+            </a>
+          </div>
+
+          <div class="reveal mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Public Benchmark</div>
+              <div class="mt-3 font-display text-3xl text-white">89.33%</div>
+              <div class="mt-2 text-sm text-slate-300/72">Top-1 accuracy on a 600-image, 33-class validation sample.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-3</div>
+              <div class="mt-3 font-display text-3xl text-white">99.00%</div>
+              <div class="mt-2 text-sm text-slate-300/72">High-confidence shortlisting for operator review and rapid triage.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Coverage</div>
+              <div class="mt-3 font-display text-3xl text-white">33</div>
+              <div class="mt-2 text-sm text-slate-300/72">PlantVillage classes aligned to the public documentation surface.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Explainability</div>
+              <div class="mt-3 font-display text-3xl text-white">LayerCAM</div>
+              <div class="mt-2 text-sm text-slate-300/72">Heatmap and overlay outputs ready for DELTAPLANO, reports, and field trust.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal relative lg:pt-10">
+          <div class="glass rounded-[32px] p-6 sm:p-8">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="section-kicker">Mission Control</div>
+                <h2 class="mt-2 font-display text-2xl text-white">The bio-digital orchestration surface.</h2>
+              </div>
+              <div class="rounded-full border border-neonleaf/20 bg-neonleaf/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-neonleaf">v3.2 live</div>
+            </div>
+
+            <div class="mt-7 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5">
+              <div class="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-cyan-200/60">
+                <span>DELTA stack</span>
+                <span>Edge ready</span>
+              </div>
+              <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Vision core</div>
+                  <div class="mt-3 text-lg font-semibold text-white">MobileNetV2 + EfficientFormerV2-S1</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Hybrid edge inference designed for Raspberry Pi 5 runtime realism.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Explainer</div>
+                  <div class="mt-3 text-lg font-semibold text-white">LayerCAM overlays</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Readable attention maps that show where the model focused on the leaf.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Operations</div>
+                  <div class="mt-3 text-lg font-semibold text-white">DELTAPLANO + Admin + API</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Conversational bot access, local control plane, and integration endpoints.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Signals</div>
+                  <div class="mt-3 text-lg font-semibold text-white">7 environmental sensor channels</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Temperature, humidity, pressure, light, CO2, pH, and EC enrich the diagnosis loop.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-7 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <div class="section-kicker">Public benchmark logic</div>
+                <div class="mt-3 grid gap-3">
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">General model</span>
+                    <span class="font-semibold text-white">89.33% top-1 | 99.00% top-3</span>
+                  </div>
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">EfficientFormer estimate</span>
+                    <span class="font-semibold text-white">92.91% top-1 | 100.00% top-3</span>
+                  </div>
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">Mean edge latency</span>
+                    <span class="font-semibold text-white">41.360 ms</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mx-auto flex h-28 w-28 items-center justify-center rounded-full border border-neonleaf/20 bg-gradient-to-br from-neonleaf/15 via-cyan-300/8 to-transparent shadow-pulse">
+                <div class="flex h-20 w-20 items-center justify-center rounded-full border border-cyan-300/16 bg-slate-950/70 text-center">
+                  <span class="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100/72">Leaf<br />Signal</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="audio-dock fixed bottom-5 right-5 z-40 w-[min(320px,calc(100vw-1rem))] rounded-[26px] p-3.5 sm:p-4">
+        <div class="flex items-center gap-3">
+          <button id="audio-toggle" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-300/14 bg-white/5 text-cyan-100" aria-label="Toggle soundtrack">
+            <svg id="audio-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 10V14H8L12 18V6L8 10H5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path d="M16.5 8.5C17.7 9.4 18.5 10.9 18.5 12.5C18.5 14.1 17.7 15.6 16.5 16.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path d="M14.4 10.2C15 10.7 15.4 11.5 15.4 12.4C15.4 13.3 15 14.1 14.4 14.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path id="audio-slash" d="M4 4L20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </button>
+          <div class="min-w-0 flex-1">
+            <div class="text-[10px] uppercase tracking-[0.26em] text-cyan-200/60">Hero soundtrack</div>
+            <div class="mt-1 text-sm font-semibold text-white">Space Epic Cinematic Journey</div>
+            <div id="audio-status" class="mt-1 text-xs text-slate-300/68">Muted loop active</div>
+          </div>
+          <button id="audio-panel-toggle" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-300/14 bg-white/5 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100" aria-expanded="false" aria-controls="audio-panel" aria-label="Show soundtrack controls">Vol</button>
+        </div>
+        <div id="audio-panel" class="audio-panel mt-3 hidden border-t border-cyan-300/8 pt-3">
+          <a href="https://pixabay.com/music/main-title-space-epic-cinematic-journey-174145/" target="_blank" rel="noreferrer" class="block text-xs text-slate-300/68">Royalty-free Pixabay track, muted by default for browser policy.</a>
+          <div>
+            <div class="mb-2 flex items-center justify-between text-xs text-slate-300/65">
+            <span id="audio-volume-label">35%</span>
+            </div>
+            <input id="audio-volume" type="range" min="0" max="100" value="35" class="h-2 w-full cursor-pointer rounded-full bg-white/10" aria-label="Soundtrack volume" />
+          </div>
+        </div>
+      </div>
+
+      <audio id="hero-audio" loop muted playsinline preload="metadata" src="https://cdn.pixabay.com/download/audio/2023/10/31/audio_a56deec5d8.mp3?filename=rockot-space-epic-cinematic-journey-174145.mp3"></audio>
+    </section>
+
+    <section id="features" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-3xl">
+          <div class="section-kicker">Features</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">One product surface, multiple deep-tech entry points.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">DELTA Plant is not just another plant classifier. It is an AI plant health orchestration layer that combines edge inference, explainability, sensor-aware reasoning, operational workflows, and premium communication surfaces.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">01</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Edge-native visual intelligence</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Run AI plant health inference on Raspberry Pi 5 with a production baseline and an advanced EfficientFormer pipeline designed for realistic edge deployment.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">02</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Explainable diagnosis</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">LayerCAM overlays reveal where the model focused on the leaf, helping operators and researchers interpret model attention rather than relying on opaque predictions.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">03</div>
+            <h3 class="mt-4 font-display text-2xl text-white">DELTAPLANO operations</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Open a conversational gateway into DELTA Plant through Telegram, enabling quick diagnostics, follow-up questions, and human-readable plant health workflows.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">04</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Sensor and rule fusion</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Blend leaf image analysis with environmental sensor channels, expert rules, and agronomic context to move from recognition to decision support.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">05</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Research-to-release pipeline</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Training, export, benchmarking, dissemination, and manual regeneration are wired into a resumable pipeline that supports disciplined technical storytelling.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">06</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Investor-grade communication</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">GitHub Pages, documentation, benchmark framing, and premium design language turn the repository into a coherent deep-tech narrative for funding and partnership conversations.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="technology" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="grid gap-8 xl:grid-cols-[1fr_1.05fr] xl:items-start">
+          <div class="reveal max-w-2xl">
+            <div class="section-kicker">Technology and research</div>
+            <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Built at the intersection of edge AI, plant biology, and robotic orchestration.</h2>
+            <p class="mt-5 text-lg leading-8 text-slate-300/72">DELTA Plant positions AI plant health as a systems problem: not just image classification, but a coordinated runtime that spans sensing, inference, explainability, agronomic reasoning, and deployable human interfaces.</p>
+
+            <div class="mt-10 grid gap-5 sm:grid-cols-2">
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Vision stack</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">MobileNetV2 transfer learning remains the production baseline while EfficientFormerV2-S1 expands the deep-tech story with TFLite int8 export, float32 fallback, and benchmark pathways.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Explainability layer</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">LayerCAM produces heatmaps and overlays that show where the model looked, improving interpretability for researchers, growers, and partner organizations.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Decision layer</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">Expert rules, agronomic recommendations, and a quantum-inspired risk component enrich raw model output with plant-health reasoning.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Operational layer</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">DELTAPLANO, admin tooling, API endpoints, manuals, and benchmark artifacts expose the system to operators, integrators, and technical stakeholders.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div class="section-kicker">Research map</div>
+                <h3 class="mt-3 font-display text-3xl text-white">DELTA Plant system flow</h3>
+              </div>
+              <div class="rounded-full border border-cyan-300/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.24em] text-cyan-100/62">Ready for agritech pilots</div>
+            </div>
+
+            <div class="mt-8 space-y-4">
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">1. Observe</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Leaf image capture, optional sensor acquisition, and context-aware input gathering.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">Input</div>
+                </div>
+              </div>
+              <div class="stat-line"></div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">2. Infer</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Hybrid edge vision stack performs plant disease inference and optional ensemble logic.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">AI</div>
+                </div>
+              </div>
+              <div class="stat-line"></div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">3. Explain</div>
+                    <div class="mt-1 text-sm text-slate-300/68">LayerCAM overlays and textual interpretation make the diagnosis legible to humans.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">XAI</div>
+                </div>
+              </div>
+              <div class="stat-line"></div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">4. Orchestrate</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Rules, recommendations, conversational flows, and operational interfaces turn insight into action.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">Ops</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-8 grid gap-4 sm:grid-cols-3">
+              <div class="rounded-[24px] border border-neonleaf/10 bg-neonleaf/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-neonleaf/68">Edge performance</div>
+                <div class="mt-3 font-display text-3xl text-white">41.360 ms</div>
+                <div class="mt-2 text-sm text-slate-300/68">Mean measured edge inference for the public runtime profile.</div>
+              </div>
+              <div class="rounded-[24px] border border-cyan-300/10 bg-cyan-300/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-cyan-200/68">Public top-1</div>
+                <div class="mt-3 font-display text-3xl text-white">89.33%</div>
+                <div class="mt-2 text-sm text-slate-300/68">Public benchmark reference on 600 validation images.</div>
+              </div>
+              <div class="rounded-[24px] border border-bioglow/10 bg-bioglow/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-bioglow/68">Public top-3</div>
+                <div class="mt-3 font-display text-3xl text-white">99.00%</div>
+                <div class="mt-2 text-sm text-slate-300/68">High-confidence support for fast operator review.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="demo" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-3xl">
+          <div class="section-kicker">Demo</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">From repository to live operational narrative.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">The DELTA Plant landing page is designed to make the product legible in under a minute: what it does, why it matters, how it performs, and where stakeholders can validate the technical depth.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="section-kicker">Operator journey</div>
+            <div class="mt-6 grid gap-5 md:grid-cols-3">
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Step 1</div>
+                <h3 class="mt-3 font-display text-xl text-white">Capture</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Collect a leaf image, sensor values, and context from the field, lab, or greenhouse floor.</p>
+              </div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Step 2</div>
+                <h3 class="mt-3 font-display text-xl text-white">Diagnose</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Run edge inference, apply explainability, and enrich the result with agronomic intelligence.</p>
+              </div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Step 3</div>
+                <h3 class="mt-3 font-display text-xl text-white">Act</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Deliver recommendations, benchmark trust signals, and ongoing DELTAPLANO follow-up.</p>
+              </div>
+            </div>
+
+            <div class="mt-8 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5 sm:p-6">
+              <div class="section-kicker">Launch sequence</div>
+              <pre class="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7 text-slate-200/82">python main.py --preflight --enable-api --enable-telegram --daemon</pre>
+              <p class="mt-4 text-sm leading-7 text-slate-300/68">Designed for direct deployment on GitHub Pages for storytelling and Raspberry Pi 5 for runtime execution.</p>
+            </div>
+          </div>
+
+          <div class="grid gap-6">
+            <a class="docs-card reveal glass rounded-[32px] p-7 sm:p-8" href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">
+              <div class="section-kicker">Live access</div>
+              <h3 class="mt-3 font-display text-2xl text-white">Open DELTAPLANO</h3>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">Move straight into the conversational control layer and test the product surface most relevant to operators and partners.</p>
+              <div class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Open Telegram bot <span aria-hidden="true">-></span></div>
+            </a>
+            <a class="docs-card reveal glass rounded-[32px] p-7 sm:p-8" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">
+              <div class="section-kicker">Code and assets</div>
+              <h3 class="mt-3 font-display text-2xl text-white">Inspect the repository</h3>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">Benchmark reports, release notes, model card, manual, and the orchestration codebase are all accessible from the public repository.</p>
+              <div class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Explore GitHub <span aria-hidden="true">-></span></div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="impact" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-3xl">
+          <div class="section-kicker">Use cases and impact</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Positioned for venture conversations, field pilots, and research credibility.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">DELTA Plant creates a single narrative thread across product design, AI performance, and operational practicality. That makes it legible to both technical evaluators and decision-makers.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Greenhouse AI</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Protected crop operations</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Support controlled-environment agriculture with explainable edge diagnostics and a lightweight operator-facing workflow.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Field scouting</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Portable plant triage</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Enable fast field checks, leaf health triage, and recommendation loops without relying on cloud-only inference paths.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Research platforms</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Explainable edge experimentation</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Give AI researchers and agronomic labs a practical substrate for benchmarking, explainability, and deployment-aware experimentation.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Deep-tech capital</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Investor-ready narrative</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Present a differentiated combination of agritech, edge AI, robotics orchestration, and polished public-facing communication.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="docs" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-3xl">
+          <div class="section-kicker">Docs and assets</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Validate the story with technical depth.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">The landing page is only the front door. The repository also exposes the benchmark source, user manual, release notes, model card, and the code itself so every claim can be audited.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/README.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Repository guide</div>
+            <h3 class="mt-4 font-display text-2xl text-white">README</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Product framing, quick start, benchmark snapshot, and links to the most relevant technical assets.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Model transparency</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Model Card</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Understand deployment assumptions, benchmark framing, and how DELTA Plant communicates model performance.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Operations manual</div>
+            <h3 class="mt-4 font-display text-2xl text-white">User Manual PDF</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Review the operational manual for runtime setup, interfaces, telemetry, and explainability details.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Benchmark source</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Public Report</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Inspect the 600-image benchmark report and the raw comparison assets behind the public metrics surface.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="relative border-t border-cyan-300/8 py-12">
+    <div class="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-slate-950/70 shadow-halo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2C8 5 7 8.2 7 10.8C7 15.5 9.8 19 12 22C14.2 19 17 15.5 17 10.8C17 8.2 16 5 12 2Z" stroke="#79e7ff" stroke-width="1.4" />
+              <path d="M12 5.5V18.2" stroke="#9bff83" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
+          </span>
+          <div>
+            <div class="font-display text-xl text-white">DELTA Plant</div>
+            <div class="text-sm text-slate-300/62">AI Plant Health and Robotics Orchestrator</div>
+          </div>
+        </div>
+
+        <p class="mt-5 max-w-2xl text-base leading-8 text-slate-300/68">A premium GitHub Pages and repository experience for edge AI plant health, leaf disease detection, DELTAPLANO operations, explainable diagnostics, and precision agriculture storytelling.</p>
+      </div>
+
+      <div class="footer-grid grid gap-8 sm:grid-cols-2">
+        <div>
+          <div class="section-kicker">Quick links</div>
+          <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
+            <a href="https://proctor81.github.io/delta-plant/" target="_blank" rel="noreferrer">Live website</a>
+            <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">Access DELTAPLANO</a>
+            <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub repository</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/RELEASE.md" target="_blank" rel="noreferrer">Release notes</a>
+          </div>
+        </div>
+        <div>
+          <div class="section-kicker">Research assets</div>
+          <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
+            <a href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">Model card</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">User manual PDF</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">Public benchmark report</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/comparison_summary.json" target="_blank" rel="noreferrer">Benchmark JSON</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mx-auto mt-12 flex max-w-7xl flex-col gap-3 border-t border-cyan-300/8 px-6 pt-6 text-sm text-slate-400/70 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+      <span>Copyright <span id="footer-year"></span> DELTA Plant. Deep-tech landing page built with HTML, Tailwind CDN, and vanilla JavaScript.</span>
+      <span>Music credit: Pixabay - Space Epic Cinematic Journey.</span>
+    </div>
+  </footer>
+
+  <script>
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const menuToggle = document.getElementById('menu-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = mobileMenu.querySelectorAll('a');
+    const siteHeader = document.getElementById('site-header');
+
+    menuToggle.addEventListener('click', () => {
+      const expanded = menuToggle.getAttribute('aria-expanded') === 'true';
+      menuToggle.setAttribute('aria-expanded', String(!expanded));
+      mobileMenu.classList.toggle('hidden');
+    });
+
+    mobileLinks.forEach((link) => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.add('hidden');
+        menuToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    const updateHeader = () => {
+      if (window.scrollY > 20) {
+        siteHeader.classList.add('nav-solid');
+      } else {
+        siteHeader.classList.remove('nav-solid');
+      }
+    };
+
+    updateHeader();
+    window.addEventListener('scroll', updateHeader, { passive: true });
+
+    const reveals = document.querySelectorAll('.reveal');
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' });
+
+    reveals.forEach((element, index) => {
+      element.style.transitionDelay = `${Math.min(index * 40, 240)}ms`;
+      if (prefersReducedMotion) {
+        element.classList.add('is-visible');
+      } else {
+        revealObserver.observe(element);
+      }
+    });
+
+    const audio = document.getElementById('hero-audio');
+    const audioToggle = document.getElementById('audio-toggle');
+    const audioPanel = document.getElementById('audio-panel');
+    const audioPanelToggle = document.getElementById('audio-panel-toggle');
+    const audioStatus = document.getElementById('audio-status');
+    const audioVolume = document.getElementById('audio-volume');
+    const audioVolumeLabel = document.getElementById('audio-volume-label');
+    const audioSlash = document.getElementById('audio-slash');
+
+    audio.volume = Number(audioVolume.value) / 100;
+
+    const setAudioState = (enabled) => {
+      audio.muted = !enabled;
+      audioSlash.style.opacity = enabled ? '0' : '1';
+      audioStatus.textContent = enabled ? 'Soundtrack enabled' : 'Muted loop active';
+    };
+
+    const setAudioPanel = (expanded) => {
+      audioPanel.classList.toggle('hidden', !expanded);
+      audioPanelToggle.setAttribute('aria-expanded', String(expanded));
+      audioPanelToggle.textContent = expanded ? 'Hide' : 'Vol';
+    };
+
+    setAudioState(false);
+    setAudioPanel(false);
+
+    const tryAutoplayMuted = async () => {
+      try {
+        await audio.play();
+      } catch (error) {
+        audioStatus.textContent = 'Ready to play on tap';
+      }
+    };
+
+    tryAutoplayMuted();
+
+    audioToggle.addEventListener('click', async () => {
+      const shouldEnable = audio.muted || audio.paused;
+      if (audio.paused) {
+        try {
+          await audio.play();
+        } catch (error) {
+          audioStatus.textContent = 'Playback blocked - tap again';
+          return;
+        }
+      }
+      setAudioState(shouldEnable);
+    });
+
+    audioPanelToggle.addEventListener('click', () => {
+      const expanded = audioPanelToggle.getAttribute('aria-expanded') === 'true';
+      setAudioPanel(!expanded);
+    });
+
+    audioVolume.addEventListener('input', () => {
+      const value = Number(audioVolume.value);
+      audio.volume = value / 100;
+      audioVolumeLabel.textContent = `${value}%`;
+      if (value === 0) {
+        setAudioState(false);
+      } else if (audio.muted) {
+        setAudioState(true);
+      }
+    });
+
+    audio.addEventListener('error', () => {
+      audioStatus.textContent = 'Soundtrack source unavailable';
+      audioToggle.disabled = true;
+      audioToggle.classList.add('opacity-50');
+    });
+
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+    const canvas = document.getElementById('cosmos-canvas');
+    const ctx = canvas.getContext('2d');
+    const pointer = { x: 0, y: 0, active: false };
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let particles = [];
+
+    const createParticle = () => {
+      const leafMode = Math.random() > 0.9;
+      return {
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * (leafMode ? 0.16 : 0.24),
+        vy: (Math.random() - 0.5) * (leafMode ? 0.12 : 0.2),
+        r: leafMode ? 2.2 + Math.random() * 2.6 : 0.6 + Math.random() * 1.8,
+        leafMode,
+        hue: leafMode ? 160 + Math.random() * 28 : 182 + Math.random() * 20,
+        alpha: leafMode ? 0.24 + Math.random() * 0.24 : 0.18 + Math.random() * 0.34
+      };
+    };
+
+    const resizeCanvas = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const particleCount = prefersReducedMotion ? 34 : Math.max(52, Math.min(96, Math.floor((width * height) / 18000)));
+      particles = Array.from({ length: particleCount }, createParticle);
+    };
+
+    const drawLeaf = (x, y, size, rotation, color, alpha) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.bezierCurveTo(size * 0.8, -size * 0.45, size * 0.85, size * 0.65, 0, size);
+      ctx.bezierCurveTo(-size * 0.85, size * 0.65, -size * 0.8, -size * 0.45, 0, -size);
+      ctx.fillStyle = `hsla(${color}, 90%, 68%, ${alpha})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, -size * 0.74);
+      ctx.lineTo(0, size * 0.74);
+      ctx.strokeStyle = `hsla(${color - 25}, 90%, 74%, ${alpha * 1.3})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawVines = (time) => {
+      const vines = [
+        [width * 0.1, height * 0.88, width * 0.26, height * 0.58, width * 0.44, height * 0.68, width * 0.62, height * 0.34],
+        [width * 0.32, height * 0.95, width * 0.42, height * 0.72, width * 0.58, height * 0.78, width * 0.76, height * 0.44],
+        [width * 0.7, height * 0.98, width * 0.72, height * 0.72, width * 0.78, height * 0.64, width * 0.9, height * 0.28]
+      ];
+
+      vines.forEach((points, index) => {
+        const gradient = ctx.createLinearGradient(points[0], points[1], points[6], points[7]);
+        gradient.addColorStop(0, 'rgba(25, 245, 193, 0.08)');
+        gradient.addColorStop(0.55, 'rgba(121, 231, 255, 0.22)');
+        gradient.addColorStop(1, 'rgba(155, 255, 131, 0.08)');
+        ctx.beginPath();
+        ctx.moveTo(points[0], points[1]);
+        ctx.bezierCurveTo(points[2], points[3], points[4], points[5], points[6], points[7]);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        for (let step = 0; step <= 4; step += 1) {
+          const t = step / 4;
+          const x = Math.pow(1 - t, 3) * points[0] + 3 * Math.pow(1 - t, 2) * t * points[2] + 3 * (1 - t) * Math.pow(t, 2) * points[4] + Math.pow(t, 3) * points[6];
+          const y = Math.pow(1 - t, 3) * points[1] + 3 * Math.pow(1 - t, 2) * t * points[3] + 3 * (1 - t) * Math.pow(t, 2) * points[5] + Math.pow(t, 3) * points[7];
+          drawLeaf(x + Math.sin(time * 0.0007 + step + index) * 4, y, 6 + step * 0.8, (time * 0.0003 + step) * 0.8, 155 + index * 12, 0.12 + step * 0.02);
+        }
+      });
+    };
+
+    const animate = (time) => {
+      ctx.clearRect(0, 0, width, height);
+      drawVines(time);
+
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < -30) p.x = width + 30;
+        if (p.x > width + 30) p.x = -30;
+        if (p.y < -30) p.y = height + 30;
+        if (p.y > height + 30) p.y = -30;
+
+        if (pointer.active) {
+          const dx = p.x - pointer.x;
+          const dy = p.y - pointer.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 120) {
+            const force = (120 - distance) / 1200;
+            p.x += (dx / distance) * force * 12;
+            p.y += (dy / distance) * force * 12;
+          }
+        }
+
+        if (p.leafMode) {
+          drawLeaf(p.x, p.y, p.r, time * 0.0005 + i, p.hue, p.alpha);
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 100%, 82%, ${p.alpha})`;
+          ctx.fill();
+        }
+
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const q = particles[j];
+          const dx = p.x - q.x;
+          const dy = p.y - q.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 112) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.strokeStyle = `rgba(121, 231, 255, ${0.12 * (1 - distance / 112)})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
+        }
+      }
+
+      if (!prefersReducedMotion) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    resizeCanvas();
+    if (!prefersReducedMotion) {
+      requestAnimationFrame(animate);
+    } else {
+      animate(0);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('pointermove', (event) => {
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      pointer.active = true;
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => {
+      pointer.active = false;
+    });
+  </script>
+</body>
+</html>

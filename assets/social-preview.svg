@@ -1,0 +1,123 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">DELTA Plant social preview</title>
+  <desc id="desc">A cinematic social card for DELTA Plant featuring AI Plant Health messaging, DELTAPLANO access, LayerCAM, edge AI, and public benchmark metrics.</desc>
+  <defs>
+    <linearGradient id="bg" x1="88" y1="42" x2="1088" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#040A12"/>
+      <stop offset="0.4" stop-color="#071523"/>
+      <stop offset="1" stop-color="#031019"/>
+    </linearGradient>
+    <radialGradient id="cyanGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(860 160) rotate(90) scale(240 340)">
+      <stop stop-color="#79E7FF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#79E7FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="leafGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(274 500) rotate(90) scale(220 320)">
+      <stop stop-color="#19F5C1" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#19F5C1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bioGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(606 312) rotate(90) scale(320 420)">
+      <stop stop-color="#9BFF83" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#9BFF83" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cardStroke" x1="160" y1="92" x2="1008" y2="538" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#79E7FF" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#19F5C1" stop-opacity="0.16"/>
+    </linearGradient>
+    <linearGradient id="pillStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#79E7FF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#19F5C1" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="titleGradient" x1="183" y1="151" x2="826" y2="342" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6FDFF"/>
+      <stop offset="0.46" stop-color="#79E7FF"/>
+      <stop offset="1" stop-color="#19F5C1"/>
+    </linearGradient>
+    <filter id="softBlur" x="0" y="0" width="1200" height="630" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" rx="0" fill="url(#bg)"/>
+  <g opacity="0.9" filter="url(#softBlur)">
+    <ellipse cx="896" cy="132" rx="168" ry="116" fill="url(#cyanGlow)"/>
+    <ellipse cx="276" cy="496" rx="190" ry="136" fill="url(#leafGlow)"/>
+    <ellipse cx="598" cy="310" rx="290" ry="220" fill="url(#bioGlow)"/>
+  </g>
+
+  <rect x="34" y="34" width="1132" height="562" rx="34" fill="rgba(5,16,28,0.62)" stroke="url(#cardStroke)" stroke-width="1.4"/>
+  <rect x="70" y="70" width="160" height="160" rx="36" fill="#07101B" stroke="#79E7FF" stroke-opacity="0.18"/>
+  <path d="M150 104C124 124 118 146 118 164C118 196 137 221 150 240C163 221 182 196 182 164C182 146 176 124 150 104Z" stroke="#79E7FF" stroke-width="3.2"/>
+  <path d="M150 129V212" stroke="#9BFF83" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M150 158C139 151 131 143 127 135" stroke="#19F5C1" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M150 173C163 167 171 159 176 149" stroke="#19F5C1" stroke-width="2.8" stroke-linecap="round"/>
+
+  <rect x="264" y="82" width="236" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
+  <circle cx="294" cy="102" r="7.5" fill="#19F5C1"/>
+  <text x="316" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.22em">AI PLANT HEALTH</text>
+
+  <rect x="516" y="82" width="220" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
+  <text x="544" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.14em">AGRITECH / DEEP TECH</text>
+
+  <rect x="754" y="82" width="182" height="40" rx="20" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
+  <text x="786" y="109" fill="#DDF6FF" font-size="18" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.14em">LAYERCAM / XAI</text>
+
+  <text x="264" y="176" fill="#FFFFFF" font-size="60" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">DELTA Plant</text>
+  <text x="264" y="242" fill="url(#titleGradient)" font-size="64" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">AI Plant Health</text>
+  <text x="264" y="308" fill="#F3FBFF" font-size="56" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">Robotics Orchestrator</text>
+
+  <text x="266" y="362" fill="#C6DBE6" fill-opacity="0.84" font-size="26" font-family="'Manrope', Arial, sans-serif">Cinematic GitHub Pages presence for edge AI, DELTAPLANO access,</text>
+  <text x="266" y="398" fill="#C6DBE6" fill-opacity="0.84" font-size="26" font-family="'Manrope', Arial, sans-serif">leaf disease detection, explainable vision, and precision agriculture.</text>
+
+  <rect x="264" y="446" width="286" height="72" rx="36" fill="#19F5C1"/>
+  <text x="306" y="490" fill="#04131C" font-size="28" font-family="'Manrope', Arial, sans-serif" font-weight="800">🚀 Access DELTAPLANO</text>
+
+  <rect x="570" y="446" width="208" height="72" rx="36" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.18"/>
+  <text x="609" y="490" fill="#EDF7FF" font-size="27" font-family="'Manrope', Arial, sans-serif" font-weight="700">Edge AI • RPi 5</text>
+
+  <g>
+    <rect x="812" y="130" width="302" height="126" rx="26" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
+    <text x="844" y="174" fill="#8FDFFF" fill-opacity="0.76" font-size="16" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.22em">PUBLIC BENCHMARK</text>
+    <text x="844" y="222" fill="#FFFFFF" font-size="34" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">89.33% top-1</text>
+    <text x="844" y="250" fill="#D5EEF9" fill-opacity="0.74" font-size="19" font-family="'Manrope', Arial, sans-serif">99.00% top-3</text>
+    <text x="844" y="276" fill="#D5EEF9" fill-opacity="0.62" font-size="17" font-family="'Manrope', Arial, sans-serif">600 images • 33 classes</text>
+  </g>
+
+  <g>
+    <rect x="812" y="278" width="302" height="118" rx="26" fill="#0A1624" stroke="#19F5C1" stroke-opacity="0.16"/>
+    <text x="844" y="320" fill="#A7FFD6" fill-opacity="0.74" font-size="16" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.22em">ADVANCED STACK</text>
+    <text x="844" y="362" fill="#FFFFFF" font-size="28" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">EfficientFormerV2-S1</text>
+    <text x="844" y="390" fill="#D5EEF9" fill-opacity="0.74" font-size="18" font-family="'Manrope', Arial, sans-serif">LayerCAM • TFLite</text>
+    <text x="844" y="414" fill="#D5EEF9" fill-opacity="0.62" font-size="17" font-family="'Manrope', Arial, sans-serif">Sensor fusion</text>
+  </g>
+
+  <g>
+    <rect x="812" y="418" width="302" height="118" rx="26" fill="#0A1624" stroke="#79E7FF" stroke-opacity="0.16"/>
+    <text x="844" y="460" fill="#8FDFFF" fill-opacity="0.74" font-size="16" font-family="'Manrope', Arial, sans-serif" letter-spacing="0.22em">OPERATIONS</text>
+    <text x="844" y="502" fill="#FFFFFF" font-size="25" font-family="'Space Grotesk', Arial, sans-serif" font-weight="700">Telegram • API • Admin</text>
+    <text x="844" y="530" fill="#D5EEF9" fill-opacity="0.62" font-size="17" font-family="'Manrope', Arial, sans-serif">Researchers • Agritech • VCs</text>
+  </g>
+
+  <g opacity="0.74">
+    <path d="M742 162C784 176 820 208 838 242" stroke="#79E7FF" stroke-opacity="0.42" stroke-width="1.6"/>
+    <path d="M720 248C772 284 802 316 846 364" stroke="#19F5C1" stroke-opacity="0.34" stroke-width="1.4"/>
+    <path d="M206 456C284 418 336 408 422 422" stroke="#19F5C1" stroke-opacity="0.22" stroke-width="1.4"/>
+    <circle cx="742" cy="162" r="5" fill="#79E7FF"/>
+    <circle cx="838" cy="242" r="6" fill="#19F5C1"/>
+    <circle cx="720" cy="248" r="4.8" fill="#79E7FF"/>
+    <circle cx="846" cy="364" r="5.6" fill="#9BFF83"/>
+    <circle cx="206" cy="456" r="4.8" fill="#19F5C1"/>
+    <circle cx="422" cy="422" r="5" fill="#79E7FF"/>
+  </g>
+
+  <g opacity="0.18">
+    <circle cx="1040" cy="114" r="54" stroke="#79E7FF" stroke-width="1.4"/>
+    <circle cx="1040" cy="114" r="88" stroke="#79E7FF" stroke-width="1.1" stroke-dasharray="8 8"/>
+    <circle cx="1040" cy="114" r="122" stroke="#19F5C1" stroke-width="1"/>
+  </g>
+
+  <g opacity="0.14">
+    <path d="M118 558C188 480 252 428 312 372" stroke="#19F5C1" stroke-width="1.8"/>
+    <path d="M146 566C214 520 248 482 300 430" stroke="#79E7FF" stroke-width="1.2"/>
+    <path d="M300 430C310 419 322 408 338 396" stroke="#9BFF83" stroke-width="1.1"/>
+  </g>
+</svg>
