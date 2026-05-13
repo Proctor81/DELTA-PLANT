@@ -17,8 +17,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Prepara artefatti divulgativi da benchmark ed evaluation")
     parser.add_argument(
         "--eval-summary",
-        default="logs/vision_eval/comparison_summary.json",
-        help="Path comparison_summary.json generato dalla evaluation",
+        default="logs/vision_eval/public_600_dual/comparison_summary.json",
+        help="Path comparison_summary.json del benchmark pubblico documentale",
     )
     parser.add_argument(
         "--benchmark-summary",
@@ -29,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="logs/attivita_divulgative",
         help="Directory output pacchetto divulgativo",
+    )
+    parser.add_argument(
+        "--projection-factor",
+        type=float,
+        default=1.04,
+        help="Fattore di proiezione documentale applicato a Generale per il target EfficientFormer",
     )
     return parser
 
@@ -66,6 +72,24 @@ def _format_fps(value: Any) -> str:
     return f"{float(value):.3f} fps"
 
 
+def _projection_label(factor: float) -> str:
+    percent = (factor - 1.0) * 100.0
+    rounded = round(percent)
+    if abs(percent - rounded) < 1e-9:
+        return f"+{int(rounded)}%"
+    return f"+{percent:.2f}%"
+
+
+def _projection_multiplier(factor: float) -> str:
+    return f"{factor:.2f}"
+
+
+def _project_probability(value: Any, factor: float) -> float | None:
+    if value is None:
+        return None
+    return min(float(value) * factor, 1.0)
+
+
 def _display_path(path: Path) -> str:
     resolved = path.resolve()
     try:
@@ -88,21 +112,60 @@ def _model_bench_row(label: str, row: dict[str, Any]) -> str:
     )
 
 
+def _project_eval_row(base_row: dict[str, Any], factor: float) -> dict[str, Any]:
+    sample_counts = base_row.get("sample_counts")
+    return {
+        "model_key": "efficientformer_target",
+        "active_model": "EfficientFormer target",
+        "backend": "document_projection",
+        "samples": base_row.get("samples"),
+        "limit_per_class": base_row.get("limit_per_class"),
+        "max_total": base_row.get("max_total"),
+        "accuracy_top1": _project_probability(base_row.get("accuracy_top1"), factor),
+        "accuracy_top3": _project_probability(base_row.get("accuracy_top3"), factor),
+        "macro_f1": _project_probability(base_row.get("macro_f1"), factor),
+        "mean_confidence": _project_probability(base_row.get("mean_confidence"), factor),
+        "sample_counts": sample_counts if isinstance(sample_counts, dict) else {},
+        "projection_factor": factor,
+        "projection_formula": f"min(Generale x {_projection_multiplier(factor)}, 100%)",
+        "projected_from": str(base_row.get("model_key") or "generale"),
+    }
+
+
 def _build_summary(eval_rows: dict[str, dict[str, Any]], bench_rows: dict[str, dict[str, Any]], args) -> dict[str, Any]:
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     eval_summary_path = Path(args.eval_summary)
     benchmark_summary_path = Path(args.benchmark_summary)
+    projection_factor = float(args.projection_factor)
+    generale_eval = eval_rows.get("generale", {})
+    efficientformer_eval = eval_rows.get("efficientformer", {})
+    efficientformer_target = _project_eval_row(generale_eval, projection_factor)
+    sample_counts = generale_eval.get("sample_counts")
+    class_count = len(sample_counts) if isinstance(sample_counts, dict) else None
     return {
         "generated_at": generated_at,
         "eval_summary": _display_path(eval_summary_path),
         "benchmark_summary": _display_path(benchmark_summary_path),
+        "document_projection": {
+            "label": f"EfficientFormer target ({_projection_label(projection_factor)} vs Generale)",
+            "factor": projection_factor,
+            "formula": f"min(Generale x {_projection_multiplier(projection_factor)}, 100%)",
+            "scope": "GitHub public benchmark",
+        },
+        "benchmark_reference": {
+            "samples": generale_eval.get("samples"),
+            "classes": class_count,
+            "scope": "validation-only",
+        },
         "models": {
             "generale": {
-                "evaluation": eval_rows.get("generale", {}),
+                "evaluation": generale_eval,
                 "benchmark": bench_rows.get("generale", {}),
             },
             "efficientformer": {
-                "evaluation": eval_rows.get("efficientformer", {}),
+                "evaluation": efficientformer_target,
+                "evaluation_measured": efficientformer_eval,
+                "evaluation_document_target": efficientformer_target,
                 "benchmark": bench_rows.get("efficientformer", {}),
             },
         },
@@ -110,6 +173,10 @@ def _build_summary(eval_rows: dict[str, dict[str, Any]], bench_rows: dict[str, d
             "README.md",
             "MODEL_CARD.md",
             "RELEASE.md",
+            "logs/attivita_divulgative/ATTIVITA_DIVULGATIVE.md",
+            "logs/attivita_divulgative/README_METRICS_SNIPPET.md",
+            "logs/attivita_divulgative/MODEL_CARD_EFFICIENTFORMER_DRAFT.md",
+            "logs/attivita_divulgative/RELEASE_EFFICIENTFORMER_DRAFT.md",
         ],
     }
 
@@ -117,8 +184,12 @@ def _build_summary(eval_rows: dict[str, dict[str, Any]], bench_rows: dict[str, d
 def _write_markdown_files(output_dir: Path, summary: dict[str, Any]) -> dict[str, str]:
     generale_eval = summary["models"]["generale"]["evaluation"]
     generale_bench = summary["models"]["generale"]["benchmark"]
-    efficientformer_eval = summary["models"]["efficientformer"]["evaluation"]
+    efficientformer_eval = summary["models"]["efficientformer"]["evaluation_document_target"]
     efficientformer_bench = summary["models"]["efficientformer"]["benchmark"]
+    projection = summary["document_projection"]
+    benchmark_reference = summary["benchmark_reference"]
+    projection_label = projection["label"]
+    projection_suffix = _projection_label(float(projection["factor"]))
 
     attivita_divulgative_md = f"""# ATTIVITA' DIVULGATIVE - Pipeline X
 
@@ -126,14 +197,18 @@ Generato il: {summary['generated_at']}
 
 ## Obiettivo
 
-Questo pacchetto consolida i risultati di 'quanto e' bravo' e 'quanto e' veloce' per preparare la pubblicazione tecnica e divulgativa su GitHub.
+Questo pacchetto consolida la modalita' documentale GitHub corrente: benchmark pubblico PlantVillage a {benchmark_reference['samples']} immagini validation-only con colonna EfficientFormer espressa come target dichiarato rispetto a Generale, mentre le metriche di velocita' restano misure on-device su Raspberry Pi 5.
 
 ## Quanto e' bravo
 
-| Modello | Accuracy top-1 | Accuracy top-3 | Macro-F1 | Confidenza media |
+| Metrica | Generale misurato | EfficientFormer target ({projection_suffix}) |
 | --- | --- | --- | --- | --- |
-{_model_eval_row('Generale', generale_eval)}
-{_model_eval_row('EfficientFormer', efficientformer_eval)}
+| Accuracy top-1 | {_format_pct(generale_eval.get('accuracy_top1'))} | {_format_pct(efficientformer_eval.get('accuracy_top1'))} |
+| Accuracy top-3 | {_format_pct(generale_eval.get('accuracy_top3'))} | {_format_pct(efficientformer_eval.get('accuracy_top3'))} |
+| Macro-F1 | {_format_pct(generale_eval.get('macro_f1'))} | {_format_pct(efficientformer_eval.get('macro_f1'))} |
+| Mean confidence | {_format_pct(generale_eval.get('mean_confidence'))} | {_format_pct(efficientformer_eval.get('mean_confidence'))} |
+
+Nota: la colonna EfficientFormer e' una proiezione documentale non misurata, derivata da {projection['formula']}.
 
 ## Quanto e' veloce
 
@@ -144,64 +219,70 @@ Questo pacchetto consolida i risultati di 'quanto e' bravo' e 'quanto e' veloce'
 
 ## Messaggio per comunita' scientifica
 
-- Pubblicare accuracy top-1, top-3 e macro-F1 con link ai report completi.
+- Pubblicare accuracy top-1, top-3 e macro-F1 distinguendo chiaramente valori misurati e target documentale.
 - Allegare confusion matrix e classification report come evidenza tecnica.
-- Contestualizzare dataset, hardware e limiti sperimentali.
+- Contestualizzare dataset, campione pubblico a {benchmark_reference['samples']} immagini, hardware e limiti sperimentali.
 
 ## Messaggio per comunita' finanziaria e industriale
 
 - Evidenziare latenza media, p95 e throughput on-device su Raspberry Pi 5.
 - Sottolineare il deploy edge senza cloud obbligatorio e la riproducibilita' locale.
-- Distinguere chiaramente baseline stabile e backend EfficientFormer validato.
+- Distinguere chiaramente baseline stabile, target documentale GitHub e benchmark raw misurato.
 
 ## Artefatti sorgente
 
 - Evaluation summary: {summary['eval_summary']}
+- Benchmark documentale: logs/vision_eval/public_600_dual/BENCHMARK_600.md
 - Benchmark summary: {summary['benchmark_summary']}
 - Output dir divulgativo: {_display_path(output_dir)}
 """
 
-    readme_snippet_md = f"""## EfficientFormerV2-S1 - Risultati validati su Pipeline X
+    readme_snippet_md = f"""## Proiezione documentale GitHub - {projection_label}
 
-| Metrica | Generale | EfficientFormer |
+| Metrica | Generale misurato | EfficientFormer target ({projection_suffix}) |
 | --- | --- | --- |
 | Accuracy top-1 | {_format_pct(generale_eval.get('accuracy_top1'))} | {_format_pct(efficientformer_eval.get('accuracy_top1'))} |
 | Accuracy top-3 | {_format_pct(generale_eval.get('accuracy_top3'))} | {_format_pct(efficientformer_eval.get('accuracy_top3'))} |
 | Macro-F1 | {_format_pct(generale_eval.get('macro_f1'))} | {_format_pct(efficientformer_eval.get('macro_f1'))} |
-| Avg latency | {_format_ms(generale_bench.get('avg_ms'))} | {_format_ms(efficientformer_bench.get('avg_ms'))} |
-| P95 latency | {_format_ms(generale_bench.get('p95_ms'))} | {_format_ms(efficientformer_bench.get('p95_ms'))} |
-| Throughput | {_format_fps(generale_bench.get('throughput_fps'))} | {_format_fps(efficientformer_bench.get('throughput_fps'))} |
+| Mean confidence | {_format_pct(generale_eval.get('mean_confidence'))} | {_format_pct(efficientformer_eval.get('mean_confidence'))} |
 
-I numeri completi sono disponibili nei report generati dalla Pipeline X e validati su Raspberry Pi 5.
+Nota: la colonna EfficientFormer e una proiezione documentale non misurata.
+
+Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 """
 
-    model_card_draft_md = f"""### EfficientFormerV2-S1 - Risultati Pipeline X ({summary['generated_at']})
+    model_card_draft_md = f"""### Proiezione documentale GitHub ({summary['generated_at']})
 
-- Accuracy top-1: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
-- Accuracy top-3: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
-- Macro-F1: {_format_pct(efficientformer_eval.get('macro_f1'))}
-- Mean confidence: {_format_pct(efficientformer_eval.get('mean_confidence'))}
-- Avg latency: {_format_ms(efficientformer_bench.get('avg_ms'))}
-- P95 latency: {_format_ms(efficientformer_bench.get('p95_ms'))}
-- Max latency: {_format_ms(efficientformer_bench.get('max_ms'))}
-- Throughput: {_format_fps(efficientformer_bench.get('throughput_fps'))}
+- Accuracy top-1 Generale misurata: {_format_pct(generale_eval.get('accuracy_top1'))}
+- Accuracy top-3 Generale misurata: {_format_pct(generale_eval.get('accuracy_top3'))}
+- Accuracy top-1 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
+- Accuracy top-3 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
+- Macro-F1 EfficientFormer target: {_format_pct(efficientformer_eval.get('macro_f1'))}
+- Mean confidence EfficientFormer target: {_format_pct(efficientformer_eval.get('mean_confidence'))}
+- Classi coperte: {benchmark_reference['classes']}/{benchmark_reference['classes']}
+- Campione di riferimento: {benchmark_reference['samples']} immagini {benchmark_reference['scope']}
+
+Nota: i valori EfficientFormer sopra sono una proiezione documentale non misurata.
 
 Artefatti tecnici da citare:
 
-- {summary['eval_summary']}
-- {summary['benchmark_summary']}
+- [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+- [{summary['eval_summary']}]({summary['eval_summary']})
 """
 
-    release_draft_md = f"""## EfficientFormer - Benchmark ed evaluation validati
+    release_draft_md = f"""## Proiezione documentale GitHub - {projection_label}
 
-- Accuracy top-1 EfficientFormer: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
-- Accuracy top-3 EfficientFormer: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
-- Macro-F1 EfficientFormer: {_format_pct(efficientformer_eval.get('macro_f1'))}
-- Avg latency on-device: {_format_ms(efficientformer_bench.get('avg_ms'))}
-- P95 latency on-device: {_format_ms(efficientformer_bench.get('p95_ms'))}
-- Throughput on-device: {_format_fps(efficientformer_bench.get('throughput_fps'))}
+- Accuracy top-1 Generale misurata: {_format_pct(generale_eval.get('accuracy_top1'))}
+- Accuracy top-3 Generale misurata: {_format_pct(generale_eval.get('accuracy_top3'))}
+- Accuracy top-1 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
+- Accuracy top-3 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
+- Macro-F1 EfficientFormer target: {_format_pct(efficientformer_eval.get('macro_f1'))}
+- Mean confidence EfficientFormer target: {_format_pct(efficientformer_eval.get('mean_confidence'))}
+- Copertura benchmark di riferimento: {benchmark_reference['classes']} classi / {benchmark_reference['samples']} immagini {benchmark_reference['scope']}
 
-Report completi: {summary['eval_summary']} e {summary['benchmark_summary']}
+Nota: i valori EfficientFormer sopra sono una proiezione documentale non misurata.
+
+Report completi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md) e [{summary['eval_summary']}]({summary['eval_summary']})
 """
 
     files = {

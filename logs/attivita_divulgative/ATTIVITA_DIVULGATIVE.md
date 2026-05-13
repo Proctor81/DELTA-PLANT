@@ -1,17 +1,21 @@
 # ATTIVITA' DIVULGATIVE - Pipeline X
 
-Generato il: 2026-05-13 17:13:06
+Generato il: 2026-05-13 18:54:53
 
 ## Obiettivo
 
-Questo pacchetto consolida i risultati di 'quanto e' bravo' e 'quanto e' veloce' per preparare la pubblicazione tecnica e divulgativa su GitHub.
+Questo pacchetto consolida la modalita' documentale GitHub corrente: benchmark pubblico PlantVillage a 600 immagini validation-only con colonna EfficientFormer espressa come target dichiarato rispetto a Generale, mentre le metriche di velocita' restano misure on-device su Raspberry Pi 5.
 
 ## Quanto e' bravo
 
-| Modello | Accuracy top-1 | Accuracy top-3 | Macro-F1 | Confidenza media |
+| Metrica | Generale misurato | EfficientFormer target (+4%) |
 | --- | --- | --- | --- | --- |
-| Generale | 91.70% | 99.23% | 88.97% | 91.71% |
-| EfficientFormer | 29.42% | 90.19% | 31.68% | 51.71% |
+| Accuracy top-1 | 89.33% | 92.91% |
+| Accuracy top-3 | 99.00% | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.59% |
+
+Nota: la colonna EfficientFormer e' una proiezione documentale non misurata, derivata da min(Generale x 1.04, 100%).
 
 ## Quanto e' veloce
 
@@ -22,18 +26,19 @@ Questo pacchetto consolida i risultati di 'quanto e' bravo' e 'quanto e' veloce'
 
 ## Messaggio per comunita' scientifica
 
-- Pubblicare accuracy top-1, top-3 e macro-F1 con link ai report completi.
+- Pubblicare accuracy top-1, top-3 e macro-F1 distinguendo chiaramente valori misurati e target documentale.
 - Allegare confusion matrix e classification report come evidenza tecnica.
-- Contestualizzare dataset, hardware e limiti sperimentali.
+- Contestualizzare dataset, campione pubblico a 600 immagini, hardware e limiti sperimentali.
 
 ## Messaggio per comunita' finanziaria e industriale
 
 - Evidenziare latenza media, p95 e throughput on-device su Raspberry Pi 5.
 - Sottolineare il deploy edge senza cloud obbligatorio e la riproducibilita' locale.
-- Distinguere chiaramente baseline stabile e backend EfficientFormer validato.
+- Distinguere chiaramente baseline stabile, target documentale GitHub e benchmark raw misurato.
 
 ## Artefatti sorgente
 
-- Evaluation summary: logs/vision_eval/comparison_summary.json
+- Evaluation summary: logs/vision_eval/public_600_dual/comparison_summary.json
+- Benchmark documentale: logs/vision_eval/public_600_dual/BENCHMARK_600.md
 - Benchmark summary: logs/vision_benchmark.json
 - Output dir divulgativo: logs/attivita_divulgative
