@@ -36,6 +36,7 @@ Icon
 datasets/captures/
 datasets/training/
 datasets/training_33classes/
+datasets/training_33classes_smoke_github/
 datasets/training_flower/
 datasets/training_fruit/
 datasets/learning_by_doing/
@@ -62,3 +63,6 @@ data/telegram_user_map.json
 
 # Memoria conversazionale locale del bot Telegram
 memory/sessions/
+
+# Artifact locali generati fuori dal flusso repo
+artifact.html
