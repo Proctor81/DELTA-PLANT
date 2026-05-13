@@ -6,6 +6,7 @@
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
 ![Version](https://img.shields.io/badge/Version-v3.2--Unified--Edge--Intelligence-green)
 ![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
+![LayerCAM](https://img.shields.io/badge/XAI-LayerCAM-orange)
 ![Generale](https://img.shields.io/badge/Generale-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
 ![EfficientFormer](https://img.shields.io/badge/EfficientFormer%20stimato%20%2B4%25-87.26%25%20top--1%20%7C%2099.94%25%20top--3-brightgreen)
 
@@ -102,9 +103,41 @@ Riferimenti tecnici:
 
 ---
 
+## 🔍 Tecnologia LayerCAM
+
+<p align="center"><strong>Come DELTA mostra dove sta guardando il modello AI</strong></p>
+
+<p align="center">
+    <img alt="Explainable AI" src="https://img.shields.io/badge/Explainable%20AI-LayerCAM-orange">
+    <img alt="Output visuale" src="https://img.shields.io/badge/Output-Heatmap%20%2B%20Overlay-blue">
+    <img alt="Uso operativo" src="https://img.shields.io/badge/Uso%20operativo-Telegram%20e%20referto-success">
+</p>
+
+<table>
+    <tr>
+        <td align="center"><strong>A cosa serve</strong><br>Rende la diagnosi piu leggibile per operatori e agricoltori mostrando quali zone della foglia hanno influenzato maggiormente la decisione del modello.</td>
+        <td align="center"><strong>Cosa fa esattamente</strong><br>Genera una heatmap delle aree visive che hanno pesato di piu nella predizione e la sovrappone alla foto originale come overlay pronto per lettura e condivisione.</td>
+        <td align="center"><strong>Come DELTA la usa</strong><br>L'overlay puo essere salvato in <code>exports/explanations</code> e inviato su Telegram insieme alla foto originale e al referto testuale.</td>
+    </tr>
+</table>
+
+LayerCAM, in pratica, aiuta a verificare se il modello sta concentrando l'attenzione su elementi coerenti con la diagnosi, per esempio:
+
+- lesioni fogliari e zone necrotiche
+- aree clorotiche o alterazioni cromatiche
+- bordi danneggiati, nervature o texture patologiche
+- regioni della foglia realmente rilevanti, invece dello sfondo
+
+> **Importante:** LayerCAM non e una segmentazione clinica millimetrica del tessuto malato e non sostituisce la valutazione agronomica. E uno strumento di spiegabilita visuale: mostra **dove** il modello ha guardato, non certifica da solo **quanto** tessuto sia malato.
+
+In DELTA v3.2 l'overlay LayerCAM puo essere generato dal backend EfficientFormer quando la spiegabilita e disponibile, anche se la classificazione operativa resta sul profilo `generale`.
+
+---
+
 ## 📋 Indice
 
 - [Benchmark pubblico in evidenza](#-benchmark-pubblico-in-evidenza)
+- [Tecnologia LayerCAM](#-tecnologia-layercam)
 - [Caratteristiche principali](#-caratteristiche-principali)
 - [Pacchetto divulgativo v3.2](#-pacchetto-divulgativo-v32)
 - [Architettura](#-architettura)
