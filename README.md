@@ -6,7 +6,8 @@
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
 ![Version](https://img.shields.io/badge/Version-v3.2--Unified--Edge--Intelligence-green)
 ![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
-![Accuracy](https://img.shields.io/badge/Accuracy-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
+![Generale](https://img.shields.io/badge/Generale-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
+![EfficientFormer](https://img.shields.io/badge/EfficientFormer%20stimato%20%2B4%25-87.26%25%20top--1%20%7C%2099.94%25%20top--3-brightgreen)
 
 
 > **DELTA Plant** — *AI & Robotics Orchestrator per la Salute delle Piante*  
