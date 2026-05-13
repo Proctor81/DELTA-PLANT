@@ -3300,6 +3300,7 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "solo dopo esecuzione sul Raspberry Pi 5 reale e sul validation set finale. "
         "Se nelle superfici documentali si usa una proiezione target EfficientFormer, va "
         "etichettata esplicitamente come non misurata e derivata dal profilo Generale con "
+        "un incremento documentale contenuto (ad esempio +4%) e con "
         "un cap massimo al 100%."
     )
 

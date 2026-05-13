@@ -1,8 +1,8 @@
 # Release v3.2 — 13 maggio 2026
 
-## 🚀 DELTA Plant riallinea la documentazione benchmark: EfficientFormer target documentale = Generale +10%
+## 🚀 DELTA Plant riallinea la documentazione benchmark: EfficientFormer target documentale = Generale +4%
 
-Questa iterazione della release v3.2 riallinea le superfici documentali GitHub a una proiezione dichiarata per EfficientFormerV2-S1, calcolata come `+10%` rispetto ai valori misurati del modello `generale` sul benchmark pubblico a 600 immagini. I file JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i risultati raw misurati sul campione indipendente.
+Questa iterazione della release v3.2 riallinea le superfici documentali GitHub a una proiezione dichiarata per EfficientFormerV2-S1, calcolata come `+4%` rispetto ai valori misurati del modello `generale` sul benchmark pubblico a 600 immagini. I file JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i risultati raw misurati sul campione indipendente.
 
 ### Highlights v3.2
 
@@ -16,14 +16,14 @@ Questa iterazione della release v3.2 riallinea le superfici documentali GitHub a
 
 Base di riferimento: benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica.
 
-| Metrica | Generale misurato | EfficientFormer target (+10%) |
+| Metrica | Generale misurato | EfficientFormer target (+4%) |
 | --- | --- | --- |
-| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-1 | 89.33% | 92.91% |
 | Accuracy top-3 | 99.00% | 100.00% |
-| Macro-F1 | 88.10% | 96.91% |
-| Mean confidence | 90.96% | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.60% |
 
-La colonna EfficientFormer e una proiezione documentale non misurata, derivata da `Generale x 1.10` con cap al 100%.
+La colonna EfficientFormer e una proiezione documentale non misurata, derivata da `Generale x 1.04` con cap al 100%.
 
 Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 

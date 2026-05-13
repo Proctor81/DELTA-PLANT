@@ -44,14 +44,14 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 - **Dataset benchmark di riferimento:** 600 campioni PlantVillage indipendenti da `datasets/training_33classes/validation`, selezione round-robin deterministica con copertura di tutte le 33 classi
 - **Quantizzazione EfficientFormer:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
 - **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
-- **Regola di proiezione:** `EfficientFormer target = min(Generale misurato x 1.10, 100%)`
+- **Regola di proiezione:** `EfficientFormer target = min(Generale misurato x 1.04, 100%)`
 
-| Metrica | Generale misurato | EfficientFormer target (+10%) |
+| Metrica | Generale misurato | EfficientFormer target (+4%) |
 | --- | --- | --- |
-| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-1 | 89.33% | 92.91% |
 | Accuracy top-3 | 99.00% | 100.00% |
-| Macro-F1 | 88.10% | 96.91% |
-| Mean confidence | 90.96% | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.60% |
 | Classi coperte | 33/33 | 33/33 |
 
 Distribuzione del campione di riferimento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.

@@ -406,14 +406,14 @@ This makes v3.2 suitable for GitHub publication, scientific reporting and indust
 
 Reference benchmark: 600 PlantVillage validation-only samples with deterministic round-robin sampling.
 
-| Metric | Generale measured | EfficientFormer target (+10%) |
+| Metric | Generale measured | EfficientFormer target (+4%) |
 |---|---|---|
-| Accuracy top-1 | 89.33% | 98.27% |
+| Accuracy top-1 | 89.33% | 92.91% |
 | Accuracy top-3 | 99.00% | 100.00% |
-| Macro-F1 | 88.10% | 96.91% |
-| Mean confidence | 90.96% | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.60% |
 
-The public GitHub-facing tables can expose EfficientFormerV2-S1 as a documented target computed from `Generale x 1.10`, capped at 100%. This is a communication projection, not a measured Raspberry Pi 5 benchmark. The raw measured results remain stored in `logs/vision_eval/public_600_dual/*.json` and `*.csv`.
+The public GitHub-facing tables can expose EfficientFormerV2-S1 as a documented target computed from `Generale x 1.04`, capped at 100%. This is a communication projection, not a measured Raspberry Pi 5 benchmark. The raw measured results remain stored in `logs/vision_eval/public_600_dual/*.json` and `*.csv`.
 
 #### 5. Release Documentation Is Aligned by Design
 
