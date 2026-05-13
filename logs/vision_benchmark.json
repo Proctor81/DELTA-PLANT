@@ -1,0 +1,28 @@
+[
+  {
+    "model_key": "generale",
+    "active_model": "generale",
+    "backend": "mobilenet",
+    "runs": 50,
+    "warmup": 5,
+    "avg_ms": 41.36,
+    "min_ms": 21.793,
+    "p50_ms": 41.236,
+    "p95_ms": 54.318,
+    "max_ms": 66.085,
+    "throughput_fps": 24.178
+  },
+  {
+    "model_key": "efficientformer",
+    "active_model": "EfficientFormerV2-S1",
+    "backend": "efficientformer",
+    "runs": 50,
+    "warmup": 5,
+    "avg_ms": 308.918,
+    "min_ms": 222.32,
+    "p50_ms": 270.327,
+    "p95_ms": 582.547,
+    "max_ms": 706.852,
+    "throughput_fps": 3.237
+  }
+]

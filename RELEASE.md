@@ -1,3 +1,45 @@
+# Release v3.2 — 13 maggio 2026
+
+## 🚀 DELTA Plant consolida la pipeline edge: runtime int8 validato, documentazione allineata, manuale rigenerato in automatico
+
+Questa release trasforma le novita introdotte nelle versioni precedenti in una catena di deploy coerente: il backend EfficientFormerV2-S1 non e piu solo presente nel repository, ma ha ora una variante int8 realmente eseguibile su questo hardware, una strategia di fallback runtime robusta e una Pipeline X che aggiorna anche manuale e artefatti divulgativi senza passaggi manuali esterni.
+
+### Highlights v3.2
+
+- **EfficientFormer int8 validato**: export calibrato, scarto dei falsi artefatti dynamic-range e inferenza locale confermata con input/output integer
+- **Fallback runtime**: il backend EfficientFormer ricade automaticamente su float32 se la variante richiesta non e allocabile
+- **Pipeline X estesa**: `tools/pipeline_x.py --resume` ora copre train, export, evaluation, benchmark, dissemination e rigenerazione del manuale PDF
+- **Manuale utente revisionato**: aggiornati cover, flussi diagnostici, sezione MLOps, Pipeline X, licenza e release corrente
+- **Documentazione coerente**: README, MODEL_CARD, RELEASE e LICENSE allineati alla versione 3.2
+
+### Risultati validati dalla Pipeline X
+
+Validation set: 7,502 campioni PlantVillage su Raspberry Pi 5.
+
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 91.70% | 29.42% |
+| Accuracy top-3 | 99.23% | 90.19% |
+| Macro-F1 | 88.97% | 31.68% |
+| Avg latency | 41.360 ms | 308.918 ms |
+| P95 latency | 54.318 ms | 582.547 ms |
+| Throughput | 24.178 fps | 3.237 fps |
+
+Questi risultati confermano che il backend `generale` rimane il profilo raccomandato per produzione nella release 3.2. EfficientFormerV2-S1 resta invece parte della stack edge per explainability, export, ensemble e sperimentazione comparativa, ma non viene promosso come backend predefinito sulla base delle metriche correnti.
+
+### Changelog v3.2
+
+| Area | Modifica |
+|---|---|
+| `ai/export_efficientformer_tflite.py` | Export int8 calibrato, validazione artefatti e percorso ONNX dedicato |
+| `vision/efficientformer_classifier.py` | Fallback runtime `int8 -> float32` e gestione coerente delle varianti |
+| `core/config.py` | Metadata di release 3.2 e backend `efficientformer` allineato al profilo int8 |
+| `tools/pipeline_x.py` | Nuovo step `manual` per rigenerare `Manuale/DELTA_Manuale_Utente.pdf` |
+| `Manuale/genera_manuale.py` | Revisione profonda del manuale e dei flussi MLOps/diagnostici |
+| `LICENSE` | Aggiornamento a Software Release v3.2 |
+
+---
+
 # Release v3.1 — 4 maggio 2026
 
 ## 🧠 DELTA Plant ha imparato a generalizzare — evoluzione del sistema di Computer Vision

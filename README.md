@@ -2,28 +2,29 @@
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red?logo=raspberry-pi)
-![AI](https://img.shields.io/badge/AI-TFLite%20float16-orange)
+![AI](https://img.shields.io/badge/AI-Hybrid%20Edge%20INT8-orange)
 ![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
-![Version](https://img.shields.io/badge/Version-v3.1--Generalized--CV-green)
+![Version](https://img.shields.io/badge/Version-v3.2--Unified--Edge--Intelligence-green)
 ![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
 ![Accuracy](https://img.shields.io/badge/Accuracy-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
 
 
 > **DELTA Plant** — *AI & Robotics Orchestrator per la Salute delle Piante*  
 > **DELTA** (Detection and Evaluation of Leaf Troubles and Anomalies)  
-> Sistema AI orchestrato specializzato nella diagnostica fitosanitaria fogliare su **Raspberry Pi 5** — v3.1 Generalized Computer Vision Architecture
+> Sistema AI orchestrato specializzato nella diagnostica fitosanitaria fogliare su **Raspberry Pi 5** — v3.2 Unified Edge Intelligence
 
-> 🧠 **v3.1 — DELTA ha imparato a generalizzare:** il sistema di Computer Vision ha evoluto la sua capacità di riconoscimento dalle specie specifiche verso un modello generalizzato su 33 classi PlantVillage, con genus-filter adattivo, rilevamento contestuale della salute e Q&A follow-up intelligente.
+> 🧠 **v3.2 — DELTA consolida l'edge runtime:** alla generalizzazione PlantVillage si aggiungono un backend EfficientFormerV2-S1 int8 realmente eseguibile su questo hardware, fallback runtime float32, Pipeline X resumable end-to-end e rigenerazione automatica del manuale a fine pipeline.
 
 > 💾 **Memoria Persistente Diagnostica:** DELTA Plant salva localmente per utente la cronologia conversazionale e il referto diagnostico strutturato più recente, così l'operatore può chiedere approfondimenti successivi su nome della pianta, rischio, raccomandazioni, sensori e anomalie anche dopo il riavvio del bot.
 
-> 🔥 **Hybrid Vision Backend pronto all'attivazione:** il repository include ora un backend opzionale **EfficientFormerV2-S1** con export PyTorch→ONNX→TFLite, ensemble con MobileNetV2 e explainability LayerCAM per overlay visuali inviabili anche su Telegram.
+> 🔥 **Hybrid Vision Backend operativo:** il repository include un backend **EfficientFormerV2-S1** con export PyTorch→ONNX→TFLite, variante int8 validata, ensemble con MobileNetV2 ed explainability LayerCAM per overlay visuali inviabili anche su Telegram.
 
 ---
 
 ## 📋 Indice
 
 - [Caratteristiche principali](#-caratteristiche-principali)
+- [Pacchetto divulgativo v3.2](#-pacchetto-divulgativo-v32)
 - [Architettura](#-architettura)
 - [Modello AI](#-modello-ai)
 - [Sensori supportati](#-sensori-supportati)
@@ -36,19 +37,35 @@
 
 ---
 
-## 🆕 Novità in v3.1 — Generalized Computer Vision
+## 🆕 Novità in v3.2 — Unified Edge Intelligence
 
-> **DELTA Plant ha imparato a generalizzare**, evolvendo il suo modello di Computer Vision da un sistema specializzato a un'architettura generalizzata capace di operare su tutte le 33 classi PlantVillage con intelligenza contestuale.
+> **DELTA Plant passa dalla generalizzazione alla messa in produzione coerente dell'intera stack edge**, mantenendo il modello PlantVillage a 33 classi ma chiudendo il cerchio su deploy, benchmark, evaluation, disseminazione e manualistica.
 
 | Innovazione | Descrizione |
 |---|---|
-| **Genus-Filter adattivo** | Rileva automaticamente il genere della pianta dalla descrizione dell'operatore e filtra le classi diagnostiche in modo contestuale |
-| **Contextual Health Detection** | Il modello AI riconosce le piante sane non solo per classificazione diretta ma in modo contestuale, basandosi sul genere rilevato |
-| **Q&A Follow-up intelligente** | Dialogo bidirezionale post-diagnosi: DELTA pone domande specifiche per approfondire la diagnosi senza richiedere ulteriori foto |
-| **Memoria persistente diagnostica** | Il referto della diagnosi viene memorizzato localmente per consentire approfondimenti coerenti su ogni elemento del risultato |
-| **Anti-photo-loop fix** | Eliminato il loop di richiesta foto a fine diagnosi — il flusso è ora completamente lineare |
-| **Paginazione messaggi** | Messaggi lunghi paginati automaticamente con pulsante `/continua` per una UX fluida su mobile |
-| **PlantVillage Benchmark** | 83.9% top-1 / 96.1% top-3 su 660 immagini reali — la classe corretta appare nelle prime 3 predizioni nel 96% dei casi |
+| **EfficientFormer int8 eseguibile** | Export calibrato e validazione locale impediscono di promuovere falsi artefatti dynamic-range; il backend int8 ora alloca e inferisce davvero |
+| **Fallback runtime robusto** | Se la variante richiesta di EfficientFormer non è allocabile, DELTA ricade automaticamente su float32 senza interrompere il servizio |
+| **Pipeline X completa** | `tools/pipeline_x.py --resume` orchestra fine-tuning, export, evaluation, benchmark, dissemination e rigenerazione del manuale PDF |
+| **Manuale aggiornato in pipeline** | Il PDF utente viene rigenerato come step ufficiale di rilascio, così la documentazione segue le modifiche di sistema |
+| **Generalizzazione + Q&A persistono** | Restano genus-filter adattivo, rilevamento contestuale della salute, follow-up intelligente e memoria diagnostica persistente |
+| **Deploy edge coerente** | Config runtime, README, MODEL_CARD, RELEASE e LICENSE sono allineati alla release 3.2 |
+
+---
+
+## 📣 Pacchetto divulgativo v3.2
+
+La Pipeline X genera anche un pacchetto pronto per la pubblicazione tecnica e divulgativa su GitHub, con messaggi distinti per comunita scientifica, stakeholder industriali e documentazione di release.
+
+- Sintesi divulgativa: [logs/attivita_divulgative/ATTIVITA_DIVULGATIVE.md](logs/attivita_divulgative/ATTIVITA_DIVULGATIVE.md)
+- Snippet README: [logs/attivita_divulgative/README_METRICS_SNIPPET.md](logs/attivita_divulgative/README_METRICS_SNIPPET.md)
+- Draft Model Card: [logs/attivita_divulgative/MODEL_CARD_EFFICIENTFORMER_DRAFT.md](logs/attivita_divulgative/MODEL_CARD_EFFICIENTFORMER_DRAFT.md)
+- Draft Release: [logs/attivita_divulgative/RELEASE_EFFICIENTFORMER_DRAFT.md](logs/attivita_divulgative/RELEASE_EFFICIENTFORMER_DRAFT.md)
+- Summary machine-readable: [logs/attivita_divulgative/dissemination_summary.json](logs/attivita_divulgative/dissemination_summary.json)
+- Evaluation completa: [logs/vision_eval/comparison_summary.json](logs/vision_eval/comparison_summary.json)
+- Benchmark completo: [logs/vision_benchmark.json](logs/vision_benchmark.json)
+- Manuale PDF rigenerato: [Manuale/DELTA_Manuale_Utente.pdf](Manuale/DELTA_Manuale_Utente.pdf)
+
+Messaggio chiave della release odierna: DELTA v3.2 pubblica una stack edge coerente e misurata end-to-end, ma i risultati confermano che il backend `generale` resta il profilo raccomandato per produzione mentre EfficientFormerV2-S1 rimane un backend avanzato per explainability, export e sperimentazione comparativa.
 
 ---
 
@@ -57,7 +74,7 @@
 | Funzionalità | Descrizione |
 |---|---|
 | **Analisi fogliare generalizzata** | Diagnostica 33 classi di malattie/patologie fogliari via MobileNetV2 transfer learning con genus-filter adattivo |
-| **Backend ibrido CNN/ViT** | EfficientFormerV2-S1 opzionale in float16/int8, attivabile via `MODELS_REGISTRY` o `config.yaml` |
+| **Backend ibrido CNN/ViT** | EfficientFormerV2-S1 con profilo `int8` validato, fallback `float32`, ensemble e explainability LayerCAM |
 | **Input sensori manuale** | Utente invia foto + 7 dati sensori (TEMP, UMID, PRESS, LUMI, CO₂, pH, EC) |
 | **21 regole esperte** | 12 foglia + 4 fiore + 5 frutto — valutazione in parallelo |
 | **Oracolo Quantistico di Grover** | 4 qubit, 3 iterazioni, 16 stati di rischio — Quantum Risk Score [0,1] |
@@ -67,6 +84,7 @@
 | **Pannello Amministratore** | Protetto PBKDF2-SHA256 — backup, statistiche, pubblicazione GitHub |
 | **API REST opzionale** | Flask — 7 endpoint per integrazione esterna |
 | **Explainable AI** | LayerCAM con heatmap JET/Viridis e overlay pronta per invio su Telegram |
+| **Pipeline X resumable** | Refresh end-to-end di training/export/evaluation/benchmark/dissemination/manuale con stato persistito |
 | **Export Excel** | `.xlsx` aggiornato automaticamente ad ogni diagnosi |
 | **Installazione automatica** | Script Bash + systemd per avvio al boot |
 | **Privacy dati** | Tutte le diagnosi e i dati operativi rimangono esclusivamente in locale |
@@ -93,7 +111,7 @@ main.py ──► DeltaAgent
 | Parametro | Valore |
 |---|---|
 | Baseline produzione | TensorFlow Lite float16 (MobileNetV2 transfer learning) |
-| Backend avanzato opzionale | EfficientFormerV2-S1 TFLite float16 con variante int8 fully quantized |
+| Backend avanzato opzionale | EfficientFormerV2-S1 TFLite int8 di default con float32 fallback e variante float16 legacy |
 | Dimensione Keras | 14 MB |
 | Dimensione TFLite baseline | 5.0 MB (float16) |
 | Input shape | `(224, 224, 3)` — preprocessing MobileNetV2: `(x/127.5)−1.0` |
@@ -108,13 +126,13 @@ main.py ──► DeltaAgent
 
 - Backend: `vision/efficientformer_classifier.py`
 - Configurazione: `MODELS_REGISTRY['efficientformer']` + override opzionali in `config.yaml`
-- Quantizzazione: `float16` di default, `int8` opzionale via `variants`
+- Quantizzazione: `int8` di default, `float32` come fallback runtime, `float16` disponibile come variante legacy
 - Ensemble: media pesata delle probabilita con MobileNetV2 (`VisionService`)
 - Explainability: `LayerCAM` con overlay PNG salvabile in `exports/explanations`
 - Telegram: invio foto originale + foto con heatmap + referto testuale nella stessa diagnosi
-- MLOps: `ai/export_efficientformer_tflite.py`, `ai/evaluate_vision_backends.py`, `tools/benchmark_vision_models.py`
+- MLOps: `ai/export_efficientformer_tflite.py`, `ai/evaluate_vision_backends.py`, `tools/benchmark_vision_models.py`, `tools/pipeline_x.py`
 
-> ℹ️ Il repository contiene gia la pipeline software completa per EfficientFormer. I benchmark on-device vanno eseguiti sul Raspberry Pi 5 reale con `tools/benchmark_vision_models.py` dopo l'export dei pesi finali.
+> ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
 ### Classi diagnostiche — 33 classi PlantVillage
 
@@ -208,7 +226,7 @@ ACTIVE_MODEL: efficientformer
 
 MODELS_REGISTRY:
     efficientformer:
-        quantization: float16
+        quantization: int8
         enable_ensemble: true
         enable_explainability: true
 ```
@@ -218,7 +236,7 @@ MODELS_REGISTRY:
 ```bash
 # 1. Fine-tuning + export ONNX/SavedModel/TFLite
 python ai/export_efficientformer_tflite.py \
-    --dataset-root datasets/training \
+    --dataset-root datasets/training_33classes \
     --output-dir models \
     --mode all \
     --quantization both
@@ -231,10 +249,38 @@ python tools/benchmark_vision_models.py \
 
 # 3. Valutazione accuracy/F1/confusion matrix sul validation set
 python ai/evaluate_vision_backends.py \
-    --dataset-root datasets/training/validation \
+    --dataset-root datasets/training_33classes/validation \
     --model-keys generale efficientformer \
     --output-dir logs/vision_eval
 ```
+
+### Pipeline X end-to-end
+
+```bash
+# Resume dal primo step mancante
+python tools/pipeline_x.py --resume
+
+# La pipeline aggiorna anche:
+# - logs/vision_eval/comparison_summary.json
+# - logs/vision_benchmark.json
+# - logs/attivita_divulgative/
+# - Manuale/DELTA_Manuale_Utente.pdf
+```
+
+#### Risultati validati su Pipeline X
+
+Validation set: 7,502 campioni PlantVillage su Raspberry Pi 5.
+
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 91.70% | 29.42% |
+| Accuracy top-3 | 99.23% | 90.19% |
+| Macro-F1 | 88.97% | 31.68% |
+| Avg latency | 41.360 ms | 308.918 ms |
+| P95 latency | 54.318 ms | 582.547 ms |
+| Throughput | 24.178 fps | 3.237 fps |
+
+In questa validazione end-to-end il backend `generale` resta il profilo piu competitivo sia in accuratezza sia in latenza. EfficientFormerV2-S1 rimane integrato nella stack edge per export, explainability, ensemble e sperimentazione controllata, ma non viene promosso come profilo di default sulla base di questi numeri.
 
 ### Autostart su Raspberry Pi (systemd)
 
@@ -332,7 +378,7 @@ python Manuale/genera_manuale.py
 
 ## 📄 Licenza
 
-**DELTA PLANT SOFTWARE LICENSE** — Software Release: **v3.1**  
+**DELTA PLANT SOFTWARE LICENSE** — Software Release: **v3.2**  
 Copyright © 2026 Paolo Ciccolella. All rights reserved.
 
 Il core di DELTA Plant è software proprietario. È consentito l'uso a scopi di
@@ -353,7 +399,7 @@ Il testo integrale è nel file [`LICENSE`](LICENSE) del repository.
 
 ---
 
-## 📈 Model Training Details (v2.0.6)
+## 📈 Model Training Details (baseline + hybrid reference)
 
 ### Dataset Composition
 - **Total Images:** 119,173 (PlantVillage v2.0)
@@ -384,4 +430,4 @@ Il testo integrale è nel file [`LICENSE`](LICENSE) del repository.
 
 ---
 
-*README aggiornato con risultati benchmark reale — 03/05/2026*
+*README aggiornato alla release 3.2 — 13/05/2026*

@@ -50,6 +50,16 @@ LEARNING_BY_DOING_DIR = DATASETS_DIR / "learning_by_doing"
 for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEARNING_BY_DOING_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
+SYSTEM_INFO = {
+    "name": "DELTA Plant",
+    "acronym": "DELTA",
+    "version": "3.2",
+    "release": "v3.2",
+    "release_name": "Unified Edge Intelligence",
+    "release_date": "2026-05-13",
+    "manual_revision": "2026-05-13",
+}
+
 # ─────────────────────────────────────────────
 # MODELLO AI
 # ─────────────────────────────────────────────
@@ -64,7 +74,7 @@ MODEL_CONFIG = {
     "low_confidence_threshold": 0.50,  # Soglia active learning
     "num_threads": 4,                  # Thread inferenza NPU/CPU
     "use_edge_tpu": True,              # Raspberry Pi AI HAT 2+
-    "model_version": "v3.0-33c",      # 33-class PlantVillage MobileNetV2 (leaf-only)
+    "model_version": "v3.2-33c-hybrid-edge",  # Stack 33 classi con backend edge validati
     "model_accuracy": 0.8390,          # Benchmark top-1 (2026-05-03)
     "leaf_only_mode": True,            # v3.0: Focus on leaf diseases only
 }
@@ -101,12 +111,12 @@ MODELS_REGISTRY: dict = {
     "efficientformer": {
         "backend": "efficientformer",
         "display_name": "EfficientFormerV2-S1",
-        "description": "Classificatore ibrido CNN/ViT EfficientFormerV2-S1 per 33 classi PlantVillage",
+        "description": "Classificatore ibrido CNN/ViT EfficientFormerV2-S1 per 33 classi PlantVillage con profilo int8 edge validato",
         "labels_path": str(MODELS_DIR / "labels_33classes_correct.txt"),
         "input_size": (224, 224),
         "num_classes": 33,
         "num_threads": 6,
-        "quantization": "float16",
+        "quantization": "int8",
         "top_k": 3,
         "enable_delegate": True,
         "enable_ensemble": True,
@@ -124,11 +134,16 @@ MODELS_REGISTRY: dict = {
             "float16": {
                 "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_float16.tflite"),
             },
+            "float32": {
+                "model_path": str(
+                    MODELS_DIR / "efficientformer_v2_s1_saved_model" / "efficientformer_v2_s1_33classes_float32.tflite"
+                ),
+            },
             "int8": {
                 "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_int8.tflite"),
             },
         },
-        "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_float16.tflite"),
+        "model_path": str(MODELS_DIR / "efficientformer_v2_s1_33classes_int8.tflite"),
     },
 }
 

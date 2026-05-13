@@ -1,14 +1,14 @@
-# DELTA v3.1 — Intelligent PlantVillage Generalization: Technical User Guide
+# DELTA v3.2 — Hybrid Edge Intelligence: Technical User Guide
 
-**Date:** 4 May 2026  
-**Version:** 3.1  
+**Date:** 13 May 2026  
+**Version:** 3.2  
 **Audience:** Technical users, system administrators, agronomists  
 
 ---
 
 ## Overview
 
-DELTA v3.0 is a **specialized orchestrated AI** focused exclusively on **leaf disease diagnosis**. Unlike v2.0 (multi-organ), v3.0 removes flower and fruit analysis to streamline diagnostics and improve leaf classification accuracy.
+DELTA v3.2 is a **specialized orchestrated AI for leaf disease diagnosis** with a coherent edge deployment chain. The release keeps the 33-class PlantVillage workflow, adds a validated EfficientFormerV2-S1 int8 runtime path and aligns evaluation, benchmark, dissemination and manual generation inside Pipeline X.
 
 **Key Features:**
 - ✅ 38-class leaf disease classification (PlantVillage)
@@ -350,90 +350,88 @@ Content-Type: application/json
 
 ---
 
-## What's New in v3.1 — Intelligent PlantVillage Generalization
+## What's New in v3.2 — Hybrid Edge Intelligence
 
 ### Overview
 
-DELTA v3.1 evolves the Computer Vision model by introducing **contextual generalization over PlantVillage classes**. The system now understands which plant genus the operator is working with and restricts AI classification to that genus only — eliminating cross-genus confusion and dramatically improving diagnostic accuracy for plants whose visual symptoms overlap across species.
+DELTA v3.2 closes the gap between experimental vision features and a publishable edge release. The system keeps the 33-class PlantVillage workflow introduced earlier, but now adds a validated EfficientFormerV2-S1 runtime path, a robust runtime fallback strategy, an end-to-end resumable Pipeline X and a dissemination package that turns benchmark and evaluation outputs into publishable repository material.
 
 ---
 
 ### Key Innovations
 
-#### 1. Genus Detection (Programmatic, Zero-LLM)
+#### 1. EfficientFormerV2-S1 Runtime Validated on Target Hardware
 
-When the operator describes the plant, DELTA extracts the **genus** using a prioritized keyword map:
+The repository now includes a runtime path for EfficientFormerV2-S1 that is not just exported, but actually executable on the Raspberry Pi 5 target.
 
-```python
-_GENUS_KEYWORD_MAP = [
-    (["bell pepper", "peperone", "pepper", "capsicum"], "Bell_pepper"),
-    (["apple", "mela"],                                  "Apple"),
-    (["blueberry", "mirtillo"],                          "Blueberry"),
-    (["cherry", "ciliegio", "ciliegia"],                 "Cherry"),
-    (["corn", "mais", "granturco"],                      "Corn"),
-    (["grape", "uva", "vite", "vitis"],                  "Grape"),
-    (["peach", "pesca", "pesco"],                        "Peach"),
-    (["potato", "patata"],                               "Potato"),
-    (["squash", "zucca"],                                "Squash"),
-    (["strawberry", "fragola"],                          "Strawberry"),
-    (["tomato", "pomodoro"],                             "Tomato"),
-]
+- Quantization profile: `int8` by default
+- Runtime fallback: automatic `float32` downgrade if the requested profile cannot be allocated
+- Legacy compatibility: `float16` kept available for controlled experiments
+- Explainability support: LayerCAM overlays can still be generated from the fine-tuned PyTorch checkpoint
+
+#### 2. Pipeline X Becomes the Official Release Conveyor
+
+Pipeline X is now the release-grade orchestration entry point for the hybrid vision stack:
+
+```bash
+python tools/pipeline_x.py --resume
 ```
 
-**Two-phase matching:**
-1. Multi-word keywords first (e.g. `"bell pepper"` before `"pepper"`)
-2. Single-word keywords second
+The pipeline executes, resumes and persists status across these steps:
 
-This ensures `"bell pepper"` is never mistaken for `"pepper"` (Tomato genus).
+1. EfficientFormer fine-tuning
+2. Export ONNX, SavedModel and TFLite artifacts
+3. Evaluation of `generale` vs `efficientformer`
+4. Edge benchmark on Raspberry Pi 5
+5. Dissemination package generation
+6. User manual PDF regeneration
 
-#### 2. Class Filtering
+#### 3. Dissemination Is Now a First-Class Output
 
-Once the genus is detected, the LLM receives **only the classes belonging to that genus**:
+The repository no longer treats benchmark and evaluation as internal-only artifacts. The v3.2 flow explicitly prepares publication-ready material for technical and divulgative use.
 
-| Operator says | Genus detected | Classes offered to LLM |
+Generated outputs include:
+
+- `logs/vision_eval/comparison_summary.json`
+- `logs/vision_benchmark.json`
+- `logs/attivita_divulgative/ATTIVITA_DIVULGATIVE.md`
+- `logs/attivita_divulgative/README_METRICS_SNIPPET.md`
+- `logs/attivita_divulgative/MODEL_CARD_EFFICIENTFORMER_DRAFT.md`
+- `logs/attivita_divulgative/RELEASE_EFFICIENTFORMER_DRAFT.md`
+- `Manuale/DELTA_Manuale_Utente.pdf`
+
+This makes v3.2 suitable for GitHub publication, scientific reporting and industrial communication without manual result transcription.
+
+#### 4. Validated Metrics from Today's Pipeline X Run
+
+Validation set: 7,502 PlantVillage samples on Raspberry Pi 5.
+
+| Metric | Generale | EfficientFormer |
 |---|---|---|
-| "peperone con macchie" | Bell_pepper | Bell_pepper_Bacterial_spot, Bell_pepper_healthy |
-| "pomodoro con macchie" | Tomato | Tomato_Bacterial_spot, Tomato_Early_blight, … |
-| "vite sembra sana" | Grape | Grape_Black_rot, Grape_Esca, Grape_Leaf_blight, Grape_healthy |
+| Accuracy top-1 | 91.70% | 29.42% |
+| Accuracy top-3 | 99.23% | 90.19% |
+| Macro-F1 | 88.97% | 31.68% |
+| Avg latency | 41.360 ms | 308.918 ms |
+| P95 latency | 54.318 ms | 582.547 ms |
+| Throughput | 24.178 fps | 3.237 fps |
 
-Without filtering, `Bell_pepper_Bacterial_spot` and `Tomato_Bacterial_spot` share very similar visual features — the model would frequently misclassify.
+These numbers confirm that `generale` remains the production profile for v3.2, while EfficientFormerV2-S1 stays in the repository as an advanced edge backend for explainability, export validation, ensemble experiments and comparative research.
 
-#### 3. Contextual Health Detection (LLM Stateless)
+#### 5. Release Documentation Is Aligned by Design
 
-The health check no longer relies on the single keyword `"sano"`. Instead, an LLM call evaluates the **entire operator sentence**:
+Version 3.2 aligns runtime configuration, public documentation and legal packaging around the same release metadata.
 
-- Input: `"la vite sembra stare benone"`
-- LLM prompt: binary classification → `SANO` / `NON_SANO` / `INCERTO`
-- If `SANO`: skip disease flow, produce wellness assessment
-- Uses `chat_internal()` (stateless, no ConversationMemory read/write)
+The following surfaces are synchronized with the current release:
 
-#### 4. Q&A Follow-up Loop Fix
+- `README.md`
+- `MODEL_CARD.md`
+- `RELEASE.md`
+- `LICENSE`
+- `Manuale/genera_manuale.py`
 
-Previously, `free_chat_handler` (PTB group 99) would intercept operator answers during the Q&A phase, generating a double response. Fixed with dedicated flag `diag_qa_active`:
+#### 6. Persistent Diagnostic Memory Remains Part of the Operator Experience
 
-```
-START follow-up → diag_qa_active = True
-  operator answers → ConversationHandler handles it (group 0)
-  free_chat_handler skips (diag_qa_active is True)
-END follow-up → diag_qa_active = False
-```
-
-#### 5. No-Photo-Loop Fix
-
-The LLM was occasionally appending "send a photo for further analysis" to the diagnosis, causing the bot to restart the photo upload flow. Fixed at two levels:
-
-1. **Prompt constraint:** `"Do not ask the user to send photos — image acquisition phase is complete."`
-2. **Post-processing filter:** `_PHOTO_REQUEST_PATTERNS` regex removes any residual photo-request sentences from LLM output before delivery.
-
-#### 6. Paginated Messages — Inline Button
-
-Long diagnosis messages (>4096 chars) are split into chunks. The continuation button is now an **inline keyboard button** (`📄 Continua lettura`) registered as a global handler — works even after `ConversationHandler.END`.
-
-#### 7. Shared Chat Engine + Persistent Conversation Memory
-
-Telegram free chat, `/chat`, and diagnosis-related LLM calls now share the same `ChatEngine` instance inside the bot application context. This removes context drift between handlers that previously maintained separate in-memory histories.
-
-Conversation history is now persisted on disk per user:
+The conversational layer still preserves the latest structured diagnosis and bounded chat memory per user, so the operator can continue asking follow-up questions after the diagnosis phase or after a restart.
 
 ```text
 memory/sessions/<user_id>.json
@@ -441,31 +439,25 @@ memory/sessions/<user_id>.json
 
 Operational characteristics:
 
-- Last 20 turns are retained per user (bounded growth)
-- History survives process restarts
-- Cache is refreshed if a newer session file exists on disk
-- `[DELTA] ...` service/error messages are excluded from memory
+- Last 20 turns retained per user
+- Disk-backed persistence across restarts
+- Cache refresh when the on-disk session is newer
+- Service/error boilerplate excluded from memory
 
-This means an operator can complete a diagnosis, then continue with questions like:
+#### 7. Telegram Delivery Flow Stays Hardened
 
-- "Why is the risk high?"
-- "Explain the diagnosis in simpler terms"
-- "Suggest an immediate treatment plan"
+The operator-facing Telegram flow preserves the safeguards introduced earlier:
 
-without losing the immediate conversational context.
+- follow-up answers do not get hijacked by free chat routing
+- residual requests to upload another photo are filtered out of the final diagnosis
+- paginated replies continue through a dedicated inline button
+- diagnosis state is cleaned up even when final delivery raises an exception
 
-#### 8. Diagnosis State Auto-Recovery
-
-Two Telegram failure paths were hardened:
-
-1. If `_send_diagnosis_paginated()` raises during final delivery, cleanup now runs in `finally`, ensuring `diagnosis_active=False` and removing transient `diag_*` markers.
-2. If an unprompted image upload is invalid, `diagnosis_active` is reset before returning.
-
-This guarantees that a failed Telegram send cannot leave the bot permanently mute in free chat.
+Together, these guarantees keep the v3.2 release stable while the hybrid edge stack and dissemination workflow are expanded.
 
 ---
 
-### Telegram Menu Layout (v3.1)
+### Telegram Menu Layout (v3.2)
 
 ```
 [ 🆕 Diagnosi                              ]
@@ -476,4 +468,4 @@ This guarantees that a failed Telegram send cannot leave the bot permanently mut
 
 ---
 
-**DELTA v3.1 — Orchestrated AI for Leaf Health | 4 May 2026**
+**DELTA v3.2 — Orchestrated AI for Leaf Health | 13 May 2026**

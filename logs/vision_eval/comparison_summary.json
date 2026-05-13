@@ -1,0 +1,22 @@
+[
+  {
+    "model_key": "generale",
+    "active_model": "generale",
+    "backend": "mobilenet",
+    "samples": 7502,
+    "accuracy_top1": 0.9169554785390562,
+    "accuracy_top3": 0.9922687283391096,
+    "macro_f1": 0.8896801755480392,
+    "mean_confidence": 0.9170761749295354
+  },
+  {
+    "model_key": "efficientformer",
+    "active_model": "EfficientFormerV2-S1",
+    "backend": "efficientformer",
+    "samples": 7502,
+    "accuracy_top1": 0.2941882164756065,
+    "accuracy_top3": 0.9018928285790456,
+    "macro_f1": 0.3167821604855721,
+    "mean_confidence": 0.5171320547591334
+  }
+]

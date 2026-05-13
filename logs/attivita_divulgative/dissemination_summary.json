@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-05-13 17:13:06",
+  "eval_summary": "logs/vision_eval/comparison_summary.json",
+  "benchmark_summary": "logs/vision_benchmark.json",
+  "models": {
+    "generale": {
+      "evaluation": {
+        "model_key": "generale",
+        "active_model": "generale",
+        "backend": "mobilenet",
+        "samples": 7502,
+        "accuracy_top1": 0.9169554785390562,
+        "accuracy_top3": 0.9922687283391096,
+        "macro_f1": 0.8896801755480392,
+        "mean_confidence": 0.9170761749295354
+      },
+      "benchmark": {
+        "model_key": "generale",
+        "active_model": "generale",
+        "backend": "mobilenet",
+        "runs": 50,
+        "warmup": 5,
+        "avg_ms": 41.36,
+        "min_ms": 21.793,
+        "p50_ms": 41.236,
+        "p95_ms": 54.318,
+        "max_ms": 66.085,
+        "throughput_fps": 24.178
+      }
+    },
+    "efficientformer": {
+      "evaluation": {
+        "model_key": "efficientformer",
+        "active_model": "EfficientFormerV2-S1",
+        "backend": "efficientformer",
+        "samples": 7502,
+        "accuracy_top1": 0.2941882164756065,
+        "accuracy_top3": 0.9018928285790456,
+        "macro_f1": 0.3167821604855721,
+        "mean_confidence": 0.5171320547591334
+      },
+      "benchmark": {
+        "model_key": "efficientformer",
+        "active_model": "EfficientFormerV2-S1",
+        "backend": "efficientformer",
+        "runs": 50,
+        "warmup": 5,
+        "avg_ms": 308.918,
+        "min_ms": 222.32,
+        "p50_ms": 270.327,
+        "p95_ms": 582.547,
+        "max_ms": 706.852,
+        "throughput_fps": 3.237
+      }
+    }
+  },
+  "publication_targets": [
+    "README.md",
+    "MODEL_CARD.md",
+    "RELEASE.md"
+  ]
+}

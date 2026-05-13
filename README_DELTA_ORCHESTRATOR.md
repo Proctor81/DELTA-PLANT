@@ -1,45 +1,84 @@
-# DELTA Ð Multi-LLM Agent Orchestrator (LangGraph Edition)
+# DELTA Orchestrator - Multi-Agent Layer for DELTA Plant v3.2
 
-## Come compilare e avviare il grafo
+## Ruolo nel repository
 
-1. **Installazione dipendenze**
-   ```bash
-   cd delta_orchestrator
-   pip install -r requirements.txt
-   ```
-2. **Avvio FastAPI**
-   ```bash
-   uvicorn delta_orchestrator.api.routes:router --host 0.0.0.0 --port 8000
-   ```
-3. **Avvio con Docker**
-   ```bash
-   docker-compose up --build
-   ```
+DELTA Orchestrator e il modulo opzionale che aggiunge orchestrazione multi-step, grafi LangGraph, API FastAPI e strumenti di esecuzione attorno al core di DELTA Plant.
 
-## Esempio di utilizzo CLI
+Nella release 3.2 il percorso di produzione del repository resta centrato su:
+
+- stack edge vision a 33 classi
+- Pipeline X resumable
+- benchmark ed evaluation validati
+- pacchetto divulgativo generato automaticamente
+
+L'orchestrator completa questa architettura quando serve coordinare task piu complessi, ma non sostituisce il runtime diagnostico principale.
+
+## Componenti principali
+
+- `delta_orchestrator/graphs/main_graph.py`: grafo principale di orchestrazione
+- `delta_orchestrator/nodes/`: planner, router, executor, critic e specialist nodes
+- `delta_orchestrator/adapters/`: adapter LLM e integrazioni esterne
+- `delta_orchestrator/tools/`: tool di contesto, web search, vision e code execution
+- `delta_orchestrator/api/routes.py`: esposizione FastAPI
+- `delta_orchestrator/integration/delta_bridge.py`: bridge asincrono verso il resto di DELTA
+- `delta_orchestrator/tests/test_orchestrator.py`: copertura di base del modulo
+
+## Backend LLM
+
+Stato runtime documentato per il ramo orchestrator:
+
+- backend primario: HuggingFace Inference API
+- fallback opzionale: Ollama via `OLLAMA_ENDPOINT`
+- modello HF configurabile tramite `HF_MODEL_NAME`
+- in assenza di backend disponibili, il nodo executor restituisce un errore controllato
+
+Questo livello e separato dalla Pipeline X vision: i risultati di benchmark, evaluation e dissemination della release 3.2 vengono prodotti dai tool in root repository, non dal modulo orchestrator.
+
+## Avvio rapido
+
+1. Installare le dipendenze del modulo:
+
+```bash
+cd delta_orchestrator
+pip install -r requirements.txt
+```
+
+2. Avviare l'API FastAPI:
+
+```bash
+uvicorn delta_orchestrator.api.routes:router --host 0.0.0.0 --port 8000
+```
+
+3. In alternativa, usare Docker:
+
+```bash
+docker-compose up --build
+```
+
+## Esempi di integrazione
+
+### Chiamata via bridge
+
 ```python
 import asyncio
 from delta_orchestrator.integration.delta_bridge import orchestrate_task
 
 async def main():
-    result = await orchestrate_task("Diagnosi pianta", {"delta_context": {"plant_type": "pomodoro"}})
-    print(result)
+   result = await orchestrate_task(
+      "Diagnosi pianta",
+      {"delta_context": {"plant_type": "pomodoro"}},
+   )
+   print(result)
 
 asyncio.run(main())
 ```
 
-## Esempio di chiamata da main.py / Flask / Telegram bot
-```python
-from delta_orchestrator.integration.delta_bridge import orchestrate_task
-# ...
-result = asyncio.run(orchestrate_task("Diagnosi pianta", delta_context))
-```
+### Invocazione diretta del grafo
 
-## Esempio invocazione main_graph
 ```python
+import asyncio
 from delta_orchestrator.graphs.main_graph import MainGraph
 from delta_orchestrator.state.schema import DeltaOrchestratorState
-import asyncio
 
 graph = MainGraph()
 state = DeltaOrchestratorState()
@@ -47,29 +86,14 @@ result = asyncio.run(graph.run(state.dict()))
 print(result)
 ```
 
-## Prossimi passi consigliati
+## Posizionamento nella release 3.2
 
-# Pipeline LLM attuale
+- il repository principale pubblica la narrativa di release in `README.md`, `MODEL_CARD.md` e `RELEASE.md`
+- il pacchetto divulgativo e generato in `logs/attivita_divulgative/`
+- l'orchestrator resta un layer avanzato per sperimentazione, integrazione e automazione di task compositi
 
-## Chat engine e priorita backend
-La pipeline DELTA usa HuggingFace come backend principale per la chat e, nel ramo orchestrator, Ollama come fallback secondario. TinyLlama locale e llama.cpp sono stati rimossi dai flussi runtime.
+Per il percorso end-to-end che porta agli artefatti pubblicabili della release 3.2, il riferimento operativo resta:
 
-**Requisiti:**
-- Token HuggingFace valido in `.env` (`HF_API_TOKEN`)
-- Modello HF configurato in `.env` (`HF_MODEL_NAME`, default consigliato `meta-llama/Llama-3.1-8B-Instruct`)
-- (Opzionale orchestrator) endpoint Ollama raggiungibile (`OLLAMA_ENDPOINT`)
-
-**Comportamento:**
-- DELTAPLANO_bot e ChatEngine usano esclusivamente HuggingFace.
-- L'orchestrator usa HuggingFace e, se non disponibile, prova Ollama.
-- In assenza di backend disponibili, viene restituito un messaggio di errore controllato.
-
-**Note:**
-- Se ricevi "Errore durante l'elaborazione della domanda. Dettagli: ...", copia qui il traceback per la diagnosi.
-
-## Comandi utili
-```
-git add .
-git commit -m "Patch: consolidamento LLM su HuggingFace/Ollama e rimozione TinyLlama"
-git push
+```bash
+python tools/pipeline_x.py --resume
 ```

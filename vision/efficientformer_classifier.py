@@ -246,9 +246,21 @@ class EfficientFormerClassifier(VisionBackend):
             self._primary = self._create_interpreter_bundle(self._cfg, self._model_key)
             self._align_labels_with_output(self._labels, self._primary.output_details)
         except Exception as exc:
-            self._error = str(exc)
-            LOGGER.warning("EfficientFormer primario non disponibile: %s", exc)
-            return
+            fallback_cfg = self._resolve_primary_fallback_config(exc)
+            if fallback_cfg is None:
+                self._error = str(exc)
+                LOGGER.warning("EfficientFormer primario non disponibile: %s", exc)
+                return
+
+            try:
+                self._primary = self._create_interpreter_bundle(fallback_cfg, self._model_key)
+                self._cfg = fallback_cfg
+                self._quantization = str(fallback_cfg.get("quantization", self._quantization)).lower()
+                self._align_labels_with_output(self._labels, self._primary.output_details)
+            except Exception as fallback_exc:
+                self._error = str(fallback_exc)
+                LOGGER.warning("EfficientFormer primario non disponibile: %s", fallback_exc)
+                return
 
         if self._ensemble_enabled:
             try:
@@ -279,6 +291,28 @@ class EfficientFormerClassifier(VisionBackend):
                 self._threads,
                 bool(self._ensemble_bundle),
             )
+
+    def _resolve_primary_fallback_config(self, primary_exc: Exception) -> Optional[Dict[str, Any]]:
+        if self._quantization not in {"float16", "int8"}:
+            return None
+
+        fallback_cfg = self._resolve_variant_config(self._base_cfg, "float32")
+        fallback_path = fallback_cfg.get("model_path")
+        if not fallback_path or fallback_path == self._cfg.get("model_path"):
+            return None
+
+        try:
+            resolved_path = self._resolve_model_path(fallback_cfg)
+        except Exception:
+            return None
+
+        LOGGER.warning(
+            "EfficientFormer %s non disponibile (%s), provo fallback float32: %s",
+            self._quantization,
+            primary_exc,
+            resolved_path,
+        )
+        return fallback_cfg
 
     def _init_explainer(self) -> None:
         if not self._cfg.get("enable_explainability", True):
@@ -585,7 +619,87 @@ class EfficientFormerClassifier(VisionBackend):
         colored = self._colorize_heatmap(heatmap)
         alpha = float(self._cfg.get("overlay_alpha", 0.40))
         base = self._ensure_bgr(image_bgr)
-        return cv2.addWeighted(base, 1.0 - alpha, colored, alpha, 0.0)
+        overlay = cv2.addWeighted(base, 1.0 - alpha, colored, alpha, 0.0)
+        return self._annotate_focus_region(overlay, heatmap)
+
+    def _annotate_focus_region(self, overlay_bgr: np.ndarray, heatmap: np.ndarray) -> np.ndarray:
+        try:
+            import cv2  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError("OpenCV richiesto per annotazione focus explainability") from exc
+
+        normalized = np.clip(np.asarray(heatmap, dtype=np.float32), 0.0, 1.0)
+        if normalized.size == 0:
+            return overlay_bgr
+
+        peak_value = float(np.max(normalized))
+        if peak_value <= 0.0:
+            return overlay_bgr
+
+        annotated = overlay_bgr.copy()
+        image_h, image_w = normalized.shape[:2]
+        min_area = max(32.0, float(image_h * image_w) * 0.001)
+        smoothed = cv2.GaussianBlur(normalized, (0, 0), sigmaX=6.0, sigmaY=6.0)
+        peak_ratio = float(self._cfg.get("focus_peak_ratio", 0.70))
+        min_threshold = float(self._cfg.get("focus_min_threshold", 0.50))
+        threshold = max(min_threshold, peak_value * peak_ratio)
+
+        mask = np.uint8(smoothed >= threshold) * 255
+        kernel = np.ones((5, 5), dtype=np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = [contour for contour in contours if cv2.contourArea(contour) >= min_area]
+
+        if contours:
+            contour = max(contours, key=cv2.contourArea)
+            if len(contour) >= 5:
+                (focus_x, focus_y), axes, angle = cv2.fitEllipse(contour)
+                center = (int(round(focus_x)), int(round(focus_y)))
+                expanded_axes = (
+                    max(20, int(round(axes[0] * 0.56))),
+                    max(20, int(round(axes[1] * 0.56))),
+                )
+                cv2.ellipse(
+                    annotated,
+                    center,
+                    expanded_axes,
+                    float(angle),
+                    0,
+                    360,
+                    (0, 0, 0),
+                    8,
+                    lineType=cv2.LINE_AA,
+                )
+                cv2.ellipse(
+                    annotated,
+                    center,
+                    expanded_axes,
+                    float(angle),
+                    0,
+                    360,
+                    (0, 255, 255),
+                    4,
+                    lineType=cv2.LINE_AA,
+                )
+                marker_radius = max(10, int(round(min(expanded_axes) * 0.24)))
+            else:
+                (focus_x, focus_y), radius = cv2.minEnclosingCircle(contour)
+                center = (int(round(focus_x)), int(round(focus_y)))
+                marker_radius = max(18, int(round(radius * 1.10)))
+                cv2.circle(annotated, center, marker_radius, (0, 0, 0), 8, lineType=cv2.LINE_AA)
+                cv2.circle(annotated, center, marker_radius, (0, 255, 255), 4, lineType=cv2.LINE_AA)
+        else:
+            peak_y, peak_x = np.unravel_index(int(np.argmax(normalized)), normalized.shape)
+            center = (int(peak_x), int(peak_y))
+            marker_radius = max(18, min(image_h, image_w) // 10)
+            cv2.circle(annotated, center, marker_radius, (0, 0, 0), 8, lineType=cv2.LINE_AA)
+            cv2.circle(annotated, center, marker_radius, (0, 255, 255), 4, lineType=cv2.LINE_AA)
+
+        cv2.circle(annotated, center, max(3, marker_radius // 6), (0, 0, 0), -1, lineType=cv2.LINE_AA)
+        cv2.circle(annotated, center, max(2, marker_radius // 8), (255, 255, 255), -1, lineType=cv2.LINE_AA)
+        return annotated
 
     def _colorize_heatmap(self, heatmap: np.ndarray) -> np.ndarray:
         try:

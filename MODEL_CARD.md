@@ -3,10 +3,10 @@
 ## Model Overview
 
 **Model Name:** DELTA Plant Leaf Disease Stack  
-**Version:** 3.1 (Baseline MobileNetV2 + optional EfficientFormerV2-S1 backend)  
-**Release Date:** 2026-05-03  
-**License:** Creative Commons BY-SA 4.0 (Scientific Research)  
-**Citation:** DELTA Plant v3.1 | PlantVillage Dataset | MobileNetV2 baseline + EfficientFormerV2-S1 hybrid backend
+**Version:** 3.2 (Baseline MobileNetV2 + EfficientFormerV2-S1 edge backend)  
+**Release Date:** 2026-05-13  
+**License:** DELTA PLANT SOFTWARE LICENSE (core proprietario per ricerca non commerciale; componenti OSS ove indicato)  
+**Citation:** DELTA Plant v3.2 | PlantVillage Dataset | MobileNetV2 baseline + EfficientFormerV2-S1 hybrid edge backend
 
 ---
 
@@ -24,7 +24,7 @@
 
 ### Deployment Profiles
 - **Profile A - Production Baseline:** MobileNetV2 TFLite float16, benchmark reale pubblicato e stabile
-- **Profile B - Advanced Hybrid Edge:** EfficientFormerV2-S1 TFLite float16/int8, ensemble + explainability, attivabile via `MODELS_REGISTRY['efficientformer']`
+- **Profile B - Advanced Hybrid Edge:** EfficientFormerV2-S1 TFLite int8 di default, fallback float32, ensemble + explainability, attivabile via `MODELS_REGISTRY['efficientformer']`
 
 ### Training Configuration
 ```
@@ -51,13 +51,24 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 | **Velocità inferenza (TFLite RPi5)** | ~180ms (XNNPACK delegate) |
 | **Dataset benchmark** | 660 img PlantVillage (20/classe) |
 
-### EfficientFormerV2-S1 - Stato benchmark
-- **Repository support:** completo lato software (backend, export, benchmark harness, evaluation pipeline)
-- **Quantizzazione target:** float16 default, int8 fully quantized opzionale
-- **Benchmark on-device:** da eseguire sul Raspberry Pi 5 reale con `tools/benchmark_vision_models.py`
-- **Accuracy/F1/confusion matrix:** da produrre con `ai/evaluate_vision_backends.py` sul validation set effettivo
+### EfficientFormerV2-S1 - Risultati Pipeline X (2026-05-13)
+- **Repository support:** completo lato software, export, benchmark harness, evaluation pipeline e rigenerazione manuale via Pipeline X
+- **Quantizzazione target:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
+- **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
+- **Dataset di evaluation:** 7,502 campioni PlantVillage (`datasets/training_33classes/validation`)
 
-> Il repository ora include la pipeline pronta per EfficientFormerV2-S1, ma i numeri finali di accuracy e latenza devono essere pubblicati solo dopo esecuzione sul modello fine-tuned reale e sul Raspberry Pi 5 target.
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 91.70% | 29.42% |
+| Accuracy top-3 | 99.23% | 90.19% |
+| Macro-F1 | 88.97% | 31.68% |
+| Mean confidence | 91.71% | 51.71% |
+| Avg latency | 41.360 ms | 308.918 ms |
+| P95 latency | 54.318 ms | 582.547 ms |
+| Max latency | 66.085 ms | 706.852 ms |
+| Throughput | 24.178 fps | 3.237 fps |
+
+> I risultati pubblicati dalla Pipeline X confermano che il backend `generale` resta il profilo di riferimento per accuratezza e latenza sul Raspberry Pi 5 target. EfficientFormerV2-S1 rimane disponibile come backend edge avanzato per explainability, ensemble e sperimentazione controllata, ma non viene promosso come default su questa release.
 
 ### Bell Pepper Classification (Priority Class)
 - **Samples:** 7,425 images (7.8% of training set)
@@ -170,7 +181,7 @@ print(explanation.get("target_layer"), explanation.get("summary"))
 5. **Lighting Conditions:** Model trained on varied lighting but may struggle with extreme conditions
 6. **Inter-class confusion:** Tomato spot diseases (Bacterial_spot, Early_blight, Septoria, Target_Spot) are morphologically similar — top-3 accuracy (96.1%) recommended for clinical use
 7. **Explainability dependency:** LayerCAM richiede il checkpoint PyTorch fine-tuned oltre al file TFLite di inferenza
-8. **Hybrid backend metrics:** i numeri EfficientFormer vanno considerati "pending validation" finche non vengono generati con gli script inclusi nel repository
+8. **Hybrid backend tradeoff:** EfficientFormerV2-S1 e validato in runtime ed evaluation, ma nella release 3.2 mostra accuracy top-1 e latenza significativamente peggiori rispetto al backend `generale`; usare quindi solo quando servono explainability, export o sperimentazione comparativa
 
 ---
 
@@ -232,8 +243,8 @@ python ai/evaluate_vision_backends.py \
 - **Repository:** [https://github.com/Proctor81/DELTA-PLANT](https://github.com/Proctor81/DELTA-PLANT)
 - **Dataset Source:** [PlantVillage GitHub](https://github.com/spMohanty/PlantVillage-Dataset)
 - **License:** Proprietary (Scientific Research Use — see LICENSE)
-- **Last Updated:** 2026-05-08 (EfficientFormer backend, export pipeline, LayerCAM integration)
+- **Last Updated:** 2026-05-13 (EfficientFormer int8 executable backend, Pipeline X, manuale e release 3.2)
 
 ---
 
-**Status:** ✅ MobileNet baseline production ready | 🧪 EfficientFormer hybrid backend integrated in codebase | 🚀 Edge deployment optimized
+**Status:** ✅ MobileNet baseline production ready | ✅ EfficientFormer int8 runtime validated | 🚀 Edge deployment and documentation pipeline aligned

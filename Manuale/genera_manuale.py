@@ -135,6 +135,31 @@ def _collect_modules() -> list[dict]:
     return modules
 
 
+DEFAULT_SYSTEM_INFO = {
+    "name": "DELTA Plant",
+    "version": "3.2",
+    "release": "v3.2",
+    "release_name": "Unified Edge Intelligence",
+    "release_date": "2026-05-13",
+    "manual_revision": "2026-05-13",
+}
+
+
+def _resolve_system_info(cfg: dict | None = None) -> dict[str, str]:
+    info = dict(DEFAULT_SYSTEM_INFO)
+    raw = (cfg or {}).get("SYSTEM_INFO", {})
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            if isinstance(value, str) and value:
+                info[key] = value
+    if not info.get("release"):
+        info["release"] = f"v{info['version']}"
+    return info
+
+
+SYSTEM_INFO = _resolve_system_info(_load_config())
+
+
 # ─────────────────────────────────────────────────────────────
 # CLASSE PDF
 # ─────────────────────────────────────────────────────────────
@@ -248,7 +273,7 @@ class ManualePDF(FPDF):
         self.set_font(self._FONT, "B", 7.5)
         self.set_text_color(140, 175, 225)
         self.set_xy(12, 18)
-        self.cell(0, 6, "RASPBERRY PI 5  \u00b7  AI HAT 2+  \u00b7  DIAGNOSI FITOSANITARIA  \u00b7  v2.0")
+        self.cell(0, 6, f"RASPBERRY PI 5  ·  AI HAT 2+  ·  {SYSTEM_INFO['release_name'].upper()}  ·  {SYSTEM_INFO['release']}")
 
         # ── Titolo DELTA ─────────────────────────────────────
         self.set_font(self._FONT, "B", 58)
@@ -278,8 +303,8 @@ class ManualePDF(FPDF):
         # ── Pillole feature ───────────────────────────────────
         features = [
             ("Visione AI",    (35, 105, 195)),
-            ("Sensori IoT",   (20, 125, 70)),
-            ("Diagnosi",      (130, 65, 25)),
+            ("Pipeline X",    (20, 125, 70)),
+            ("Manuale 3.2",   (130, 65, 25)),
         ]
         x0 = 12
         for label, col in features:
@@ -299,7 +324,7 @@ class ManualePDF(FPDF):
         self.set_font(self._FONT, "B", 15)
         self.set_text_color(12, 42, 105)
         self.set_xy(22, 190)
-        self.cell(176, 10, "MANUALE UTENTE", align="L")
+        self.cell(176, 10, f"MANUALE UTENTE · {SYSTEM_INFO['release']}", align="L")
 
         # ── Area info in basso ────────────────────────────────
         self.set_fill_color(7, 28, 78)
@@ -308,7 +333,7 @@ class ManualePDF(FPDF):
         self.set_text_color(130, 165, 215)
         self.set_xy(12, 276)
         self.cell(186, 6,
-                  f"Generato automaticamente il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}",
+                  f"Release {SYSTEM_INFO['release']} · generato automaticamente il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}",
                   align="L")
         self.set_xy(12, 283)
         self.cell(186, 6, "Aggiornare con:  python Manuale/genera_manuale.py", align="L")
@@ -490,36 +515,33 @@ def _add_intro(pdf: ManualePDF):
         "fornire diagnosi fitosanitarie in tempo reale direttamente su Raspberry Pi 5."
     )
     cfg = _load_config()
+    system_info = _resolve_system_info(cfg)
     _add_license_appendix(pdf)
     pdf._body(
-        "DELTA Plant introduce l'analisi simultanea di foglie, fiori e frutti, "
-        "l'Oracolo Quantistico di Grover per la quantificazione del rischio composito, "
-        "la DELTA Academy per la formazione interattiva degli operatori e un sistema "
-        "di autenticazione con pannello amministratore. Il sistema è progettato per "
-        "operare in modo autonomo in serre, orti urbani e laboratori di ricerca "
-        "agronomica. Tutti i dati vengono archiviati localmente in un database SQLite "
-        "e possono essere esportati in Excel per analisi successive."
+        f"La release {system_info['release']} consolida DELTA come piattaforma edge-AI "
+        "ibrida: backend MobileNetV2 stabile in produzione, backend EfficientFormerV2-S1 "
+        "int8 realmente eseguibile su questo hardware, Pipeline X resumable end-to-end, "
+        "telemetria locale, memoria diagnostica persistente e manualistica rigenerabile "
+        "automaticamente a ogni rilascio."
     )
-    pdf._subsection("Caratteristiche principali — v2.0")
+    pdf._subsection(f"Caratteristiche principali — {system_info['release']}")
     pdf._bullet([
-        "Analisi multi-organo: foglie, fiori e frutti in simultanea (visione artificiale HSV multi-range)",
-        "27 classi diagnostiche totali: 10 foglia, 8 fiore, 9 frutto",
-        "21 regole esperte agronomiche (12 base + 4 fiore + 5 frutto)",
-        "Oracolo Quantistico di Grover: 4 qubit, 16 stati di rischio, Quantum Risk Score [0,1]",
-        "Lettura continua di 7 parametri ambientali via I2C (BME680, VEML7700, SCD41, ADS1115)",
-        "Fine-tuning del modello AI con dati raccolti sul campo",
-        "DELTA Academy: formazione interattiva con 5 scenari clinici, quiz, simulazioni e badge",
-        "Pannello Amministratore protetto da password PBKDF2-SHA256 (260.000 iterazioni)",
-        "Modalità input immagini da cartella — analisi senza camera fisica",
-        "Interfaccia CLI interattiva + API REST opzionale (Flask)",
-        "Export automatico in Excel (.xlsx) con formattazione professionale",
-        "Installazione automatica su Raspberry Pi 5 con script Bash + systemd",
+        "Diagnostica fogliare PlantVillage a 33 classi con backend MobileNetV2 + EfficientFormerV2-S1",
+        "EfficientFormerV2-S1 int8 validato on-device, con fallback automatico float32 e explainability LayerCAM",
+        "Pipeline X resumable: fine-tuning, export, evaluation, benchmark, dissemination e rigenerazione del manuale PDF",
+        "Memoria persistente per chat e diagnosi, utile per follow-up coerenti anche dopo riavvio",
+        "Lettura continua di 7 parametri ambientali via I2C o inserimento manuale guidato",
+        "21 regole esperte agronomiche + Oracolo Quantistico di Grover per il Quantum Risk Score [0,1]",
+        "DELTA Academy e Lab MLOps per formazione operatore e miglioramento continuo",
+        "Pannello amministratore, API REST opzionale, export Excel e materiali divulgativi automatici",
+        "Installazione automatica su Raspberry Pi 5 con autostart systemd e preflight AI",
     ])
     pdf._subsection("Come usare questo manuale")
     pdf._body(
         "Il manuale è diviso in due parti principali: la Parte A descrive l'hardware "
         "(componenti, collegamento, configurazione fisica); la Parte B descrive il software "
-        "(installazione, avvio, utilizzo delle funzioni e interpretazione degli output)."
+        "(installazione, avvio, utilizzo delle funzioni, pipeline MLOps, interpretazione degli output "
+        "e aggiornamento della documentazione di release)."
     )
 
 
@@ -645,8 +667,10 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
         "Il profilo baseline resta MobileNetV2 in TensorFlow Lite float16, mentre il "
         "profilo avanzato introduce EfficientFormerV2-S1 come backend ibrido CNN/ViT, "
         "attivabile da MODELS_REGISTRY o config.yaml, con ensemble probabilistico e "
-        "spiegabilita LayerCAM. Entrambi i backend lavorano su input 224x224 con "
-        "preprocessing MobileNet-like nel range [-1, 1]."
+        "spiegabilita LayerCAM. In v3.2 la variante EfficientFormer int8 e validata "
+        "sull'hardware target e il runtime puo fare fallback automatico a float32 se la "
+        "variante richiesta non e allocabile. Entrambi i backend lavorano su input 224x224 "
+        "con preprocessing MobileNet-like nel range [-1, 1]."
     )
     if mc:
         pdf._kv_table([
@@ -667,19 +691,33 @@ def _add_ai(pdf: ManualePDF, cfg: dict):
         pdf._body(
             "Il backend EfficientFormerV2-S1 e progettato per portare DELTA verso un "
             "profilo edge-AI piu spiegabile e piu robusto su classi morfologicamente "
-            "simili. Il backend supporta float16 come default su Raspberry Pi 5, variante "
-            "int8 fully quantized, ensemble con MobileNetV2 e generazione di heatmap "
-            "LayerCAM pronte per Telegram."
+            "simili. Il backend supporta una variante int8 fully quantized validata su questo "
+            "hardware, ensemble con MobileNetV2, explainability LayerCAM e fallback runtime "
+            "float32 per evitare blocchi operativi durante il deploy."
         )
         pdf._kv_table([
             ("Backend", ef_cfg.get("backend", "?")),
             ("Display name", ef_cfg.get("display_name", "?")),
-            ("Quantizzazione default", ef_cfg.get("quantization", "?")),
+            ("Variante runtime predefinita", ef_cfg.get("quantization", "?")),
             ("Thread target", str(ef_cfg.get("num_threads", "?"))),
             ("Ensemble", "Sì" if ef_cfg.get("enable_ensemble") else "No"),
             ("Modello ensemble", ef_cfg.get("ensemble_model_key", "?")),
             ("Explainability", ef_cfg.get("explainability_method", "?")),
             ("Checkpoint PyTorch", ef_cfg.get("pytorch_checkpoint", "?")),
+            ("Fallback runtime", "float32 automatico se la variante richiesta non alloca"),
+        ])
+        pdf._subsection("3.1c Come leggere LayerCAM")
+        pdf._body(
+            "LayerCAM e una tecnica di explainability visuale: genera una heatmap che "
+            "evidenzia le regioni dell'immagine che hanno contribuito maggiormente alla "
+            "decisione del modello. In DELTA la heatmap viene sovrapposta alla foto "
+            "originale e puo essere inviata su Telegram o salvata nei file di explainability."
+        )
+        pdf._bullet([
+            "Colori piu caldi (giallo/rosso) indicano un contributo maggiore alla predizione; colori piu freddi indicano contributo minore.",
+            "L'overlay serve a verificare se il modello sta osservando lesioni, bordi necrotici, aree clorotiche, nervature o altre strutture coerenti con il referto.",
+            "LayerCAM non e una segmentazione clinica del tessuto malato: non delimita con precisione millimetrica la patologia e non sostituisce la valutazione agronomica.",
+            "In v3.2 DELTA puo usare EfficientFormer come motore explainability anche quando la classificazione operativa resta sul backend generale, se la spiegabilita e disponibile.",
         ])
 
     pdf._subsection("3.2 Classi diagnostiche")
@@ -805,9 +843,9 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
     pdf._code_block(
         "# Metodo più semplice — da qualsiasi terminale:\n"
         "delta\n\n"
-        "# Da terminale (percorso completo)\n"
-        "cd ~/Desktop/DELTA\\ 2.0\n"
-        "python3 AVVIO_DELTA.py\n\n"
+        "# Dalla root del progetto\n"
+        "cd ~/Desktop/DELTA-PLANT\n"
+        ".venv/bin/python main.py --preflight\n\n"
         "# Avvio diretto (auto-rilancio venv se necessario)\n"
         "python3 main.py\n\n"
         "# Con venv esplicito\n"
@@ -866,25 +904,25 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "manual — inserimento interattivo da tastiera (CLI opzione dedicata)",
     ])
 
-    pdf._subsection("5.4 Diagnosi pianta — flusso completo v2.0")
+    pdf._subsection("5.4 Diagnosi pianta — flusso operativo v3.2")
     pdf._bullet([
         "1. Acquisizione frame dalla Pi Camera (o immagine da cartella input_images/)",
         "2. Rilevamento organo: foglia (modalita leaf-only v3.0 attiva di default)",
         "3. Pre-processing: ridimensionamento a 224×224, normalizzazione",
-        "4. Segmentazione foglia tramite filtro HSV verde (o GrabCut)",
-        "5. Inferenza AI foglia: classe (33 classi) + confidenza",
-        "6. Lettura sensori ambientali (temperatura, umidita, luce, CO2, pH, EC)",
+        "4. Segmentazione foglia tramite filtro HSV verde (o GrabCut) e selezione backend attivo",
+        "5. Inferenza AI: top-1, top-3, confidenza, fallback Classe_NonClassificato e spiegazione opzionale",
+        "6. Lettura sensori ambientali (temperatura, umidita, luce, CO2, pH, EC) o input manuale guidato",
         "7. Applicazione 21 regole agronomiche -> attivazione regole + livello rischio",
         "8. Oracolo Quantistico di Grover -> Quantum Risk Score [0,1]",
-        "9. Generazione raccomandazioni pratiche per l'operatore",
-        "10. Salvataggio nel database SQLite e aggiornamento Excel",
-        "11. Visualizzazione risultato a schermo con codice colore rischio",
-        "12. Analisi fiore/frutto disponibile solo se leaf_only_mode=False in core/config.py",
+        "9. Revisione contestuale LLM e Q&A follow-up se la diagnosi richiede approfondimento",
+        "10. Generazione raccomandazioni pratiche per l'operatore",
+        "11. Output Telegram/CLI/API con overlay LayerCAM quando la explainability e disponibile; in v3.2 puo essere generata da EfficientFormer anche se la classificazione attiva resta sul backend generale",
+        "12. Salvataggio in SQLite, Excel, memoria diagnostica persistente e log runtime",
     ])
 
-    pdf._subsection("5.4a Diagnosi intelligente Telegram — flusso v3.1")
+    pdf._subsection("5.4a Diagnosi intelligente Telegram — flusso v3.2")
     pdf._body(
-        "A partire dalla v3.1, il flusso diagnosi su Telegram include una fase di raccolta "
+        "In v3.2, il flusso diagnosi su Telegram include una fase di raccolta "
         "della descrizione utente e, in caso di pianta non riconosciuta, un ciclo di "
         "domande di approfondimento conversazionale con l'LLM. "
         "Il flusso si attiva sia dal menu (pulsante Diagnosi) sia inviando liberamente "
@@ -916,8 +954,8 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("Reclassificazione LLM",    "Attiva solo se l'utente ha fornito una descrizione"),
         ("Diagnosi conversazionale", "Basata su descrizione + Q&A + dati sensori, senza immagine classificata"),
         ("Foto libera",              "Stessa procedura del flusso guidato: foto → descrizione → sensori → diagnosi"),
-        ("Diagnosi singolo msg",     "v3.1.2 — la diagnosi è inviata in un solo messaggio (split automatico a 4000 char)"),
-        ("Chiusura conversazione",   "v3.1.2 — dopo 'Posso fare qualcos'altro per te?' il bot resta in attesa, nessun messaggio non sollecitato"),
+        ("Diagnosi singolo msg",     "v3.2 — la diagnosi è inviata in un solo messaggio (split automatico a 4000 char)"),
+        ("Chiusura conversazione",   "v3.2 — dopo 'Posso fare qualcos'altro per te?' il bot resta in attesa, nessun messaggio non sollecitato"),
         ("HF max_tokens",            "1500 (override via env HF_MAX_TOKENS); timeout 60s (HF_TIMEOUT)"),
     ])
 
@@ -1026,6 +1064,31 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         f"{ec}/delta_diagnoses.xlsx"
     )
 
+    pdf._subsection("5.8 Pipeline X e aggiornamento del manuale — v3.2")
+    pdf._body(
+        "Pipeline X e il flusso MLOps resumable introdotto per orchestrare l'intera catena "
+        "EfficientFormer: fine-tuning, export, evaluation, benchmark, materiali divulgativi e, "
+        "da questa release, anche la rigenerazione del manuale PDF. Lo stato viene salvato in "
+        "models/pipeline_x_state.json, quindi il comando --resume riparte sempre dal primo step "
+        "mancante senza rilanciare inutilmente il training."
+    )
+    pdf._kv_table([
+        ("State file", "models/pipeline_x_state.json"),
+        ("Stop cooperativo", "models/pipeline_x.stop"),
+        ("Step finali", "evaluate -> benchmark -> dissemination -> manual"),
+        ("Output manuale", "Manuale/DELTA_Manuale_Utente.pdf"),
+    ])
+    pdf._code_block(
+        "# Riprende la pipeline dal primo step mancante\n"
+        "python tools/pipeline_x.py --resume\n\n"
+        "# Artefatti aggiornati a fine pipeline\n"
+        "logs/vision_eval/comparison_summary.json\n"
+        "logs/vision_benchmark.json\n"
+        "logs/attivita_divulgative/dissemination_summary.json\n"
+        "Manuale/DELTA_Manuale_Utente.pdf",
+        label="PIPELINE X",
+    )
+
 
 def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf.add_page()
@@ -1111,7 +1174,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "/export, /preflight, /academy, /license, /health, /batch",
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
-        "Diagnosi spiegabile: con backend EfficientFormer attivo il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico.",
+        "Diagnosi spiegabile: il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico; l'overlay puo essere generato da EfficientFormer anche se la classificazione attiva resta sul backend generale.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
 
@@ -1585,7 +1648,7 @@ def _add_organ_analysis(pdf: ManualePDF):
     pdf._section_title("12. ANALISI MULTI-ORGANO — FOGLIA, FIORE E FRUTTO")
 
     pdf._body(
-        "DELTA v2.0 introduce l'analisi simultanea di tutti gli organi vegetali "
+        "DELTA mantiene documentata in v3.2 anche l'analisi simultanea di tutti gli organi vegetali "
         "presenti nell'inquadratura: foglie, fiori e frutti. Il sistema rileva "
         "automaticamente quali organi sono presenti nell'immagine e applica "
         "modelli di diagnosi specifici per ciascuno, in modo trasparente per l'operatore."
@@ -1697,7 +1760,7 @@ def _add_quantum_oracle(pdf: ManualePDF):
     pdf._section_title("13. ORACOLO QUANTISTICO DI GROVER — QUANTIFICAZIONE DEL RISCHIO")
 
     pdf._body(
-        "DELTA v2.0 integra una simulazione classica dell'Algoritmo di Grover "
+        "DELTA integra in v3.2 una simulazione classica dell'Algoritmo di Grover "
         "per la quantificazione del rischio degli eventi avversi agronomici. "
         "L'oracolo analizza tutti i fattori di rischio attivi e produce un "
         "Quantum Risk Score (QRS) che misura la probabilita complessiva di "
@@ -2278,7 +2341,7 @@ def _add_electrical_rendering(pdf: ManualePDF):
     pdf.set_font(pdf._FONT, "B", 12)
     pdf.set_text_color(*WHITE)
     pdf.set_xy(M + 3, TY + 1)
-    pdf.cell(PW - 6, 9.5, "DELTA v2.0 — SCHEMA DI CABLAGGIO COMPLETO", align="C")
+    pdf.cell(PW - 6, 9.5, "DELTA v3.2 — SCHEMA DI CABLAGGIO COMPLETO", align="C")
 
     # Riga info documento
     pdf.set_fill_color(236, 243, 255)
@@ -3154,12 +3217,12 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._subsection("18.4 Conversione TFLite (float16 / int8) — convert_keras_to_tflite.py")
     pdf._body(
         "Lo script ai/convert_keras_to_tflite.py converte il modello Keras in formato "
-        "TFLite ottimizzato per edge deployment. In DELTA v3.0 il formato di riferimento "
-        "del modello generale e float16; la quantizzazione INT8 resta disponibile come "
-        "opzione avanzata per target specifici."
+        "TFLite ottimizzato per edge deployment. In DELTA v3.2 il modello generale continua "
+        "a usare float16 come profilo stabile di produzione, mentre il backend EfficientFormer "
+        "della Pipeline X adotta anche una variante int8 pienamente validata per questo hardware."
     )
     pdf._code_block(
-        "# Conversione standard float16 (raccomandato per DELTA v3.0)\n"
+        "# Conversione standard float16 (baseline produzione DELTA v3.2)\n"
         "python ai/convert_keras_to_tflite.py \\\n"
         "  --keras-model models/plant_disease_model.keras \\\n"
         "  --output models/plant_disease_model_39classes.tflite \\\n"
@@ -3180,8 +3243,8 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._kv_table([
         ("none",     "FP32 — precisione massima, dimensione maggiore, piu lento su edge"),
         ("dynamic",  "Quantizzazione dinamica — buon compromesso senza dataset calibrazione"),
-        ("float16",  "FP16 — opzione consigliata per DELTA v3.0 (modello principale)"),
-        ("int8",     "Quantizzazione intera INT8 — opzionale, utile in pipeline NPU dedicate"),
+        ("float16",  "FP16 — baseline stabile del modello generale in DELTA v3.2"),
+        ("int8",     "Quantizzazione intera INT8 — profilo edge pienamente supportato per pipeline dedicate"),
     ])
 
     pdf._subsection("18.4b Pipeline EfficientFormerV2-S1 — export_efficientformer_tflite.py")
@@ -3196,26 +3259,29 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "pip install -r requirements-efficientformer.txt\n\n"
         "# Fine-tuning + export completo\n"
         "python ai/export_efficientformer_tflite.py \\\n"
-        "  --dataset-root datasets/training \\\n"
+        "  --dataset-root datasets/training_33classes \\\n"
         "  --output-dir models \\\n"
         "  --mode all \\\n"
         "  --quantization both\n\n"
-        "# Solo export da checkpoint esistente\n"
+        "# Solo export calibrato da checkpoint esistente\n"
         "python ai/export_efficientformer_tflite.py \\\n"
+        "  --dataset-root datasets/training_33classes \\\n"
         "  --mode export \\\n"
         "  --checkpoint models/efficientformer_v2_s1_33classes.pth \\\n"
-        "  --quantization float16",
+        "  --quantization both",
         label="EFFICIENTFORMER EXPORT",
     )
     pdf._bullet([
         "Output principali: efficientformer_v2_s1_33classes.pth, .onnx, SavedModel, TFLite float16, TFLite int8 e file labels.",
         "Preprocessing training/export allineato al runtime edge: mean/std = 0.5, equivalente a normalizzazione [-1, 1].",
         "Per INT8 serve un representative dataset reale; lo script usa di default datasets/training.",
-        "LayerCAM richiede il checkpoint PyTorch oltre al file TFLite di inferenza.",
+        "LayerCAM richiede il checkpoint PyTorch oltre al file TFLite di inferenza e salva overlay/heatmap in exports/explanations quando la spiegabilita e attiva.",
     ])
 
     pdf._subsection("18.4c Benchmark ed evaluation backend multipli")
     pdf._code_block(
+        "# Resume end-to-end della Pipeline X\n"
+        "python tools/pipeline_x.py --resume\n\n"
         "# Benchmark latency su device target\n"
         "python tools/benchmark_vision_models.py \\\n"
         "  --model-keys generale efficientformer \\\n"
@@ -3223,7 +3289,7 @@ def _add_mlops_operatore(pdf: ManualePDF):
         "  --runs 100 --warmup 10\n\n"
         "# Accuracy, macro-F1 e confusion matrix su validation set\n"
         "python ai/evaluate_vision_backends.py \\\n"
-        "  --dataset-root datasets/training/validation \\\n"
+        "  --dataset-root datasets/training_33classes/validation \\\n"
         "  --model-keys generale efficientformer \\\n"
         "  --output-dir logs/vision_eval",
         label="BENCHMARK + EVAL",
@@ -3274,26 +3340,22 @@ def _add_mlops_operatore(pdf: ManualePDF):
     pdf._subsection("18.6 Riepilogo Comandi MLOps")
     pdf._code_block(
         "# 1. Prepara il dataset\n"
-        "mkdir -p datasets/training/Sano datasets/training/Oidio\n"
+        "mkdir -p datasets/training_33classes/Apple_Apple_scab datasets/training_33classes/Tomato_healthy\n"
         "# ... copia immagini nelle cartelle ...\n\n"
-        "# 2. Addestra il modello Keras\n"
-        "python ai/train_keras_classifier.py \\\n"
-        "  --dataset datasets/training --output models\n\n"
-        "# 3. Converti in TFLite float16 (default DELTA v3.0)\n"
-        "python ai/convert_keras_to_tflite.py \\\n"
-        "  --keras-model models/plant_disease_model.keras \\\n"
-        "  --output models/plant_disease_model_39classes.tflite \\\n"
-        "  --quantization float16\n\n"
+        "# 2. Esegui la pipeline resumable end-to-end\n"
+        "python tools/pipeline_x.py --resume\n\n"
+        "# 3. In alternativa, esporta EfficientFormer da checkpoint esistente\n"
+        "python ai/export_efficientformer_tflite.py \\\n"
+        "  --dataset-root datasets/training_33classes --output-dir models --mode export --quantization both \\\n"
+        "  --checkpoint models/efficientformer_v2_s1_33classes.pth\n\n"
         "# 4. Valida il modello (gate di deploy)\n"
         "python main.py --preflight-only\n\n"
-        "# 4b. In alternativa, pipeline EfficientFormer completa\n"
-        "python ai/export_efficientformer_tflite.py \\\n"
-        "  --dataset-root datasets/training --output-dir models --mode all --quantization both\n\n"
-        "# 4c. Benchmark ed evaluation backend multipli\n"
+        "# 4b. Benchmark, evaluation, dissemination e manuale\n"
         "python tools/benchmark_vision_models.py --model-keys generale efficientformer --image models/validation_sample.jpg\n"
-        "python ai/evaluate_vision_backends.py --dataset-root datasets/training/validation --model-keys generale efficientformer\n\n"
+        "python ai/evaluate_vision_backends.py --dataset-root datasets/training_33classes/validation --model-keys generale efficientformer\n"
+        "python Manuale/genera_manuale.py\n\n"
         "# 5. Avvia DELTA con il nuovo modello\n"
-        "python main.py",
+        "python main.py --preflight",
         label="PIPELINE COMPLETA",
     )
 
@@ -3554,7 +3616,7 @@ def _add_github_publisher(pdf: ManualePDF):
         "2. Generazione README.md aggiornato\n"
         "3. Generazione RELEASE.md con changelog\n"
         "4. Rigenerazione Manuale/DELTA_Manuale_Utente.pdf\n"
-        "5. Richiesta versione  (suggerita automaticamente, es. v2.0.1)\n"
+        "5. Richiesta versione  (suggerita automaticamente, es. v3.2.1)\n"
         "6. Conferma prima del push\n"
         "7. git add README.md RELEASE.md Manuale/DELTA_Manuale_Utente.pdf\n"
         "8. git commit -m \"chore(release): <versione>\"\n"
@@ -3565,8 +3627,8 @@ def _add_github_publisher(pdf: ManualePDF):
 
     pdf._subsection("20.5 Versione Incrementale Automatica")
     pdf._body(
-        "Se esiste un tag git precedente (es. v2.0.0), il publisher "
-        "suggerisce automaticamente la patch successiva (v2.0.1). "
+        "Se esiste un tag git precedente (es. v3.2.0), il publisher "
+        "suggerisce automaticamente la patch successiva (v3.2.1). "
         "L'amministratore puo accettare il suggerimento o inserire "
         "una versione personalizzata."
     )
@@ -3597,8 +3659,8 @@ def _add_github_publisher(pdf: ManualePDF):
         "─── ANTEPRIMA DATI RACCOLTI ───\n"
         "Repository:   https://github.com/Proctor81/DELTA-PLANT\n"
         "Branch:       main\n"
-        "Ultimo tag:   v2.0.0  (o 'nessun tag')\n"
-        "Versione sug: v2.0.1\n\n"
+        "Ultimo tag:   v3.2.0  (o 'nessun tag')\n"
+        "Versione sug: v3.2.1\n\n"
         "Modello AI:   7 classi  |  224x224x3  |  2847 KB\n"
         "Database:     11 diagnosi totali  |  8 reali\n\n"
         "Changelog:\n"
@@ -3711,7 +3773,7 @@ def _add_pretrained_model(pdf: ManualePDF):
         "PlantVillage tramite TensorFlow Datasets, addestra un modello MobileNetV2 "
         "con transfer learning sulle classi DELTA, e converte il risultato in "
         "TFLite INT8 pronto per il deploy. Non e richiesto un account Kaggle. "
-        "Questa pipeline e separata dal modello principale v3.0 leaf-only a 33 classi."
+        "Questa pipeline e separata dal modello principale v3.2 leaf-only a 33 classi."
     )
 
     pdf._subsection("19.1 Prerequisiti")
@@ -3828,7 +3890,7 @@ def _add_license_appendix(pdf: "ManualePDF"):
     pdf._section_title("Appendice Licenza — DELTA PLANT SOFTWARE LICENSE")
 
     pdf._body("Copyright \u00a9 2026 Paolo Ciccolella. All rights reserved.")
-    pdf._body("Software Release: v3.0")
+    pdf._body(f"Software Release: {SYSTEM_INFO['release']}")
     pdf._body("(This release field must be updated at each official software release.)")
     pdf.ln(2)
 
