@@ -3,7 +3,7 @@
 ### AI Plant Health and Robotics Orchestrator for Precision Agriculture
 
 <p align="center">
-  <a href="https://proctor81.github.io/delta-plant/">
+  <a href="https://proctor81.github.io/DELTA-PLANT/">
     <img src="https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-19f5c1?style=for-the-badge&logo=githubpages&logoColor=06131f" alt="Live Demo" />
   </a>
   <a href="https://t.me/DELTAPLANO_bot">
@@ -32,7 +32,7 @@ Built for researchers, agritech teams, biotech innovators, and venture capital a
 The repository now includes a GitHub Pages-ready landing page in [index.html](index.html) with a cinematic space-meets-biology visual language, animated hero scene, ambient soundtrack controls, investor-facing storytelling, structured SEO metadata, and direct DELTAPLANO access.
 
 <p align="center">
-  <a href="https://proctor81.github.io/delta-plant/">
+  <a href="https://proctor81.github.io/DELTA-PLANT/">
     <img src="https://img.shields.io/badge/%F0%9F%8C%90%20Live%20Demo-Open%20GitHub%20Pages-19f5c1?style=for-the-badge&logo=githubpages&logoColor=06131f" alt="Live Demo" />
   </a>
 </p>
@@ -113,7 +113,7 @@ Then open `http://localhost:8080` and browse the landing page from [index.html](
 
 ## Documentation Hub
 
-- [Live website](https://proctor81.github.io/delta-plant/)
+- [Live website](https://proctor81.github.io/DELTA-PLANT/)
 - [Access DELTAPLANO](https://t.me/DELTAPLANO_bot)
 - [User manual PDF](Manuale/DELTA_Manuale_Utente.pdf)
 - [Technical architecture](Manuale/DELTA_3.0_ARCHITECTURE.md)
@@ -147,6 +147,8 @@ DELTA Plant is designed to resonate with multiple high-value audiences without d
 ## Deployment Notes
 
 The landing page is intentionally built with plain HTML, Tailwind CSS via CDN, custom CSS, and vanilla JavaScript so it can deploy directly on GitHub Pages without a build step.
+
+The repository also includes a GitHub Actions workflow that republishes a minimal `gh-pages` branch whenever the landing page files or social preview assets change on `main`.
 
 ## License
 

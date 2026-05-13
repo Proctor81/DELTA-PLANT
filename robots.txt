@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://proctor81.github.io/DELTA-PLANT/sitemap.xml
