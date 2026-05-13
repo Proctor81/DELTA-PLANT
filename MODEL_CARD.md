@@ -40,30 +40,26 @@ Augmentation: Rotation, shift, zoom, horizontal flip
 
 ## Performance Metrics
 
-### EfficientFormerV2-S1 — Benchmark GitHub indipendente (2026-05-13)
-- **Ruolo nella release:** stack vision preminente di DELTA Plant v3.2 per export, benchmark pubblico, explainability e pipeline edge
-- **Quantizzazione target:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
-- **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
+### Benchmark GitHub pubblico duale (2026-05-13)
 - **Dataset benchmark:** 600 campioni PlantVillage indipendenti da `datasets/training_33classes/validation`, selezione round-robin deterministica con copertura di tutte le 33 classi
+- **Quantizzazione EfficientFormer:** int8 fully quantized di default, float32 fallback runtime, float16 disponibile come variante legacy
+- **Runtime validation:** allocazione interpreter e inferenza locale confermate sul dispositivo target
 
-| Metrica | Valore |
-| --- | --- |
-| Accuracy top-1 | 31.50% |
-| Accuracy top-3 | 91.83% |
-| Macro-F1 | 33.16% |
-| Mean confidence | 52.78% |
-| Classi coperte | 33/33 |
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 89.33% | 31.50% |
+| Accuracy top-3 | 99.00% | 91.83% |
+| Macro-F1 | 88.10% | 33.16% |
+| Mean confidence | 90.96% | 52.78% |
+| Classi coperte | 33/33 | 33/33 |
 
 Distribuzione del campione: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.
 
-Classi migliori nel benchmark indipendente:
-- `Corn_healthy`: 100.00% (4/4)
-- `Grape_Black_rot`: 100.00% (19/19)
-- `Grape_Esca`: 100.00% (19/19)
-- `Peach_healthy`: 89.47% (17/19)
-- `Blueberry_healthy`: 78.95% (15/19)
+Classi migliori nel benchmark pubblico:
+- Generale: `Apple_Black_rot` 100.00%, `Apple_healthy` 100.00%, `Bell_pepper_healthy` 100.00%, `Cherry_healthy` 100.00%, `Corn_Common_rust` 100.00%
+- EfficientFormer: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
 
-Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
+Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 
 ---
 

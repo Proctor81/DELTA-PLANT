@@ -134,24 +134,21 @@ main.py ──► DeltaAgent
 
 > ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
-### EfficientFormerV2-S1 — Accuracy Benchmark GitHub (indipendente, 600 immagini)
+### Benchmark GitHub pubblico — 33 classi PlantVillage (600 immagini indipendenti)
 
-EfficientFormerV2-S1 e la stack vision preminente della release DELTA Plant v3.2 per benchmark pubblico, export, explainability e pipeline edge.
-
-| Metrica | Valore |
-|-----------|--------|
-| **Accuracy top-1** | **31.50%** (189/600 immagini) |
-| **Accuracy top-3** | **91.83%** (551/600 immagini) |
-| **Macro-F1** | **33.16%** |
-| **Mean confidence** | **52.78%** |
-| **Classi coperte** | **33/33** |
-| **Campione** | validation-only PlantVillage, selezione round-robin deterministica |
+| Metrica | Generale | EfficientFormer |
+|-----------|--------|--------|
+| **Accuracy top-1** | **89.33%** (536/600) | **31.50%** (189/600) |
+| **Accuracy top-3** | **99.00%** (594/600) | **91.83%** (551/600) |
+| **Macro-F1** | **88.10%** | **33.16%** |
+| **Mean confidence** | **90.96%** | **52.78%** |
+| **Classi coperte** | **33/33** | **33/33** |
+| **Campione** | validation-only PlantVillage, selezione round-robin deterministica | validation-only PlantVillage, selezione round-robin deterministica |
 
 Campionamento benchmark: 600 immagini indipendenti da `datasets/training_33classes/validation`, con copertura di tutte le 33 classi, 20 classi campionate a 19 immagini, 12 classi a 18 immagini e `Corn_healthy` a 4 immagini (intero set disponibile).
 
-- Classi migliori: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
-- Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
-- Artefatti machine-readable: [logs/vision_eval/efficientformer_independent_600/efficientformer_summary.json](logs/vision_eval/efficientformer_independent_600/efficientformer_summary.json), [logs/vision_eval/efficientformer_independent_600/efficientformer_per_class_accuracy.json](logs/vision_eval/efficientformer_independent_600/efficientformer_per_class_accuracy.json)
+- Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+- Artefatti machine-readable: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 

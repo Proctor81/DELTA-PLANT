@@ -1,12 +1,10 @@
-## EfficientFormerV2-S1 - Benchmark GitHub indipendente
+## Benchmark GitHub pubblico - Generale vs EfficientFormer
 
-EfficientFormerV2-S1 e la stack vision preminente della release DELTA Plant v3.2 per benchmark pubblico, export, explainability e pipeline edge.
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 89.33% | 31.50% |
+| Accuracy top-3 | 99.00% | 91.83% |
+| Macro-F1 | 88.10% | 33.16% |
+| Mean confidence | 90.96% | 52.78% |
 
-| Metrica | EfficientFormer |
-| --- | --- |
-| Accuracy top-1 | 31.50% |
-| Accuracy top-3 | 91.83% |
-| Macro-F1 | 33.16% |
-| Mean confidence | 52.78% |
-
-Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
+Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)

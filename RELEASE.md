@@ -1,8 +1,8 @@
 # Release v3.2 — 13 maggio 2026
 
-## 🚀 DELTA Plant porta in primo piano EfficientFormerV2-S1: benchmark GitHub indipendente, runtime int8 validato, documentazione allineata
+## 🚀 DELTA Plant aggiorna il benchmark pubblico a 33 classi: Generale + EfficientFormer sullo stesso campione indipendente
 
-Questa release consolida EfficientFormerV2-S1 come stack vision preminente di DELTA Plant per benchmark pubblico, export, explainability e pipeline edge. La catena v3.2 include runtime int8 realmente eseguibile, fallback robusto, benchmark indipendente GitHub su 600 immagini e Pipeline X in grado di aggiornare anche manuale e artefatti divulgativi.
+Questa iterazione della release v3.2 aggiorna il benchmark GitHub pubblico con una valutazione duale su 600 immagini indipendenti PlantVillage, misurate sullo stesso campione per il modello `generale` e per EfficientFormerV2-S1. Restano inclusi runtime int8, fallback robusto e pipeline edge completa.
 
 ### Highlights v3.2
 
@@ -12,20 +12,22 @@ Questa release consolida EfficientFormerV2-S1 come stack vision preminente di DE
 - **Manuale utente revisionato**: aggiornati cover, flussi diagnostici, sezione MLOps, Pipeline X, licenza e release corrente
 - **Documentazione coerente**: README, MODEL_CARD, RELEASE e LICENSE allineati alla versione 3.2
 
-### EfficientFormerV2-S1 — Benchmark GitHub indipendente
+### Benchmark GitHub pubblico duale
 
 Benchmark su 600 immagini PlantVillage validation-only, con copertura di tutte le 33 classi e selezione round-robin deterministica.
 
-| Metrica | EfficientFormer |
-| --- | --- |
-| Accuracy top-1 | 31.50% |
-| Accuracy top-3 | 91.83% |
-| Macro-F1 | 33.16% |
-| Mean confidence | 52.78% |
+| Metrica | Generale | EfficientFormer |
+| --- | --- | --- |
+| Accuracy top-1 | 89.33% | 31.50% |
+| Accuracy top-3 | 99.00% | 91.83% |
+| Macro-F1 | 88.10% | 33.16% |
+| Mean confidence | 90.96% | 52.78% |
 
-Classi piu solide nel benchmark indipendente: `Corn_healthy` 100.00%, `Grape_Black_rot` 100.00%, `Grape_Esca` 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%.
+Classi piu solide del benchmark pubblico:
+- Generale: `Apple_Black_rot`, `Apple_healthy`, `Bell_pepper_healthy`, `Cherry_healthy`, `Corn_Common_rust` a 100.00%
+- EfficientFormer: `Corn_healthy`, `Grape_Black_rot`, `Grape_Esca` a 100.00%, `Peach_healthy` 89.47%, `Blueberry_healthy` 78.95%
 
-Report completo per classe: [logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md](logs/vision_eval/efficientformer_independent_600/BENCHMARK_600.md)
+Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 
 ### Changelog v3.2
 
