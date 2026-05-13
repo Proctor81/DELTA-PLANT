@@ -80,6 +80,10 @@ def _clear_user_data_keys(context: "ContextTypes.DEFAULT_TYPE", *keys: str) -> N
         context.user_data.pop(key, None)
 
 
+def _clear_chat_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
+    _clear_user_data_keys(context, "chat_mode_active", "chat_pending_chunks", "chat_pending_parse_mode")
+
+
 def _clear_diagnosis_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
     _clear_user_data_keys(context, *_DIAG_TRANSIENT_KEYS)
     context.user_data.pop("diag_qa_active", None)
@@ -917,7 +921,7 @@ async def chat_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Termina la sessione di chat e torna al menu principale."""
     if not await _guard(update):
         return ConversationHandler.END
-    _clear_user_data_keys(context, "chat_mode_active", "chat_pending_chunks", "chat_pending_parse_mode")
+    _clear_chat_state(context)
     query = update.callback_query
     if query:
         await query.answer("Chat terminata")
@@ -933,6 +937,8 @@ async def chat_command_chiudi(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    was_chat_active = bool(context.user_data.get("chat_mode_active"))
+    _clear_chat_state(context)
     intro = (
         "Benvenuto in @DELTAPLANO_bot.\n"
         "Qui puoi interagire con DELTA Plant da Telegram per avviare diagnosi, "
@@ -940,12 +946,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Usa /menu per vedere le azioni disponibili."
     )
     await _send(update, intro, reply_markup=_menu_keyboard())
+    if was_chat_active:
+        return ConversationHandler.END
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
-        return
+        return ConversationHandler.END
+    was_chat_active = bool(context.user_data.get("chat_mode_active"))
+    _clear_chat_state(context)
     await _send(update, "Menu principale:", reply_markup=_menu_keyboard())
+    if was_chat_active:
+        return ConversationHandler.END
 
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2048,13 +2060,31 @@ async def _send_diagnosis_visuals(
     context: ContextTypes.DEFAULT_TYPE,
     record: Dict[str, Any],
 ) -> None:
-    """Invia foto originale + overlay explainability se disponibili."""
+    """Invia prima il feedback CAM e poi la foto originale di riferimento."""
     chat = update.effective_chat
     if chat is None:
         return
 
     explain_cfg = VISION_CONFIG.get("explainability", {})
     artifact = record.get("explainability") or {}
+    overlay_path = artifact.get("overlay_path")
+
+    if explain_cfg.get("send_overlay", True) and overlay_path:
+        overlay_file = Path(str(overlay_path))
+        if not overlay_file.exists():
+            logger.warning("Overlay explainability non trovato: %s", overlay_file)
+        else:
+            caption_lines = [
+                "Feedback CAM DELTA Plant: il cerchio e il target indicano dove il modello sta guardando.",
+                "Le aree piu calde della LayerCAM corrispondono alla regione che ha pesato maggiormente nella decisione.",
+            ]
+            caption = "\n".join(caption_lines)
+
+            try:
+                with overlay_file.open("rb") as photo_file:
+                    await chat.send_photo(photo=photo_file, caption=caption)
+            except Exception as exc:
+                logger.warning("Invio overlay explainability Telegram fallito: %s", exc)
 
     image_path = context.user_data.get("diag_image_path")
     if explain_cfg.get("send_original", True) and image_path:
@@ -2064,29 +2094,10 @@ async def _send_diagnosis_visuals(
                 with original_path.open("rb") as photo_file:
                     await chat.send_photo(
                         photo=photo_file,
-                        caption="Foto originale acquisita per la diagnosi DELTA Plant.",
+                        caption="Foto originale acquisita per la diagnosi DELTA Plant (riferimento).",
                     )
             except Exception as exc:
                 logger.warning("Invio foto originale Telegram fallito: %s", exc)
-
-    overlay_path = artifact.get("overlay_path")
-    if not explain_cfg.get("send_overlay", True) or not overlay_path:
-        return
-
-    overlay_file = Path(str(overlay_path))
-    if not overlay_file.exists():
-        logger.warning("Overlay explainability non trovato: %s", overlay_file)
-        return
-
-    caption = "Heatmap di attenzione LayerCAM generata da DELTA Plant."
-    if artifact.get("summary"):
-        caption = f"{caption}\n{_clip_text(str(artifact['summary']), 220)}"
-
-    try:
-        with overlay_file.open("rb") as photo_file:
-            await chat.send_photo(photo=photo_file, caption=caption)
-    except Exception as exc:
-        logger.warning("Invio overlay explainability Telegram fallito: %s", exc)
 
 
 async def _send_ai_diagnosis_opinion(

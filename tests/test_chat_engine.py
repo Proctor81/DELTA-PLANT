@@ -70,6 +70,26 @@ def test_chat_anchors_followup_to_latest_diagnosis_context():
     ]
 
 
+def test_chat_anchors_short_deictic_followup_to_most_recent_diagnosis():
+    history = [
+        "Utente: Ho chiesto una diagnosi della pianta.\nPianta: vite.\nElementi completi della diagnosi:\nStato pianta: Da monitorare\nRischio: BASSO",
+        "DELTA: Diagnosi precedente sulla vite con rischio basso.",
+        "Utente: Ho chiesto una diagnosi della pianta.\nPianta: pomodoro.\nElementi completi della diagnosi:\nStato pianta: Compromesso\nRischio: ALTO",
+        "DELTA: Diagnosi più recente sul pomodoro con rischio alto.",
+    ]
+    engine = _build_engine(history)
+
+    response = engine.chat("77", "questa")
+
+    assert response == "Risposta di follow-up"
+    call = engine._hf_llm.calls[0]
+    assert "DIAGNOSI DELTA RECENTE" in call["user_message"]
+    assert "Pianta: pomodoro." in call["user_message"]
+    assert "Diagnosi più recente sul pomodoro con rischio alto." in call["user_message"]
+    assert "Pianta: vite." not in call["user_message"]
+    assert engine.memory.appended == [("77", "questa", "Risposta di follow-up")]
+
+
 def test_chat_leaves_unrelated_question_unwrapped():
     history = [
         "Utente: Ho chiesto una diagnosi della pianta.\nPianta: pomodoro.",
@@ -104,3 +124,21 @@ def test_chat_engine_loads_env_when_instantiated_outside_main(monkeypatch, tmp_p
     assert engine._hf_llm.max_tokens == 321
     assert engine._hf_llm.timeout == 45
     assert engine._hf_available is True
+
+
+def test_chat_compacts_large_history_before_calling_hf():
+    history = []
+    for idx in range(8):
+        history.append(f"Utente: rapporto diagnostico {idx} " + ("x" * 1800))
+        history.append(f"DELTA: risposta diagnostica {idx} " + ("y" * 1800))
+
+    engine = _build_engine(history)
+
+    engine.chat("77", "ciao")
+
+    call = engine._hf_llm.calls[0]
+    serialized_history = call["history"]
+    assert serialized_history
+    assert sum(len(item["content"]) for item in serialized_history) <= chat_engine.MAX_HISTORY_TOTAL_CHARS
+    assert all(len(item["content"]) <= chat_engine.MAX_HISTORY_MESSAGE_CHARS for item in serialized_history)
+    assert serialized_history[-1]["content"].startswith("risposta diagnostica 7")

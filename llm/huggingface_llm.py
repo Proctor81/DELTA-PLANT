@@ -136,6 +136,65 @@ class HuggingFaceLLM:
                 ) from e
         return self._client
 
+    def _reset_client(self) -> None:
+        """Forza la ricreazione del client HF al prossimo uso."""
+        self._client = None
+
+    @staticmethod
+    def _is_auth_error(err_msg: str) -> bool:
+        normalized = (err_msg or "").lower()
+        return "401" in normalized or "unauthorized" in normalized
+
+    @staticmethod
+    def _is_transient_error(err_msg: str) -> bool:
+        normalized = (err_msg or "").lower()
+        transient_markers = (
+            "request id",
+            "timeout",
+            "timed out",
+            "503",
+            "502",
+            "504",
+            "service unavailable",
+            "bad gateway",
+            "gateway",
+            "temporarily unavailable",
+            "connection reset",
+            "connection aborted",
+            "remote protocol error",
+            "provider",
+            "overloaded",
+            "unavailable",
+        )
+        return any(marker in normalized for marker in transient_markers)
+
+    @staticmethod
+    def _format_runtime_error(err_msg: str) -> str:
+        if HuggingFaceLLM._is_transient_error(err_msg):
+            return (
+                "[DELTA] Il servizio LLM e temporaneamente non disponibile. "
+                "Riprova tra qualche secondo."
+            )
+        return (
+            "[DELTA] Impossibile generare risposta LLM in questo momento. "
+            "Riprova piu tardi."
+        )
+
+    @staticmethod
+    def _format_auth_error(token_valid: bool) -> str:
+        if token_valid:
+            return (
+                "[DELTA] L'autenticazione HuggingFace verso il provider e fallita. "
+                "Verifica che il token abbia il permesso 'Make calls to Inference Providers' "
+                "e che il modello configurato sia raggiungibile, poi riprova."
+            )
+        return (
+            "[DELTA] Token HuggingFace non valido. "
+            "Crea un nuovo token su https://huggingface.co/settings/tokens "
+            "(tipo Fine-grained, permesso 'Make calls to Inference Providers') "
+            "e aggiorna HF_API_TOKEN in .env."
+        )
+
     def _probe_model(self, client, model: str) -> bool:
         """Verifica se un modello è raggiungibile con una chiamata di test minima."""
         try:
@@ -204,8 +263,6 @@ class HuggingFaceLLM:
         if not model:
             return "[DELTA] Nessun modello LLM disponibile.", "none"
 
-        client = self._get_client()
-
         # Costruisci la sequenza di messaggi
         messages = [
             {"role": "system", "content": system_prompt or DELTA_SYSTEM_PROMPT}
@@ -214,37 +271,40 @@ class HuggingFaceLLM:
             messages.extend(history)
         messages.append({"role": "user", "content": user_message})
 
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-            )
-            answer = resp.choices[0].message.content.strip()
-            logger.info(f"HF risposta generata con {model} ({len(answer)} chars)")
-            return answer, model
-
-        except Exception as e:
-            err_msg = str(e)
-            logger.warning(f"Errore HF con modello {model}: {err_msg}")
-
-            # Rileva token scaduto/non valido → mostra istruzioni e abbandona subito
-            if "401" in err_msg or "unauthorized" in err_msg.lower():
-                logger.warning(_TOKEN_HELP)
-                return (
-                    "[DELTA] Token HuggingFace non valido. "
-                    "Crea un nuovo token su https://huggingface.co/settings/tokens "
-                    "(tipo Fine-grained, permesso 'Make calls to Inference Providers') "
-                    "e aggiorna HF_API_TOKEN in .env.",
-                    "none",
+        last_error = ""
+        for attempt in range(2):
+            try:
+                client = self._get_client()
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
                 )
+                answer = resp.choices[0].message.content.strip()
+                logger.info(f"HF risposta generata con {model} ({len(answer)} chars)")
+                return answer, model
 
-            return (
-                f"[DELTA] Impossibile generare risposta LLM. "
-                f"Verifica connessione e token HF. Errore: {err_msg[:100]}",
-                "none",
-            )
+            except Exception as e:
+                err_msg = str(e)
+                last_error = err_msg
+                logger.warning(f"Errore HF con modello {model}: {err_msg}")
+
+                # Rileva token scaduto/non valido → mostra istruzioni e abbandona subito
+                if self._is_auth_error(err_msg):
+                    token_valid, _ = self.validate_token()
+                    if not token_valid:
+                        logger.warning(_TOKEN_HELP)
+                    return self._format_auth_error(token_valid), "none"
+
+                if attempt == 0 and self._is_transient_error(err_msg):
+                    logger.info("Errore HF transiente, ritento una volta sul modello %s", model)
+                    self._reset_client()
+                    continue
+
+                break
+
+        return self._format_runtime_error(last_error), "none"
 
     def is_available(self) -> bool:
         """Verifica se il servizio HF è disponibile."""

@@ -167,8 +167,40 @@ def test_send_diagnosis_visuals_sends_original_and_overlay(tmp_path):
     asyncio.run(tg._send_diagnosis_visuals(update, context, record))
 
     assert len(calls) == 2
-    assert calls[0] == "Foto originale acquisita per la diagnosi DELTA Plant."
-    assert "Heatmap di attenzione LayerCAM" in calls[1]
+    assert "Feedback CAM DELTA Plant" in calls[0]
+    assert "cerchio e il target" in calls[0]
+    assert "Overlay explainability" not in calls[0]
+    assert "lesione evidenziata" not in calls[0]
+    assert calls[1] == "Foto originale acquisita per la diagnosi DELTA Plant (riferimento)."
+
+
+def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
+    calls = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        calls.append(text)
+
+    async def fake_guard(update):
+        return True
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+
+    context = types.SimpleNamespace(
+        user_data={
+            "chat_mode_active": True,
+            "chat_pending_chunks": ["parte successiva"],
+            "chat_pending_parse_mode": "Markdown",
+        }
+    )
+
+    result = asyncio.run(tg.menu(object(), context))
+
+    assert result == tg.ConversationHandler.END
+    assert calls == ["Menu principale:"]
+    assert "chat_mode_active" not in context.user_data
+    assert "chat_pending_chunks" not in context.user_data
+    assert "chat_pending_parse_mode" not in context.user_data
 
 
 def test_continue_diagnosis_message_sends_next_and_final_smile(monkeypatch):
@@ -449,3 +481,230 @@ def test_menu_keyboard_includes_chat_button():
     keyboard = tg._menu_keyboard()
     callback_data = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert tg.CMD_CHAT in callback_data
+
+
+def test_clear_diagnosis_state_resets_flags_and_transient_markers():
+    context = types.SimpleNamespace(
+        user_data={
+            "diagnosis_active": True,
+            "diag_qa_active": True,
+            "sensor_index": 2,
+            "diag_image_path": "input_images/foglia.jpg",
+            "diag_followup_qa": [("Sintomi?", "Macchie scure")],
+            "diag_followup_count": 1,
+            "diag_followup_last_question": "Sintomi?",
+            "diag_pending_chunks": ["segue"],
+            "diag_pending_parse_mode": "HTML",
+            "diag_pending_closing": "chiusura",
+            "chat_mode_active": True,
+        }
+    )
+
+    tg._clear_diagnosis_state(context)
+
+    assert context.user_data["diagnosis_active"] is False
+    assert "diag_qa_active" not in context.user_data
+    assert "sensor_index" not in context.user_data
+    assert "diag_image_path" not in context.user_data
+    assert "diag_followup_qa" not in context.user_data
+    assert "diag_pending_chunks" not in context.user_data
+    assert context.user_data["chat_mode_active"] is True
+
+
+def test_free_chat_handler_ignores_followup_and_upload_states(monkeypatch):
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="ciao"),
+        effective_user=types.SimpleNamespace(id=101),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        for user_data in ({"diag_qa_active": True}, {"upload_active": True}):
+            context = types.SimpleNamespace(
+                user_data=dict(user_data),
+                application=types.SimpleNamespace(bot_data={}),
+            )
+            asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+
+def test_receive_followup_answer_advances_state_machine(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    async def fake_generate_followup_question(engine, user_id, user_description, qa_pairs, sensor_context=""):
+        assert user_id == "55"
+        assert user_description == "Foglie con macchie scure"
+        assert qa_pairs == [("Da quanto tempo?", "Da tre giorni")]
+        assert "Temperatura" in sensor_context
+        return "Le lesioni aumentano con l'umidità?", False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: object())
+    monkeypatch.setattr(tg, "_generate_followup_question", fake_generate_followup_question)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="Da tre giorni"),
+        effective_user=types.SimpleNamespace(id=55),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_followup_qa": [],
+            "diag_followup_count": 1,
+            "diag_followup_last_question": "Da quanto tempo?",
+            "diag_user_description": "Foglie con macchie scure",
+            "sensor_data": {"temperature_c": 24.5},
+            "diag_qa_active": True,
+        }
+    )
+
+    result = asyncio.run(tg.receive_followup_answer(update, context))
+
+    assert result == tg.STATE_DIAG_FOLLOWUP
+    assert context.user_data["diag_followup_qa"] == [("Da quanto tempo?", "Da tre giorni")]
+    assert context.user_data["diag_followup_count"] == 2
+    assert context.user_data["diag_followup_last_question"] == "Le lesioni aumentano con l'umidità?"
+    assert context.user_data["diag_qa_active"] is True
+    assert sends == [
+        ("📝 <i>Risposta 1 registrata.</i>", "HTML"),
+        (f"❓ <b>Domanda 2/{tg.MAX_FOLLOWUP_QUESTIONS}:</b>\nLe lesioni aumentano con l'umidità?", "HTML"),
+    ]
+
+
+def test_receive_followup_answer_finishes_after_max_questions(monkeypatch):
+    sends = []
+    forwarded = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_send_conversational_diagnosis(update, context):
+        forwarded.append(list(context.user_data.get("diag_followup_qa", [])))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_send_conversational_diagnosis", fake_send_conversational_diagnosis)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="Le macchie si stanno allargando"),
+        effective_user=types.SimpleNamespace(id=55),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_followup_qa": [],
+            "diag_followup_count": tg.MAX_FOLLOWUP_QUESTIONS,
+            "diag_followup_last_question": "Le macchie si allargano?",
+            "diag_qa_active": True,
+        }
+    )
+
+    result = asyncio.run(tg.receive_followup_answer(update, context))
+
+    assert result == tg.ConversationHandler.END
+    assert context.user_data["diag_followup_qa"] == [
+        ("Le macchie si allargano?", "Le macchie si stanno allargando")
+    ]
+    assert context.user_data["diag_qa_active"] is False
+    assert sends == [
+        ("✅ Ho raccolto tutte le informazioni necessarie. Elaboro la diagnosi... 🔬", None)
+    ]
+    assert forwarded == [[("Le macchie si allargano?", "Le macchie si stanno allargando")]]
+
+
+def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(monkeypatch):
+    sends = []
+    remembered = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_operator_says_healthy(engine, description):
+        return False
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat_internal(self, prompt):
+            assert "Domande di approfondimento e risposte" in prompt
+            assert "Temperatura" in prompt
+            return "Valutazione conversazionale finale"
+
+        def remember_turn(self, user_id, user_input, response):
+            remembered.append((user_id, user_input, response))
+
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(tg, "_operator_says_healthy", fake_operator_says_healthy)
+    monkeypatch.setattr(tg, "_sanitize_diagnosis_opinion", lambda opinion: opinion)
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=77),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_user_description": "Dipladenia con foglie gialle e margini secchi",
+            "diag_followup_qa": [("Da quanto tempo?", "Da tre giorni")],
+            "diag_followup_mode": "fallback",
+            "sensor_data": {"temperature_c": 23.5},
+            "diag_image_path": "input_images/foglia.jpg",
+            "sensor_index": 1,
+            "diag_qa_active": True,
+            "diagnosis_active": True,
+        }
+    )
+
+    asyncio.run(tg._send_conversational_diagnosis(update, context))
+
+    assert sends == [
+        ("🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>\n\nValutazione conversazionale finale", "HTML")
+    ]
+    assert remembered == [
+        ("77", remembered[0][1], "Valutazione conversazionale finale")
+    ]
+    assert "Ho chiesto una diagnosi della pianta." in remembered[0][1]
+    assert "Pianta: Dipladenia." in remembered[0][1]
+    assert "Follow-up 1: D=Da quanto tempo? | R=Da tre giorni" in remembered[0][1]
+    assert "Sei un agronomo esperto" not in remembered[0][1]
+    assert context.user_data["diagnosis_active"] is False
+    assert "diag_qa_active" not in context.user_data
+    assert "diag_image_path" not in context.user_data
+    assert "sensor_index" not in context.user_data

@@ -13,6 +13,9 @@ logger = logging.getLogger("delta.chat_engine")
 
 # Massimo messaggi di storia da includere nel contesto
 MAX_HISTORY_TURNS = 6
+MAX_HISTORY_MESSAGE_CHARS = 700
+MAX_HISTORY_TOTAL_CHARS = 3200
+MIN_HISTORY_MESSAGE_CHARS = 160
 DIAGNOSIS_TURN_MARKER = "Ho chiesto una diagnosi della pianta."
 MAX_DIAGNOSIS_CONTEXT_CHARS = 5000
 
@@ -114,15 +117,33 @@ class ChatEngine:
         messages OpenAI usato da HuggingFace InferenceClient.
         Mantiene solo gli ultimi MAX_HISTORY_TURNS scambi.
         """
-        messages = []
         turns = []
         for line in raw_history:
             if line.startswith("Utente: "):
                 turns.append({"role": "user", "content": line[len("Utente: "):]})
             elif line.startswith("DELTA: "):
                 turns.append({"role": "assistant", "content": line[len("DELTA: "):]})
-        # Tronca alla finestra di contesto configurata
-        return turns[-(MAX_HISTORY_TURNS * 2):]
+        window = turns[-(MAX_HISTORY_TURNS * 2):]
+        compacted = []
+        remaining_chars = MAX_HISTORY_TOTAL_CHARS
+
+        for turn in reversed(window):
+            content = re.sub(r"\s+", " ", turn["content"]).strip()
+            if not content or remaining_chars <= 0:
+                continue
+
+            if len(content) > MAX_HISTORY_MESSAGE_CHARS:
+                content = content[: MAX_HISTORY_MESSAGE_CHARS - 1].rstrip() + "…"
+
+            if len(content) > remaining_chars:
+                if remaining_chars < MIN_HISTORY_MESSAGE_CHARS:
+                    break
+                content = content[: remaining_chars - 1].rstrip() + "…"
+
+            compacted.append({"role": turn["role"], "content": content})
+            remaining_chars -= len(content)
+
+        return list(reversed(compacted))
 
     @staticmethod
     def _normalize_text(text: str) -> str:

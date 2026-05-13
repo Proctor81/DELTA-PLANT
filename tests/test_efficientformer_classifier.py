@@ -1,7 +1,14 @@
 import types
+import sys
+from pathlib import Path
 
 import numpy as np
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from ai.export_efficientformer_tflite import _find_direct_tflite_artifact
 from vision.efficientformer_classifier import EfficientFormerClassifier, _InterpreterBundle
 from vision.vision_service import VisionService
 
@@ -50,6 +57,66 @@ def test_efficientformer_uses_float16_variant_from_registry(monkeypatch, tmp_pat
     assert classifier.is_ready is True
     assert classifier._cfg["model_path"] == str(float16_model)
     assert classifier._quantization == "float16"
+
+
+def test_export_int8_selection_ignores_dynamic_range_artifact(tmp_path):
+    dynamic_range = tmp_path / "efficientformer_v2_s1_33classes_int8_dynamic_range_quant.tflite"
+    dynamic_range.write_bytes(b"dynamic-range")
+
+    assert _find_direct_tflite_artifact(tmp_path, "int8") is None
+
+    full_integer = tmp_path / "efficientformer_v2_s1_33classes_full_integer_quant.tflite"
+    full_integer.write_bytes(b"full-int8")
+
+    assert _find_direct_tflite_artifact(tmp_path, "int8") == full_integer
+
+
+def test_efficientformer_falls_back_from_int8_to_float32(monkeypatch, tmp_path):
+    import core.config as cfg
+
+    labels_path = tmp_path / "labels.txt"
+    labels_path.write_text("Apple_healthy\nTomato_healthy\n", encoding="utf-8")
+    int8_model = tmp_path / "efficientformer_int8.tflite"
+    float32_model = tmp_path / "efficientformer_float32.tflite"
+    int8_model.write_bytes(b"int8")
+    float32_model.write_bytes(b"float32")
+
+    monkeypatch.setitem(
+        cfg.MODELS_REGISTRY,
+        "efficientformer_test_int8",
+        {
+            "backend": "efficientformer",
+            "labels_path": str(labels_path),
+            "quantization": "int8",
+            "variants": {
+                "int8": {"model_path": str(int8_model)},
+                "float32": {"model_path": str(float32_model)},
+            },
+        },
+    )
+    monkeypatch.setattr(cfg, "ACTIVE_MODEL", "efficientformer_test_int8", raising=False)
+
+    def fake_bundle(self, config, model_key):
+        if config["model_path"] == str(int8_model):
+            raise RuntimeError("FlexErf non supportato")
+        return _InterpreterBundle(
+            interpreter=None,
+            input_details=[{"shape": [1, 224, 224, 3], "dtype": np.float32}],
+            output_details=[{"shape": [1, 2]}],
+            runtime_name="fake-runtime",
+            model_key=model_key,
+            model_path=float32_model,
+            quantization="float32",
+        )
+
+    monkeypatch.setattr(EfficientFormerClassifier, "_create_interpreter_bundle", fake_bundle)
+    monkeypatch.setattr(EfficientFormerClassifier, "_init_explainer", lambda self: None)
+
+    classifier = EfficientFormerClassifier(model_key="efficientformer_test_int8")
+
+    assert classifier.is_ready is True
+    assert classifier._cfg["model_path"] == str(float32_model)
+    assert classifier._quantization == "float32"
 
 
 def test_efficientformer_infer_image_ensembles_probabilities():
@@ -117,6 +184,26 @@ def test_efficientformer_get_explanation_returns_overlay_payload(monkeypatch):
     assert payload["target_layer"] == "network.6"
     assert payload["image_bytes"] == b"png-bytes"
     assert payload["overlay"].shape == (4, 4, 3)
+
+
+def test_overlay_heatmap_draws_focus_marker(monkeypatch):
+    classifier = EfficientFormerClassifier.__new__(EfficientFormerClassifier)
+    classifier._cfg = {"overlay_alpha": 0.0}
+
+    monkeypatch.setattr(
+        classifier,
+        "_colorize_heatmap",
+        lambda heatmap: np.zeros((32, 32, 3), dtype=np.uint8),
+    )
+
+    base = np.zeros((32, 32, 3), dtype=np.uint8)
+    heatmap = np.zeros((32, 32), dtype=np.float32)
+    heatmap[10:22, 8:20] = 1.0
+
+    overlay = classifier._overlay_heatmap(base, heatmap)
+
+    assert overlay.shape == (32, 32, 3)
+    assert np.count_nonzero(overlay) > 0
 
 
 def test_vision_service_normalizes_low_confidence_to_fallback():
