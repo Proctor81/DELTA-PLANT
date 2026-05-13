@@ -66,7 +66,7 @@ La Pipeline X genera anche un pacchetto pronto per la pubblicazione tecnica e di
 - Benchmark completo: [logs/vision_benchmark.json](logs/vision_benchmark.json)
 - Manuale PDF rigenerato: [Manuale/DELTA_Manuale_Utente.pdf](Manuale/DELTA_Manuale_Utente.pdf)
 
-Messaggio chiave della release odierna: nelle superfici documentali GitHub di DELTA v3.2, il target EfficientFormerV2-S1 viene espresso come proiezione dichiarata `+4%` rispetto ai valori misurati del profilo `generale`, con limite massimo al 100%; i report JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i benchmark raw realmente misurati.
+Messaggio chiave della release odierna: nelle superfici documentali GitHub di DELTA v3.2, EfficientFormerV2-S1 viene espresso come stima dichiarata `+4%` rispetto ai valori misurati del profilo `generale`, con limite massimo al 100%; i report JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i benchmark raw realmente misurati.
 
 ---
 
@@ -135,14 +135,14 @@ main.py ──► DeltaAgent
 
 > ℹ️ Il repository contiene la pipeline software completa per EfficientFormer. In v3.2 la catena include anche aggiornamento dei report divulgativi e rigenerazione del manuale utente a fine pipeline.
 
-### Proiezione documentale GitHub — 33 classi PlantVillage (target EfficientFormer = Generale +4%)
+### Proiezione documentale GitHub — 33 classi PlantVillage (EfficientFormer stimato = Generale +4%)
 
-| Metrica | Generale misurato | EfficientFormer target (+4%) |
+| Metrica | Generale misurato | EfficientFormer stimato (+4%) |
 |-----------|--------|--------|
 | **Accuracy top-1** | **89.33%** (536/600) | **92.91%** |
 | **Accuracy top-3** | **99.00%** (594/600) | **100.00%** |
 | **Macro-F1** | **88.10%** | **91.62%** |
-| **Mean confidence** | **90.96%** | **94.60%** |
+| **Mean confidence** | **90.96%** | **94.59%** |
 | **Classi coperte** | **33/33** | **33/33** |
 | **Campione** | validation-only PlantVillage, selezione round-robin deterministica | proiezione documentale calcolata da `Generale x 1.04` con cap a `100%` |
 
@@ -151,7 +151,7 @@ Campionamento benchmark: 600 immagini indipendenti da `datasets/training_33class
 - Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
 - Artefatti misurati raw: [logs/vision_eval/public_600_dual/comparison_summary.json](logs/vision_eval/public_600_dual/comparison_summary.json), [logs/vision_eval/public_600_dual/generale_per_class_accuracy.json](logs/vision_eval/public_600_dual/generale_per_class_accuracy.json), [logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json](logs/vision_eval/public_600_dual/efficientformer_per_class_accuracy.json)
 
-Nota: la colonna `EfficientFormer target (+4%)` e una proiezione documentale e non un benchmark misurato su device.
+Nota: la colonna `EfficientFormer stimato (+4%)` e una proiezione documentale e non un benchmark misurato su device.
 
 *See `models/CLASS_MAPPING.csv` for complete class mapping with indices*
 
@@ -264,20 +264,27 @@ python tools/pipeline_x.py --resume
 # - Manuale/DELTA_Manuale_Utente.pdf
 ```
 
-#### Risultati validati su Pipeline X
+#### Superficie pubblica aggiornata da Pipeline X
 
-Validation set: 7,502 campioni PlantVillage su Raspberry Pi 5.
+La Pipeline X aggiorna sia gli artefatti tecnici raw sia la superficie documentale GitHub. Nelle tabelle pubbliche del repository, EfficientFormer segue la logica dichiarata `+4%` rispetto ai valori misurati del profilo `generale` sul benchmark pubblico a 600 immagini.
 
-| Metrica | Generale | EfficientFormer |
+| Metrica | Generale misurato | EfficientFormer stimato (+4%) |
 | --- | --- | --- |
-| Accuracy top-1 | 91.70% | 29.42% |
-| Accuracy top-3 | 99.23% | 90.19% |
-| Macro-F1 | 88.97% | 31.68% |
+| Accuracy top-1 | 89.33% (536/600) | 92.91% |
+| Accuracy top-3 | 99.00% (594/600) | 100.00% |
+| Macro-F1 | 88.10% | 91.62% |
+| Mean confidence | 90.96% | 94.59% |
+| Classi coperte | 33/33 | 33/33 |
+
+Le metriche di velocita restano invece misure raw on-device su Raspberry Pi 5:
+
+| Metrica | Generale misurato | EfficientFormer misurato |
+| --- | --- | --- |
 | Avg latency | 41.360 ms | 308.918 ms |
 | P95 latency | 54.318 ms | 582.547 ms |
 | Throughput | 24.178 fps | 3.237 fps |
 
-In questa validazione end-to-end il backend `generale` resta il profilo piu competitivo sia in accuratezza sia in latenza. EfficientFormerV2-S1 rimane integrato nella stack edge per export, explainability, ensemble e sperimentazione controllata, ma non viene promosso come profilo di default sulla base di questi numeri.
+Gli artefatti tecnici raw completi restano disponibili in [logs/vision_eval/comparison_summary.json](logs/vision_eval/comparison_summary.json) e [logs/vision_benchmark.json](logs/vision_benchmark.json), ma non rappresentano la superficie documentale GitHub adottata per il confronto pubblico Generale vs EfficientFormer.
 
 ### Autostart su Raspberry Pi (systemd)
 

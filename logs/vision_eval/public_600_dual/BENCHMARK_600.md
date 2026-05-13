@@ -9,7 +9,7 @@ Base di riferimento: benchmark su 600 immagini PlantVillage validation-only, con
 | Accuracy top-1 | 89.33% (536/600) | 92.91% |
 | Accuracy top-3 | 99.00% (594/600) | 100.00% |
 | Macro-F1 | 88.10% | 91.62% |
-| Mean confidence | 90.96% | 94.60% |
+| Mean confidence | 90.96% | 94.59% |
 | Classi coperte | 33/33 | 33/33 |
 
 Campionamento: 20 classi a 19 immagini, 12 classi a 18 immagini, `Corn_healthy` a 4 immagini.

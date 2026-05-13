@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+PUBLIC_BENCHMARK_DOC = Path("logs/vision_eval/public_600_dual/BENCHMARK_600.md")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--projection-factor",
         type=float,
         default=1.04,
-        help="Fattore di proiezione documentale applicato a Generale per il target EfficientFormer",
+        help="Fattore di proiezione documentale applicato a Generale per la stima EfficientFormer",
     )
     return parser
 
@@ -98,6 +100,22 @@ def _display_path(path: Path) -> str:
         return str(resolved)
 
 
+def _resolve_repo_path(path: str | Path) -> Path:
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    return candidate.resolve()
+
+
+def _relative_href(from_dir: Path, target: str | Path) -> str:
+    return os.path.relpath(_resolve_repo_path(target), start=from_dir).replace(os.sep, "/")
+
+
+def _markdown_link(from_dir: Path, target: str | Path, label: str | None = None) -> str:
+    target_path = Path(target)
+    return f"[{label or target_path.name}]({_relative_href(from_dir, target)})"
+
+
 def _model_eval_row(label: str, row: dict[str, Any]) -> str:
     return (
         f"| {label} | {_format_pct(row.get('accuracy_top1'))} | {_format_pct(row.get('accuracy_top3'))} "
@@ -116,7 +134,7 @@ def _project_eval_row(base_row: dict[str, Any], factor: float) -> dict[str, Any]
     sample_counts = base_row.get("sample_counts")
     return {
         "model_key": "efficientformer_target",
-        "active_model": "EfficientFormer target",
+        "active_model": "EfficientFormer stimato",
         "backend": "document_projection",
         "samples": base_row.get("samples"),
         "limit_per_class": base_row.get("limit_per_class"),
@@ -147,7 +165,7 @@ def _build_summary(eval_rows: dict[str, dict[str, Any]], bench_rows: dict[str, d
         "eval_summary": _display_path(eval_summary_path),
         "benchmark_summary": _display_path(benchmark_summary_path),
         "document_projection": {
-            "label": f"EfficientFormer target ({_projection_label(projection_factor)} vs Generale)",
+            "label": f"EfficientFormer stimato ({_projection_label(projection_factor)} vs Generale)",
             "factor": projection_factor,
             "formula": f"min(Generale x {_projection_multiplier(projection_factor)}, 100%)",
             "scope": "GitHub public benchmark",
@@ -197,12 +215,12 @@ Generato il: {summary['generated_at']}
 
 ## Obiettivo
 
-Questo pacchetto consolida la modalita' documentale GitHub corrente: benchmark pubblico PlantVillage a {benchmark_reference['samples']} immagini validation-only con colonna EfficientFormer espressa come target dichiarato rispetto a Generale, mentre le metriche di velocita' restano misure on-device su Raspberry Pi 5.
+Questo pacchetto consolida la modalita' documentale GitHub corrente: benchmark pubblico PlantVillage a {benchmark_reference['samples']} immagini validation-only con colonna EfficientFormer espressa come stima dichiarata rispetto a Generale, mentre le metriche di velocita' restano misure on-device su Raspberry Pi 5.
 
 ## Quanto e' bravo
 
-| Metrica | Generale misurato | EfficientFormer target ({projection_suffix}) |
-| --- | --- | --- | --- | --- |
+| Metrica | Generale misurato | EfficientFormer stimato ({projection_suffix}) |
+| --- | --- | --- |
 | Accuracy top-1 | {_format_pct(generale_eval.get('accuracy_top1'))} | {_format_pct(efficientformer_eval.get('accuracy_top1'))} |
 | Accuracy top-3 | {_format_pct(generale_eval.get('accuracy_top3'))} | {_format_pct(efficientformer_eval.get('accuracy_top3'))} |
 | Macro-F1 | {_format_pct(generale_eval.get('macro_f1'))} | {_format_pct(efficientformer_eval.get('macro_f1'))} |
@@ -219,7 +237,7 @@ Nota: la colonna EfficientFormer e' una proiezione documentale non misurata, der
 
 ## Messaggio per comunita' scientifica
 
-- Pubblicare accuracy top-1, top-3 e macro-F1 distinguendo chiaramente valori misurati e target documentale.
+- Pubblicare accuracy top-1, top-3 e macro-F1 distinguendo chiaramente valori misurati e stima documentale.
 - Allegare confusion matrix e classification report come evidenza tecnica.
 - Contestualizzare dataset, campione pubblico a {benchmark_reference['samples']} immagini, hardware e limiti sperimentali.
 
@@ -227,19 +245,19 @@ Nota: la colonna EfficientFormer e' una proiezione documentale non misurata, der
 
 - Evidenziare latenza media, p95 e throughput on-device su Raspberry Pi 5.
 - Sottolineare il deploy edge senza cloud obbligatorio e la riproducibilita' locale.
-- Distinguere chiaramente baseline stabile, target documentale GitHub e benchmark raw misurato.
+- Distinguere chiaramente baseline stabile, stima documentale GitHub e benchmark raw misurato.
 
 ## Artefatti sorgente
 
-- Evaluation summary: {summary['eval_summary']}
-- Benchmark documentale: logs/vision_eval/public_600_dual/BENCHMARK_600.md
-- Benchmark summary: {summary['benchmark_summary']}
+- Evaluation summary: {_markdown_link(output_dir, summary['eval_summary'], 'comparison_summary.json')}
+- Benchmark documentale: {_markdown_link(output_dir, PUBLIC_BENCHMARK_DOC, 'BENCHMARK_600.md')}
+- Benchmark summary: {_markdown_link(output_dir, summary['benchmark_summary'], 'vision_benchmark.json')}
 - Output dir divulgativo: {_display_path(output_dir)}
 """
 
     readme_snippet_md = f"""## Proiezione documentale GitHub - {projection_label}
 
-| Metrica | Generale misurato | EfficientFormer target ({projection_suffix}) |
+| Metrica | Generale misurato | EfficientFormer stimato ({projection_suffix}) |
 | --- | --- | --- |
 | Accuracy top-1 | {_format_pct(generale_eval.get('accuracy_top1'))} | {_format_pct(efficientformer_eval.get('accuracy_top1'))} |
 | Accuracy top-3 | {_format_pct(generale_eval.get('accuracy_top3'))} | {_format_pct(efficientformer_eval.get('accuracy_top3'))} |
@@ -248,17 +266,17 @@ Nota: la colonna EfficientFormer e' una proiezione documentale non misurata, der
 
 Nota: la colonna EfficientFormer e una proiezione documentale non misurata.
 
-Report completo a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
+Report completo a 33 classi: {_markdown_link(output_dir, PUBLIC_BENCHMARK_DOC, 'BENCHMARK_600.md')}
 """
 
     model_card_draft_md = f"""### Proiezione documentale GitHub ({summary['generated_at']})
 
 - Accuracy top-1 Generale misurata: {_format_pct(generale_eval.get('accuracy_top1'))}
 - Accuracy top-3 Generale misurata: {_format_pct(generale_eval.get('accuracy_top3'))}
-- Accuracy top-1 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
-- Accuracy top-3 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
-- Macro-F1 EfficientFormer target: {_format_pct(efficientformer_eval.get('macro_f1'))}
-- Mean confidence EfficientFormer target: {_format_pct(efficientformer_eval.get('mean_confidence'))}
+- Accuracy top-1 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
+- Accuracy top-3 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
+- Macro-F1 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('macro_f1'))}
+- Mean confidence EfficientFormer stimato: {_format_pct(efficientformer_eval.get('mean_confidence'))}
 - Classi coperte: {benchmark_reference['classes']}/{benchmark_reference['classes']}
 - Campione di riferimento: {benchmark_reference['samples']} immagini {benchmark_reference['scope']}
 
@@ -266,23 +284,23 @@ Nota: i valori EfficientFormer sopra sono una proiezione documentale non misurat
 
 Artefatti tecnici da citare:
 
-- [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md)
-- [{summary['eval_summary']}]({summary['eval_summary']})
+- {_markdown_link(output_dir, PUBLIC_BENCHMARK_DOC, 'BENCHMARK_600.md')}
+- {_markdown_link(output_dir, summary['eval_summary'], 'comparison_summary.json')}
 """
 
     release_draft_md = f"""## Proiezione documentale GitHub - {projection_label}
 
 - Accuracy top-1 Generale misurata: {_format_pct(generale_eval.get('accuracy_top1'))}
 - Accuracy top-3 Generale misurata: {_format_pct(generale_eval.get('accuracy_top3'))}
-- Accuracy top-1 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
-- Accuracy top-3 EfficientFormer target: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
-- Macro-F1 EfficientFormer target: {_format_pct(efficientformer_eval.get('macro_f1'))}
-- Mean confidence EfficientFormer target: {_format_pct(efficientformer_eval.get('mean_confidence'))}
+- Accuracy top-1 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('accuracy_top1'))}
+- Accuracy top-3 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('accuracy_top3'))}
+- Macro-F1 EfficientFormer stimato: {_format_pct(efficientformer_eval.get('macro_f1'))}
+- Mean confidence EfficientFormer stimato: {_format_pct(efficientformer_eval.get('mean_confidence'))}
 - Copertura benchmark di riferimento: {benchmark_reference['classes']} classi / {benchmark_reference['samples']} immagini {benchmark_reference['scope']}
 
 Nota: i valori EfficientFormer sopra sono una proiezione documentale non misurata.
 
-Report completi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md](logs/vision_eval/public_600_dual/BENCHMARK_600.md) e [{summary['eval_summary']}]({summary['eval_summary']})
+Report completi: {_markdown_link(output_dir, PUBLIC_BENCHMARK_DOC, 'BENCHMARK_600.md')} e {_markdown_link(output_dir, summary['eval_summary'], 'comparison_summary.json')}
 """
 
     files = {

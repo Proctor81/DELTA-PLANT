@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-05-13 18:54:53",
+  "generated_at": "2026-05-13 19:31:58",
   "eval_summary": "logs/vision_eval/public_600_dual/comparison_summary.json",
   "benchmark_summary": "logs/vision_benchmark.json",
   "document_projection": {
-    "label": "EfficientFormer target (+4% vs Generale)",
+    "label": "EfficientFormer stimato (+4% vs Generale)",
     "factor": 1.04,
     "formula": "min(Generale x 1.04, 100%)",
     "scope": "GitHub public benchmark"
@@ -79,7 +79,7 @@
     "efficientformer": {
       "evaluation": {
         "model_key": "efficientformer_target",
-        "active_model": "EfficientFormer target",
+        "active_model": "EfficientFormer stimato",
         "backend": "document_projection",
         "samples": 600,
         "limit_per_class": 0,
@@ -176,7 +176,7 @@
       },
       "evaluation_document_target": {
         "model_key": "efficientformer_target",
-        "active_model": "EfficientFormer target",
+        "active_model": "EfficientFormer stimato",
         "backend": "document_projection",
         "samples": 600,
         "limit_per_class": 0,
