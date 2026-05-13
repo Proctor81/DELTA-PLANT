@@ -7,8 +7,8 @@
 ![Version](https://img.shields.io/badge/Version-v3.2--Unified--Edge--Intelligence-green)
 ![Classes](https://img.shields.io/badge/Classes-33%20Classi-blue)
 ![LayerCAM](https://img.shields.io/badge/XAI-LayerCAM-orange)
-![Generale](https://img.shields.io/badge/Generale-83.9%25%20top--1%20%7C%2096.1%25%20top--3-success)
-![EfficientFormer](https://img.shields.io/badge/EfficientFormer%20stimato%20%2B4%25-87.26%25%20top--1%20%7C%2099.94%25%20top--3-brightgreen)
+![Generale](https://img.shields.io/badge/Generale%20pubblico-89.33%25%20top--1%20%7C%2099.00%25%20top--3-success)
+![EfficientFormer](https://img.shields.io/badge/EfficientFormer%20stimato%20%2B4%25-92.91%25%20top--1%20%7C%20100.00%25%20top--3-brightgreen)
 
 
 > **DELTA Plant** — *AI & Robotics Orchestrator per la Salute delle Piante*  
@@ -231,9 +231,9 @@ main.py ──► DeltaAgent
 | Dimensione TFLite baseline | 5.0 MB (float16) |
 | Input shape | `(224, 224, 3)` — preprocessing MobileNetV2: `(x/127.5)−1.0` |
 | Classi output | 33 classi PlantVillage |
-| Accuracy baseline top-1 | **83.9%** (554/660 img, benchmark PlantVillage) |
-| Accuracy baseline top-3 | **96.1%** (634/660 img, benchmark PlantVillage) |
-| Inferenza baseline (RPi5) | ~180ms (XNNPACK delegate) |
+| Accuracy pubblica top-1 | **89.33%** (536/600 img, benchmark pubblico PlantVillage) |
+| Accuracy pubblica top-3 | **99.00%** (594/600 img, benchmark pubblico PlantVillage) |
+| Inferenza edge generale (RPi5) | 41.360 ms medi (benchmark on-device) |
 | Soglia confidenza | 50% (fallback Classe_NonClassificato) |
 | Thread inferenza | 4 per baseline, 4-6 per EfficientFormer |
 
@@ -530,7 +530,8 @@ Il testo integrale è nel file [`LICENSE`](LICENSE) del repository.
 - **Callbacks:** EarlyStopping (patience=10), ReduceLROnPlateau
 - **Training Time:** ~24 hours (RPi5 4-core)
 
-### Benchmark indipendente (2026-05-03)
+### Benchmark storico indipendente (2026-05-03)
+- **Nota:** questo blocco conserva il primo benchmark indipendente pubblicato da DELTA Plant e resta utile come riferimento storico, ma non e la superficie benchmark principale della homepage v3.2.
 - **Dataset:** 660 immagini PlantVillage (20/classe, tutte e 33 le classi)
 - **Accuratezza top-1:** 83.9% (554/660)
 - **Accuratezza top-3:** 96.1% (634/660)
