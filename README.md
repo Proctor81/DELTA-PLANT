@@ -37,7 +37,7 @@ The repository now includes a GitHub Pages-ready landing page in [index.html](in
   </a>
 </p>
 
-![DELTA Plant Website Preview](assets/social-preview.png)
+![DELTA Plant Website Preview](https://www.image2url.com/r2/default/images/1778746172507-65d54433-1fec-459e-808b-141f7769e16c.png)
 
 | Preview Layer | What it Communicates |
 | --- | --- |
