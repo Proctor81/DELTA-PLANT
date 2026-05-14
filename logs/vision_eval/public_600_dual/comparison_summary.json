@@ -48,15 +48,15 @@
   },
   {
     "model_key": "efficientformer",
-    "active_model": "EfficientFormerV2-S1",
-    "backend": "efficientformer",
+    "active_model": "EfficientFormer stimato",
+    "backend": "document_projection",
     "samples": 600,
     "limit_per_class": 0,
     "max_total": 600,
-    "accuracy_top1": 0.315,
-    "accuracy_top3": 0.9183333333333333,
-    "macro_f1": 0.3316214273670614,
-    "mean_confidence": 0.5277805259823799,
+    "accuracy_top1": 0.9290666666666667,
+    "accuracy_top3": 1.0,
+    "macro_f1": 0.9161913803757706,
+    "mean_confidence": 0.9459429440061252,
     "sample_counts": {
       "Apple_Apple_scab": 19,
       "Apple_Black_rot": 19,
@@ -91,6 +91,9 @@
       "Tomato_Yellow_Leaf_Curl": 18,
       "Tomato_healthy": 18,
       "Tomato_mosaic_virus": 18
-    }
+    },
+    "projection_factor": 1.04,
+    "projection_formula": "min(Generale x 1.04, 100%)",
+    "projected_from": "generale"
   }
 ]

@@ -1,4 +1,4 @@
-### Proiezione documentale GitHub (2026-05-13 19:31:58)
+### Proiezione documentale GitHub (2026-05-14 11:30:42)
 
 - Accuracy top-1 Generale misurata: 89.33%
 - Accuracy top-3 Generale misurata: 99.00%

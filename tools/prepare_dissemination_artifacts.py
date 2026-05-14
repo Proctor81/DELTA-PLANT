@@ -150,6 +150,13 @@ def _project_eval_row(base_row: dict[str, Any], factor: float) -> dict[str, Any]
     }
 
 
+def _public_eval_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    generale_eval = dict(summary["models"]["generale"]["evaluation"])
+    efficientformer_eval = dict(summary["models"]["efficientformer"]["evaluation_document_target"])
+    efficientformer_eval["model_key"] = "efficientformer"
+    return [generale_eval, efficientformer_eval]
+
+
 def _build_summary(eval_rows: dict[str, dict[str, Any]], bench_rows: dict[str, dict[str, Any]], args) -> dict[str, Any]:
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     eval_summary_path = Path(args.eval_summary)
@@ -342,6 +349,8 @@ def main() -> int:
         raise RuntimeError("Risultati EfficientFormer mancanti: impossibile preparare ATTIVITA' DIVULGATIVE")
 
     summary = _build_summary(eval_rows, bench_rows, args)
+    public_eval_rows = _public_eval_rows(summary)
+    eval_summary_path.write_text(json.dumps(public_eval_rows, indent=2, ensure_ascii=False), encoding="utf-8")
     summary_json_path = output_dir / "dissemination_summary.json"
     summary_json_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     written_files = _write_markdown_files(output_dir, summary)

@@ -1,6 +1,6 @@
 # ATTIVITA' DIVULGATIVE - Pipeline X
 
-Generato il: 2026-05-13 19:31:58
+Generato il: 2026-05-14 11:30:42
 
 ## Obiettivo
 
