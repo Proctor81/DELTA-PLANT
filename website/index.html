@@ -370,6 +370,182 @@
       gap: 0.7rem;
     }
 
+    .privacy-banner-shell {
+      position: fixed;
+      left: 1rem;
+      bottom: 1rem;
+      z-index: 60;
+      width: min(460px, calc(100vw - 1.5rem));
+      padding: 1rem;
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(8, 23, 34, 0.94), rgba(4, 12, 22, 0.92));
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      box-shadow: 0 20px 60px rgba(2, 7, 13, 0.52), 0 0 28px rgba(25, 245, 193, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .privacy-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: rgba(2, 7, 13, 0.68);
+      backdrop-filter: blur(10px);
+    }
+
+    .privacy-modal-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 75;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .privacy-modal-card {
+      width: min(680px, 100%);
+      padding: 1.4rem;
+      border-radius: 32px;
+    }
+
+    .privacy-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .privacy-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #edf7ff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .privacy-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(25, 245, 193, 0.28);
+      color: #19f5c1;
+    }
+
+    .privacy-button-primary {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      color: #04131c;
+      border-color: transparent;
+      box-shadow: 0 0 0 1px rgba(121, 231, 255, 0.14), 0 16px 32px rgba(25, 245, 193, 0.18);
+    }
+
+    .privacy-button-primary:hover {
+      color: #04131c;
+    }
+
+    .privacy-button-quiet {
+      background: rgba(7, 17, 29, 0.76);
+    }
+
+    .privacy-option {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1rem 0;
+      border-top: 1px solid rgba(121, 231, 255, 0.08);
+    }
+
+    .privacy-option:first-of-type {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .privacy-state-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(121, 231, 255, 0.08);
+      color: rgba(237, 247, 255, 0.92);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .privacy-toggle {
+      position: relative;
+      flex: none;
+      width: 56px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      transition: background 180ms ease, border-color 180ms ease;
+    }
+
+    .privacy-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #edf7ff;
+      box-shadow: 0 6px 16px rgba(2, 7, 13, 0.28);
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .privacy-toggle.is-active {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      border-color: transparent;
+    }
+
+    .privacy-toggle.is-active::after {
+      transform: translateX(24px);
+      background: #04131c;
+    }
+
+    .privacy-manage {
+      position: fixed;
+      left: 1rem;
+      bottom: 1rem;
+      z-index: 58;
+    }
+
+    .privacy-manage-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.8rem;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(8, 23, 34, 0.9);
+      color: #edf7ff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 12px 36px rgba(2, 7, 13, 0.34);
+      backdrop-filter: blur(16px);
+    }
+
+    .privacy-manage-button:hover {
+      color: #19f5c1;
+      border-color: rgba(25, 245, 193, 0.26);
+    }
+
     input[type='range'] {
       accent-color: var(--neonleaf);
     }
@@ -514,6 +690,26 @@
         bottom: 20%;
         width: 220px;
         height: 220px;
+      }
+
+      .privacy-banner-shell {
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        width: auto;
+      }
+
+      .privacy-manage {
+        left: 0.75rem;
+        bottom: 0.75rem;
+      }
+
+      body.privacy-banner-visible .audio-dock {
+        bottom: 14rem !important;
+      }
+
+      body.privacy-manage-visible .audio-dock {
+        bottom: 5.5rem !important;
       }
 
       .leaf-b {
@@ -827,7 +1023,7 @@
         </div>
       </div>
 
-      <audio id="hero-audio" loop muted playsinline preload="metadata" src="https://cdn.pixabay.com/download/audio/2023/10/31/audio_a56deec5d8.mp3?filename=rockot-space-epic-cinematic-journey-174145.mp3"></audio>
+      <audio id="hero-audio" loop muted playsinline preload="none" data-src="https://cdn.pixabay.com/download/audio/2023/10/31/audio_a56deec5d8.mp3?filename=rockot-space-epic-cinematic-journey-174145.mp3"></audio>
     </section>
 
     <section id="features" class="relative py-24 sm:py-28">
@@ -1234,6 +1430,71 @@
     </div>
   </footer>
 
+  <div id="privacy-manage" class="privacy-manage hidden">
+    <button id="privacy-manage-button" type="button" class="privacy-manage-button">Privacy & cookies</button>
+  </div>
+
+  <div id="privacy-backdrop" class="privacy-backdrop hidden"></div>
+
+  <section id="privacy-banner" class="privacy-banner-shell hidden" aria-label="Privacy and cookie banner" aria-live="polite">
+    <div class="section-kicker">Privacy & cookies</div>
+    <h2 class="mt-3 font-display text-2xl leading-tight text-white">Control optional media and stored preferences.</h2>
+    <p class="mt-3 text-sm leading-6 text-slate-300/76">DELTA Plant stores one local preference record to remember your choice. Optional third-party media is limited to the hero soundtrack. You can continue with essential-only browsing or open the Privacy Preference Center.</p>
+    <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-300/72">
+      <a href="./privacy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Privacy Policy</a>
+      <a href="./cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>
+    </div>
+    <div class="privacy-action-row">
+      <button id="privacy-essential-only" type="button" class="privacy-button privacy-button-quiet">Essential only</button>
+      <button id="privacy-open-center" type="button" class="privacy-button">Preferences</button>
+      <button id="privacy-accept-all" type="button" class="privacy-button privacy-button-primary">Accept all</button>
+    </div>
+  </section>
+
+  <section id="privacy-modal" class="privacy-modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" aria-describedby="privacy-modal-copy">
+    <div class="privacy-modal-card glass">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="section-kicker">Privacy Preference Center</div>
+          <h2 id="privacy-modal-title" class="mt-3 font-display text-3xl leading-tight text-white sm:text-4xl">Choose what DELTA Plant can load on this page.</h2>
+        </div>
+        <button id="privacy-close-modal" type="button" class="privacy-button privacy-button-quiet">Close</button>
+      </div>
+
+      <p id="privacy-modal-copy" class="mt-4 max-w-3xl text-sm leading-7 text-slate-300/76">The website itself stays browseable without marketing cookies. The only optional third-party request controlled here is the hero soundtrack media. Your choice is stored locally in this browser so the banner does not reappear on every visit.</p>
+
+      <div class="mt-8">
+        <div class="privacy-option">
+          <div>
+            <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">Essential storage</div>
+            <p class="mt-2 text-sm leading-6 text-slate-300/72">Required to remember your privacy choice and keep the preference center consistent between visits.</p>
+          </div>
+          <span class="privacy-state-pill">Always on</span>
+        </div>
+
+        <div class="privacy-option">
+          <div>
+            <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">Optional soundtrack media</div>
+            <p class="mt-2 text-sm leading-6 text-slate-300/72">Allows the page to load the Pixabay-hosted hero soundtrack when you decide to play it. If disabled, no soundtrack media request is made.</p>
+            <p id="privacy-summary" class="mt-3 text-sm leading-6 text-slate-300/82"></p>
+          </div>
+          <button id="privacy-media-toggle" type="button" class="privacy-toggle" aria-pressed="false" aria-label="Toggle optional soundtrack media"></button>
+        </div>
+      </div>
+
+      <div class="privacy-action-row">
+        <button id="privacy-modal-essential" type="button" class="privacy-button privacy-button-quiet">Essential only</button>
+        <button id="privacy-save-preferences" type="button" class="privacy-button">Save preferences</button>
+        <button id="privacy-modal-accept" type="button" class="privacy-button privacy-button-primary">Accept all</button>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-300/72">
+        <a href="./privacy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Privacy Policy</a>
+        <a href="./cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>
+      </div>
+    </div>
+  </section>
+
   <script>
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1311,20 +1572,252 @@
       audioPanelToggle.textContent = expanded ? 'Hide' : 'Vol';
     };
 
-    setAudioState(false);
-    setAudioPanel(false);
+    const privacyStorageKey = 'delta-privacy-preferences';
+    const pageBody = document.body;
+    const privacyBanner = document.getElementById('privacy-banner');
+    const privacyBackdrop = document.getElementById('privacy-backdrop');
+    const privacyModal = document.getElementById('privacy-modal');
+    const privacyManage = document.getElementById('privacy-manage');
+    const privacyManageButton = document.getElementById('privacy-manage-button');
+    const privacyAcceptAll = document.getElementById('privacy-accept-all');
+    const privacyEssentialOnly = document.getElementById('privacy-essential-only');
+    const privacyOpenCenter = document.getElementById('privacy-open-center');
+    const privacyModalAccept = document.getElementById('privacy-modal-accept');
+    const privacyModalEssential = document.getElementById('privacy-modal-essential');
+    const privacySavePreferences = document.getElementById('privacy-save-preferences');
+    const privacyCloseModal = document.getElementById('privacy-close-modal');
+    const privacyMediaToggle = document.getElementById('privacy-media-toggle');
+    const privacySummary = document.getElementById('privacy-summary');
 
-    const tryAutoplayMuted = async () => {
+    let privacyPreferences = null;
+    let draftPrivacyPreferences = { essential: true, media: false };
+    let modalInvoker = null;
+
+    const normalizePrivacyPreferences = (value) => ({
+      essential: true,
+      media: Boolean(value && value.media)
+    });
+
+    const readPrivacyPreferences = () => {
       try {
-        await audio.play();
+        const rawValue = window.localStorage.getItem(privacyStorageKey);
+        if (!rawValue) {
+          return null;
+        }
+
+        const parsedValue = JSON.parse(rawValue);
+        if (parsedValue && typeof parsedValue === 'object') {
+          if (parsedValue.categories && typeof parsedValue.categories.media === 'boolean') {
+            return normalizePrivacyPreferences(parsedValue.categories);
+          }
+
+          if (typeof parsedValue.media === 'boolean') {
+            return normalizePrivacyPreferences(parsedValue);
+          }
+        }
       } catch (error) {
-        audioStatus.textContent = 'Ready to play on tap';
+        return null;
+      }
+
+      return null;
+    };
+
+    const syncPrivacyLayout = () => {
+      pageBody.classList.toggle('privacy-banner-visible', !privacyBanner.classList.contains('hidden'));
+      pageBody.classList.toggle('privacy-manage-visible', !privacyManage.classList.contains('hidden'));
+    };
+
+    const showPrivacyBanner = (visible) => {
+      privacyBanner.classList.toggle('hidden', !visible);
+      syncPrivacyLayout();
+    };
+
+    const showPrivacyManage = (visible) => {
+      privacyManage.classList.toggle('hidden', !visible);
+      syncPrivacyLayout();
+    };
+
+    const setPrivacyModalVisibility = (visible) => {
+      privacyBackdrop.classList.toggle('hidden', !visible);
+      privacyModal.classList.toggle('hidden', !visible);
+      pageBody.style.overflow = visible ? 'hidden' : '';
+
+      if (!visible && modalInvoker instanceof HTMLElement) {
+        modalInvoker.focus();
+        modalInvoker = null;
       }
     };
 
-    tryAutoplayMuted();
+    const unloadOptionalAudio = () => {
+      audio.pause();
+      audio.currentTime = 0;
+
+      if (audio.getAttribute('src')) {
+        audio.removeAttribute('src');
+        audio.load();
+      }
+    };
+
+    const ensureOptionalAudioSource = () => {
+      if (audio.getAttribute('src')) {
+        return;
+      }
+
+      const source = audio.dataset.src;
+      if (source) {
+        audio.src = source;
+        audio.load();
+      }
+    };
+
+    const updatePrivacyModalState = () => {
+      const mediaEnabled = Boolean(draftPrivacyPreferences.media);
+      privacyMediaToggle.classList.toggle('is-active', mediaEnabled);
+      privacyMediaToggle.setAttribute('aria-pressed', String(mediaEnabled));
+      privacySummary.textContent = mediaEnabled
+        ? 'Optional soundtrack media is allowed. The track can load only after you choose to play it.'
+        : 'Only essential storage is enabled. Optional soundtrack media stays blocked until you allow it.';
+    };
+
+    const updateAudioAvailability = () => {
+      if (!privacyPreferences) {
+        unloadOptionalAudio();
+        setAudioState(false);
+        audioStatus.textContent = 'Review privacy settings to enable the soundtrack';
+        return;
+      }
+
+      if (!privacyPreferences.media) {
+        unloadOptionalAudio();
+        setAudioState(false);
+        audioStatus.textContent = 'Optional soundtrack disabled by privacy settings';
+        return;
+      }
+
+      if (!audio.getAttribute('src')) {
+        audioStatus.textContent = 'Soundtrack allowed - tap to play';
+      } else if (audio.paused) {
+        audioStatus.textContent = 'Soundtrack ready - tap to play';
+      } else if (audio.muted) {
+        audioStatus.textContent = 'Soundtrack loaded - tap to unmute';
+      } else {
+        audioStatus.textContent = 'Soundtrack enabled';
+      }
+    };
+
+    const applyPrivacyPreferences = () => {
+      updatePrivacyModalState();
+      updateAudioAvailability();
+    };
+
+    const persistPrivacyPreferences = (nextPreferences) => {
+      privacyPreferences = normalizePrivacyPreferences(nextPreferences);
+      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences);
+
+      try {
+        window.localStorage.setItem(privacyStorageKey, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          categories: privacyPreferences
+        }));
+      } catch (error) {
+        // Ignore storage failures and keep the in-memory preference for the current page.
+      }
+
+      showPrivacyBanner(false);
+      showPrivacyManage(true);
+      setPrivacyModalVisibility(false);
+      applyPrivacyPreferences();
+    };
+
+    const openPrivacyCenter = (invoker) => {
+      modalInvoker = invoker instanceof HTMLElement ? invoker : document.activeElement;
+      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+      updatePrivacyModalState();
+      setPrivacyModalVisibility(true);
+      window.requestAnimationFrame(() => {
+        privacyMediaToggle.focus();
+      });
+    };
+
+    const closePrivacyCenter = () => {
+      setPrivacyModalVisibility(false);
+      if (!privacyPreferences) {
+        showPrivacyBanner(true);
+      }
+    };
+
+    setAudioState(false);
+    setAudioPanel(false);
+
+    privacyPreferences = readPrivacyPreferences();
+    draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+    showPrivacyBanner(!privacyPreferences);
+    showPrivacyManage(Boolean(privacyPreferences));
+    applyPrivacyPreferences();
+
+    privacyAcceptAll.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: true });
+    });
+
+    privacyEssentialOnly.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: false });
+    });
+
+    privacyOpenCenter.addEventListener('click', () => {
+      openPrivacyCenter(privacyOpenCenter);
+    });
+
+    privacyManageButton.addEventListener('click', () => {
+      openPrivacyCenter(privacyManageButton);
+    });
+
+    privacyMediaToggle.addEventListener('click', () => {
+      draftPrivacyPreferences = normalizePrivacyPreferences({ media: !draftPrivacyPreferences.media });
+      updatePrivacyModalState();
+    });
+
+    privacyModalAccept.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: true });
+    });
+
+    privacyModalEssential.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: false });
+    });
+
+    privacySavePreferences.addEventListener('click', () => {
+      persistPrivacyPreferences(draftPrivacyPreferences);
+    });
+
+    privacyCloseModal.addEventListener('click', () => {
+      closePrivacyCenter();
+    });
+
+    privacyBackdrop.addEventListener('click', () => {
+      closePrivacyCenter();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !privacyModal.classList.contains('hidden')) {
+        closePrivacyCenter();
+      }
+    });
 
     audioToggle.addEventListener('click', async () => {
+      if (!privacyPreferences || !privacyPreferences.media) {
+        audioStatus.textContent = privacyPreferences
+          ? 'Allow optional media in Privacy & cookies settings'
+          : 'Choose a privacy option to enable the soundtrack';
+
+        if (privacyPreferences) {
+          openPrivacyCenter(audioToggle);
+        } else {
+          showPrivacyBanner(true);
+        }
+        return;
+      }
+
+      ensureOptionalAudioSource();
+
       const shouldEnable = audio.muted || audio.paused;
       if (audio.paused) {
         try {
@@ -1335,6 +1828,7 @@
         }
       }
       setAudioState(shouldEnable);
+      updateAudioAvailability();
     });
 
     audioPanelToggle.addEventListener('click', () => {
@@ -1348,9 +1842,10 @@
       audioVolumeLabel.textContent = `${value}%`;
       if (value === 0) {
         setAudioState(false);
-      } else if (audio.muted) {
+      } else if (audio.muted && audio.getAttribute('src')) {
         setAudioState(true);
       }
+      updateAudioAvailability();
     });
 
     audio.addEventListener('error', () => {
