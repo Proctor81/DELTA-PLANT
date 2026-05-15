@@ -8,6 +8,7 @@ on:
       - website/index.html
       - website/privacy-policy.html
       - website/cookie-policy.html
+      - website/CNAME
       - website/.nojekyll
       - website/robots.txt
       - website/sitemap.xml
@@ -39,6 +40,7 @@ jobs:
           cp website/index.html site-dist/
           cp website/privacy-policy.html site-dist/
           cp website/cookie-policy.html site-dist/
+          cp website/CNAME site-dist/
           cp website/.nojekyll site-dist/
           cp website/robots.txt site-dist/
           cp website/sitemap.xml site-dist/
