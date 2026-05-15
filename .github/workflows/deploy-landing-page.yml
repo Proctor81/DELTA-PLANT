@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - website/index.html
+      - website/privacy.html
       - website/privacy-policy.html
       - website/cookie-policy.html
       - website/CNAME
@@ -38,6 +39,7 @@ jobs:
         run: |
           mkdir -p site-dist/assets
           cp website/index.html site-dist/
+          cp website/privacy.html site-dist/
           cp website/privacy-policy.html site-dist/
           cp website/cookie-policy.html site-dist/
           cp website/CNAME site-dist/
