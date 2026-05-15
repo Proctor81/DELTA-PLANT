@@ -5,12 +5,14 @@ on:
     branches:
       - main
     paths:
-      - index.html
-      - .nojekyll
-      - robots.txt
-      - sitemap.xml
-      - assets/social-preview.svg
-      - assets/social-preview.png
+      - website/index.html
+      - website/.nojekyll
+      - website/robots.txt
+      - website/sitemap.xml
+      - website/assets/contact-relay-config.js
+      - website/assets/social-preview.svg
+      - website/assets/social-preview.png
+      - website/assets/social-preview-wa-20260514.png
       - .github/workflows/deploy-landing-page.yml
   workflow_dispatch:
 
@@ -31,12 +33,14 @@ jobs:
       - name: Prepare minimal Pages bundle
         run: |
           mkdir -p site-dist/assets
-          cp index.html site-dist/
-          cp .nojekyll site-dist/
-          cp robots.txt site-dist/
-          cp sitemap.xml site-dist/
-          cp assets/social-preview.svg site-dist/assets/
-          cp assets/social-preview.png site-dist/assets/
+          cp website/index.html site-dist/
+          cp website/.nojekyll site-dist/
+          cp website/robots.txt site-dist/
+          cp website/sitemap.xml site-dist/
+          cp website/assets/contact-relay-config.js site-dist/assets/
+          cp website/assets/social-preview.svg site-dist/assets/
+          cp website/assets/social-preview.png site-dist/assets/
+          cp website/assets/social-preview-wa-20260514.png site-dist/assets/
 
       - name: Publish gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
