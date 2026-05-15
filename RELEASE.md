@@ -38,6 +38,12 @@ Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md
 | `Manuale/genera_manuale.py` | Revisione profonda del manuale e dei flussi MLOps/diagnostici |
 | `LICENSE` | Aggiornamento a Software Release v3.2 |
 
+### Addendum sito web — 14 maggio 2026
+
+- Landing pubblica riorganizzata sotto `website/` con workflow GitHub Pages minimale allineato alla nuova struttura.
+- Sezione Contact aggiunta riusando i canali gia documentati del progetto: DELTAPLANO `/feedback`, GitHub Issues e documentazione pubblica.
+- Meta social e asset di anteprima riallineati anche per WhatsApp, con polish mobile del dock audio e migliore gerarchia nella parte finale della pagina.
+
 ---
 
 # Release v3.1 — 4 maggio 2026

@@ -6,12 +6,15 @@ Bot Telegram interattivo per accesso conversazionale alle API DELTA.
 from __future__ import annotations
 
 import asyncio
+import tempfile
 import json
 import logging
 import os
 import re
 import shutil
 import random
+import wave
+from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Set, List, Tuple
@@ -31,9 +34,47 @@ from core.config import (
 )
 
 try:
+    from faster_whisper import WhisperModel
+    FASTER_WHISPER_AVAILABLE = True
+except ImportError:
+    WhisperModel = None
+    FASTER_WHISPER_AVAILABLE = False
+
+try:
+    from elevenlabs import VoiceSettings
+    from elevenlabs.client import ElevenLabs
+    ELEVENLABS_AVAILABLE = True
+except ImportError:
+    VoiceSettings = None
+    ElevenLabs = None
+    ELEVENLABS_AVAILABLE = False
+
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    edge_tts = None
+    EDGE_TTS_AVAILABLE = False
+
+try:
+    from piper import PiperVoice
+    PIPER_AVAILABLE = True
+except ImportError:
+    PiperVoice = None
+    PIPER_AVAILABLE = False
+
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except ImportError:
+    AudioSegment = None
+    PYDUB_AVAILABLE = False
+
+try:
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
     from telegram.ext import (
         Application,
+        ApplicationHandlerStop,
         CallbackQueryHandler,
         CommandHandler,
         ConversationHandler,
@@ -41,8 +82,17 @@ try:
         MessageHandler,
         filters,
     )
+    try:
+        from telegram.ext import AIORateLimiter
+        TELEGRAM_RATE_LIMITER_AVAILABLE = True
+    except ImportError:
+        AIORateLimiter = None
+        TELEGRAM_RATE_LIMITER_AVAILABLE = False
     TELEGRAM_AVAILABLE = True
 except ImportError:
+    ApplicationHandlerStop = RuntimeError
+    AIORateLimiter = None
+    TELEGRAM_RATE_LIMITER_AVAILABLE = False
     TELEGRAM_AVAILABLE = False
 
 # --- INTEGRAZIONE DELTA_ORCHESTRATOR ---
@@ -72,6 +122,25 @@ _DIAG_TRANSIENT_KEYS = (
     *_FREE_CHAT_TRANSIENT_MARKERS,
     "diag_pending_parse_mode",
     "diag_pending_closing",
+)
+
+VOICE_MODE_AUTO = "auto"
+VOICE_MODE_ON = "on"
+VOICE_MODE_OFF = "off"
+_VOICE_MODE_ALLOWED = {VOICE_MODE_AUTO, VOICE_MODE_ON, VOICE_MODE_OFF}
+
+VOICE_LANGUAGE_AUTO = "auto"
+VOICE_LANGUAGE_IT = "it"
+VOICE_LANGUAGE_EN = "en"
+_VOICE_LANGUAGE_ALLOWED = {VOICE_LANGUAGE_AUTO, VOICE_LANGUAGE_IT, VOICE_LANGUAGE_EN}
+
+_VOICE_GUIDED_DIAGNOSIS_REJECT = (
+    "❌ La modalità vocale non è supportata durante la diagnosi guidata di DELTA Plant.\n"
+    "Per favore usa messaggi di testo."
+)
+_VOICE_FREE_CHAT_ONLY_REJECT = (
+    "🎙️ La modalità vocale è disponibile solo in chat libera.\n"
+    "In questo flusso usa messaggi di testo."
 )
 
 
@@ -104,6 +173,660 @@ def _free_chat_block_reason(context: "ContextTypes.DEFAULT_TYPE") -> str:
             return key
     return ""
 
+
+def _free_chat_block_message(block_reason: str) -> str:
+    if block_reason == "chat_mode_active":
+        return "💬 La chat con DELTAPLANO è già attiva. Scrivi il tuo messaggio in chat oppure usa /chiudi per uscire."
+    if block_reason == "upload_active":
+        return "📤 È in corso un upload guidato. Invia la foto richiesta oppure usa /annulla per uscire dal flusso."
+    return "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu."
+
+
+def is_guided_diagnosis_mode(
+    context: "ContextTypes.DEFAULT_TYPE",
+    chat_id: Optional[int] = None,
+) -> bool:
+    if context.user_data.get("diagnosis_active") or context.user_data.get("diag_qa_active"):
+        return True
+    for key in _DIAG_TRANSIENT_KEYS:
+        if key in context.user_data:
+            return True
+    return False
+
+
+def _is_voice_free_chat_context(context: "ContextTypes.DEFAULT_TYPE") -> bool:
+    if context.user_data.get("chat_mode_active"):
+        return True
+    return _free_chat_block_reason(context) == ""
+
+
+def _voice_reply_mode(context: "ContextTypes.DEFAULT_TYPE") -> str:
+    raw = str(
+        context.user_data.get(
+            "voice_mode_override",
+            TELEGRAM_CONFIG.get("voice_mode_default", VOICE_MODE_AUTO),
+        )
+    ).strip().lower()
+    return raw if raw in _VOICE_MODE_ALLOWED else VOICE_MODE_AUTO
+
+
+def _should_reply_with_voice(context: "ContextTypes.DEFAULT_TYPE", input_mode: str) -> bool:
+    mode = _voice_reply_mode(context)
+    if mode == VOICE_MODE_OFF:
+        return False
+    if mode == VOICE_MODE_ON:
+        return True
+    return input_mode == "voice"
+
+
+def _voice_temp_dir() -> Path:
+    configured = str(TELEGRAM_CONFIG.get("voice_temp_dir", "")).strip()
+    base = Path(configured) if configured else Path(__file__).resolve().parent.parent / "tmp" / "telegram_voice"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def _voice_caption(text: str) -> Optional[str]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return None
+    limit = int(TELEGRAM_CONFIG.get("voice_caption_limit", 180))
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: max(limit - 1, 1)].rstrip() + "…"
+
+
+def _spoken_voice_text(text: str) -> str:
+    cleaned = re.sub(r"https?://\S+", " link disponibile in chat ", text)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = cleaned.replace("```", " ")
+    cleaned = re.sub(r"[`*_#]+", " ", cleaned)
+    cleaned = re.sub(r"^[\-•●▪◦]+\s*", ". ", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\n{2,}", ". ", cleaned)
+    cleaned = re.sub(r"(?<!\d)\n", ". ", cleaned)
+    cleaned = cleaned.replace(" / ", " oppure ")
+    cleaned = cleaned.replace("|", ", ")
+    cleaned = re.sub(r"\s*[:;]\s*", ", ", cleaned)
+    cleaned = re.sub(r"\s*[=-]{2,}\s*", ". ", cleaned)
+    cleaned = re.sub(r"([.!?]){2,}", r"\1", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,;:-")
+    if not cleaned:
+        return "Non ho contenuti da leggere in questo momento."
+    limit = int(TELEGRAM_CONFIG.get("voice_reply_max_chars", 900))
+    if len(cleaned) <= limit:
+        return cleaned
+    cutoff = cleaned.rfind(". ", 0, limit)
+    if cutoff == -1:
+        cutoff = cleaned.rfind(" ", 0, limit)
+    if cutoff == -1:
+        cutoff = limit
+    return cleaned[:cutoff].rstrip(" .") + "."
+
+
+async def _maybe_send_voice_welcome(update: Update, context: "ContextTypes.DEFAULT_TYPE") -> None:
+    if context.user_data.get("voice_welcome_sent"):
+        return
+    context.user_data["voice_welcome_sent"] = True
+    await _send(
+        update,
+        "🎙️ Modalità voce disponibile in chat libera. In automatico vale il mirroring testo→testo e vocale→vocale. Usa /voice on, /voice off o /voice auto per cambiare comportamento. Per forzare la lingua della voce usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+    )
+
+
+async def _download_voice_message_bytes(update: Update) -> bytes:
+    if not update.message or not update.message.voice:
+        return b""
+    voice_file = await update.message.voice.get_file()
+    return bytes(await voice_file.download_as_bytearray())
+
+
+def _voice_cache(context: "ContextTypes.DEFAULT_TYPE") -> Dict[str, Any]:
+    application = getattr(context, "application", None)
+    if application is None:
+        raise RuntimeError("Application Telegram non disponibile per la cache voce.")
+    return application.bot_data
+
+
+def _get_whisper_model(context: "ContextTypes.DEFAULT_TYPE"):
+    if not FASTER_WHISPER_AVAILABLE:
+        raise RuntimeError("faster-whisper non installato.")
+    cache = _voice_cache(context)
+    model = cache.get("voice_whisper_model")
+    if model is None:
+        model = WhisperModel(
+            TELEGRAM_CONFIG.get("voice_stt_model", "small"),
+            device=TELEGRAM_CONFIG.get("voice_stt_device", "auto"),
+            compute_type=TELEGRAM_CONFIG.get("voice_stt_compute_type", "int8"),
+        )
+        cache["voice_whisper_model"] = model
+    return model
+
+
+async def transcribe_audio(
+    context: "ContextTypes.DEFAULT_TYPE",
+    audio_bytes: bytes,
+    *,
+    file_suffix: str = ".ogg",
+) -> str:
+    if not audio_bytes:
+        return ""
+    temp_dir = _voice_temp_dir()
+    with tempfile.NamedTemporaryFile(dir=temp_dir, suffix=file_suffix, delete=False) as handle:
+        handle.write(audio_bytes)
+        temp_path = Path(handle.name)
+
+    def _transcribe() -> str:
+        model = _get_whisper_model(context)
+        segments, _info = model.transcribe(
+            str(temp_path),
+            language=TELEGRAM_CONFIG.get("voice_stt_language", "it"),
+            beam_size=int(TELEGRAM_CONFIG.get("voice_stt_beam_size", 1)),
+            vad_filter=bool(TELEGRAM_CONFIG.get("voice_stt_vad_filter", True)),
+        )
+        return " ".join(segment.text.strip() for segment in segments if getattr(segment, "text", "")).strip()
+
+    try:
+        return await asyncio.to_thread(_transcribe)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _elevenlabs_api_key() -> str:
+    env_name = TELEGRAM_CONFIG.get("voice_elevenlabs_api_key_env", "ELEVENLABS_API_KEY")
+    return os.getenv(env_name, "").strip()
+
+
+_ENGLISH_TTS_HINTS = {
+    "a", "an", "and", "are", "can", "check", "disease", "for", "from", "hello",
+    "how", "if", "in", "is", "it", "leaf", "need", "of", "on", "plant", "please",
+    "recommend", "risk", "soil", "symptom", "symptoms", "temperature", "the", "this",
+    "to", "use", "water", "with", "you", "your",
+}
+
+
+def _piper_profile_config(profile_id: str) -> Dict[str, str]:
+    base_dir = Path(__file__).resolve().parent.parent / "models" / "piper"
+    profiles = {
+        "it": {
+            "model_path": str(TELEGRAM_CONFIG.get("voice_piper_model_path") or (base_dir / "it_IT-paola-medium.onnx")),
+            "config_path": str(TELEGRAM_CONFIG.get("voice_piper_config_path") or (base_dir / "it_IT-paola-medium.onnx.json")),
+            "model_url": str(TELEGRAM_CONFIG.get("voice_piper_model_url", "")).strip(),
+            "config_url": str(TELEGRAM_CONFIG.get("voice_piper_config_url", "")).strip(),
+        },
+        "en": {
+            "model_path": str(TELEGRAM_CONFIG.get("voice_piper_english_model_path") or (base_dir / "en_US-ryan-medium.onnx")),
+            "config_path": str(TELEGRAM_CONFIG.get("voice_piper_english_config_path") or (base_dir / "en_US-ryan-medium.onnx.json")),
+            "model_url": str(TELEGRAM_CONFIG.get("voice_piper_english_model_url", "")).strip(),
+            "config_url": str(TELEGRAM_CONFIG.get("voice_piper_english_config_url", "")).strip(),
+        },
+    }
+    if profile_id not in profiles:
+        raise RuntimeError(f"Profilo Piper non supportato: {profile_id}")
+    return profiles[profile_id]
+
+
+def _piper_model_paths(profile_id: str) -> Tuple[Path, Path]:
+    profile = _piper_profile_config(profile_id)
+    return Path(profile["model_path"]), Path(profile["config_path"])
+
+
+def _voice_language_mode(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> str:
+    if context is None:
+        return VOICE_LANGUAGE_AUTO
+    raw = str(context.user_data.get("voice_language_override", VOICE_LANGUAGE_AUTO)).strip().lower()
+    return raw if raw in _VOICE_LANGUAGE_ALLOWED else VOICE_LANGUAGE_AUTO
+
+
+def _select_piper_voice_profile(
+    text: str,
+    context: Optional["ContextTypes.DEFAULT_TYPE"] = None,
+) -> str:
+    override = _voice_language_mode(context)
+    if override in {VOICE_LANGUAGE_IT, VOICE_LANGUAGE_EN}:
+        return override
+
+    default_profile = str(TELEGRAM_CONFIG.get("voice_piper_default_profile", "it")).strip().lower() or "it"
+    if not bool(TELEGRAM_CONFIG.get("voice_piper_auto_language", True)):
+        return default_profile
+
+    words = re.findall(r"[A-Za-z']+", text.lower())
+    english_score = sum(1 for word in words if word in _ENGLISH_TTS_HINTS)
+    ascii_only = all(ord(ch) < 128 for ch in text)
+    if english_score >= 2 or (english_score >= 1 and ascii_only and len(words) >= 4):
+        return "en"
+    return default_profile
+
+
+def _download_binary_file(url: str, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp_target = target.with_suffix(target.suffix + ".part")
+    timeout = max(int(TELEGRAM_CONFIG.get("voice_download_timeout_sec", 180)), 5)
+    try:
+        with requests.get(url, stream=True, timeout=timeout) as response:
+            response.raise_for_status()
+            with temp_target.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        handle.write(chunk)
+        temp_target.replace(target)
+    finally:
+        temp_target.unlink(missing_ok=True)
+
+
+async def _ensure_piper_model_assets(
+    context: "ContextTypes.DEFAULT_TYPE",
+    profile_id: str,
+) -> Tuple[Path, Path]:
+    if not PIPER_AVAILABLE:
+        raise RuntimeError("piper-tts non installato.")
+
+    model_path, config_path = _piper_model_paths(profile_id)
+    if model_path.exists() and config_path.exists():
+        return model_path, config_path
+
+    cache = _voice_cache(context)
+    locks = cache.get("voice_piper_download_locks")
+    if locks is None:
+        locks = {}
+        cache["voice_piper_download_locks"] = locks
+    lock = locks.get(profile_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        locks[profile_id] = lock
+
+    async with lock:
+        if model_path.exists() and config_path.exists():
+            return model_path, config_path
+
+        profile = _piper_profile_config(profile_id)
+        model_url = profile["model_url"]
+        config_url = profile["config_url"]
+        if not model_url or not config_url:
+            raise RuntimeError(f"URL del modello Piper non configurati per il profilo {profile_id}.")
+
+        await asyncio.to_thread(_download_binary_file, model_url, model_path)
+        await asyncio.to_thread(_download_binary_file, config_url, config_path)
+        return model_path, config_path
+
+
+async def _get_piper_voice(
+    context: "ContextTypes.DEFAULT_TYPE",
+    profile_id: str,
+):
+    if not PIPER_AVAILABLE:
+        raise RuntimeError("piper-tts non installato.")
+
+    model_path, config_path = await _ensure_piper_model_assets(context, profile_id)
+    cache = _voice_cache(context)
+    cache_key = str(model_path.resolve())
+    voices = cache.get("voice_piper_voices")
+    if voices is None:
+        voices = {}
+        cache["voice_piper_voices"] = voices
+    paths = cache.get("voice_piper_model_paths")
+    if paths is None:
+        paths = {}
+        cache["voice_piper_model_paths"] = paths
+    cached_voice = voices.get(profile_id)
+    if cached_voice is not None and paths.get(profile_id) == cache_key:
+        return cached_voice
+
+    def _load_voice():
+        return PiperVoice.load(
+            str(model_path),
+            config_path=str(config_path),
+            use_cuda=bool(TELEGRAM_CONFIG.get("voice_piper_use_cuda", False)),
+        )
+
+    voice = await asyncio.to_thread(_load_voice)
+    voices[profile_id] = voice
+    paths[profile_id] = cache_key
+    return voice
+
+
+def _select_tts_provider() -> str:
+    configured = str(TELEGRAM_CONFIG.get("voice_tts_provider", "auto")).strip().lower() or "auto"
+    if configured == "piper":
+        if not PIPER_AVAILABLE:
+            raise RuntimeError("Provider TTS Piper non installato.")
+        return "piper"
+    if configured == "elevenlabs":
+        if not ELEVENLABS_AVAILABLE:
+            raise RuntimeError("Provider TTS ElevenLabs non installato.")
+        if not _elevenlabs_api_key():
+            raise RuntimeError("Chiave API ElevenLabs mancante.")
+        return "elevenlabs"
+    if configured == "edge_tts":
+        if not EDGE_TTS_AVAILABLE:
+            raise RuntimeError("Provider TTS edge-tts non installato.")
+        return "edge_tts"
+    if PIPER_AVAILABLE:
+        return "piper"
+    if ELEVENLABS_AVAILABLE and _elevenlabs_api_key():
+        return "elevenlabs"
+    if EDGE_TTS_AVAILABLE:
+        return "edge_tts"
+    raise RuntimeError("Nessun provider TTS disponibile.")
+
+
+async def _tts_with_elevenlabs(text: str) -> BytesIO:
+    api_key = _elevenlabs_api_key()
+    voice_id = os.getenv(
+        TELEGRAM_CONFIG.get("voice_elevenlabs_voice_id_env", "ELEVENLABS_VOICE_ID"),
+        TELEGRAM_CONFIG.get("voice_elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB"),
+    ).strip()
+    if not voice_id:
+        raise RuntimeError("Voice ID ElevenLabs mancante.")
+
+    def _synthesize() -> bytes:
+        client = ElevenLabs(api_key=api_key)
+        audio_stream = client.text_to_speech.convert(
+            voice_id=voice_id,
+            model_id=TELEGRAM_CONFIG.get("voice_elevenlabs_model", "eleven_multilingual_v2"),
+            output_format=TELEGRAM_CONFIG.get("voice_elevenlabs_output_format", "mp3_44100_128"),
+            text=text,
+            voice_settings=VoiceSettings(
+                stability=float(TELEGRAM_CONFIG.get("voice_elevenlabs_stability", 0.8)),
+                similarity_boost=float(TELEGRAM_CONFIG.get("voice_elevenlabs_similarity_boost", 0.85)),
+                style=float(TELEGRAM_CONFIG.get("voice_elevenlabs_style", 0.4)),
+                use_speaker_boost=bool(TELEGRAM_CONFIG.get("voice_elevenlabs_speaker_boost", True)),
+            ),
+        )
+        return b"".join(audio_stream)
+
+    audio_bytes = await asyncio.to_thread(_synthesize)
+    buffer = BytesIO(audio_bytes)
+    buffer.name = "delta_voice_reply.mp3"
+    buffer.seek(0)
+    return buffer
+
+
+async def _tts_with_edge(text: str) -> BytesIO:
+    if not EDGE_TTS_AVAILABLE:
+        raise RuntimeError("edge-tts non installato.")
+    temp_dir = _voice_temp_dir()
+    temp_path = temp_dir / f"tts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.mp3"
+    communicate = edge_tts.Communicate(
+        text=text,
+        voice=TELEGRAM_CONFIG.get("voice_edge_tts_voice", "it-IT-GiuseppeMultilingualNeural"),
+        rate=TELEGRAM_CONFIG.get("voice_edge_tts_rate", "-4%"),
+        volume=TELEGRAM_CONFIG.get("voice_edge_tts_volume", "+8%"),
+        pitch=TELEGRAM_CONFIG.get("voice_edge_tts_pitch", "-8Hz"),
+        boundary=TELEGRAM_CONFIG.get("voice_edge_tts_boundary", "SentenceBoundary"),
+    )
+    await communicate.save(str(temp_path))
+    try:
+        buffer = BytesIO(temp_path.read_bytes())
+        buffer.name = "delta_voice_reply.mp3"
+        buffer.seek(0)
+        return buffer
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+async def _tts_with_piper(
+    context: "ContextTypes.DEFAULT_TYPE",
+    text: str,
+) -> BytesIO:
+    profile_id = _select_piper_voice_profile(text, context=context)
+    voice = await _get_piper_voice(context, profile_id)
+
+    def _synthesize() -> BytesIO:
+        buffer = BytesIO()
+        with wave.open(buffer, "wb") as wav_file:
+            voice.synthesize_wav(text, wav_file)
+        buffer.name = f"delta_voice_reply_{profile_id}.wav"
+        buffer.seek(0)
+        return buffer
+
+    return await asyncio.to_thread(_synthesize)
+
+
+async def text_to_speech_warm_male(
+    context: "ContextTypes.DEFAULT_TYPE",
+    text: str,
+) -> BytesIO:
+    spoken_text = _spoken_voice_text(text)
+    provider = _select_tts_provider()
+    if provider == "piper":
+        return await _tts_with_piper(context, spoken_text)
+    if provider == "elevenlabs":
+        return await _tts_with_elevenlabs(spoken_text)
+    if provider == "edge_tts":
+        return await _tts_with_edge(spoken_text)
+    raise RuntimeError(f"Provider TTS non supportato: {provider}")
+
+
+def _voice_source_format(voice_data: BytesIO) -> str:
+    suffix = Path(str(getattr(voice_data, "name", ""))).suffix.lower().lstrip(".")
+    return suffix or "mp3"
+
+
+async def _prepare_telegram_voice_payload(voice_data: BytesIO) -> BytesIO:
+    source_format = _voice_source_format(voice_data)
+    voice_data.seek(0)
+
+    if source_format == "ogg" or not PYDUB_AVAILABLE:
+        return voice_data
+
+    source_bytes = voice_data.getvalue()
+
+    def _convert() -> BytesIO:
+        segment = AudioSegment.from_file(BytesIO(source_bytes), format=source_format)
+        output = BytesIO()
+        export_kwargs: Dict[str, Any] = {
+            "format": "ogg",
+            "codec": TELEGRAM_CONFIG.get("voice_reply_codec", "libopus"),
+        }
+        bitrate = str(TELEGRAM_CONFIG.get("voice_reply_bitrate", "48k")).strip()
+        if bitrate:
+            export_kwargs["bitrate"] = bitrate
+        segment.export(output, **export_kwargs)
+        output.name = "delta_voice_reply.ogg"
+        output.seek(0)
+        return output
+
+    try:
+        return await asyncio.to_thread(_convert)
+    except Exception as exc:
+        logger.warning(
+            "Conversione risposta vocale in OGG/Opus fallita, provo il payload originale: %s",
+            exc,
+            exc_info=True,
+        )
+        voice_data.seek(0)
+        return voice_data
+
+
+async def _send_voice(
+    update: Update,
+    voice_data: BytesIO,
+    *,
+    caption: Optional[str] = None,
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+) -> None:
+    payload = await _prepare_telegram_voice_payload(voice_data)
+    payload.seek(0)
+    chat = getattr(update, "effective_chat", None)
+    if chat is None:
+        raise RuntimeError("Chat Telegram non disponibile per l'invio del vocale.")
+    reply_args: Dict[str, Any] = {"voice": payload, "reply_markup": reply_markup}
+    if caption:
+        reply_args["caption"] = caption
+    await chat.send_voice(**reply_args)
+
+
+async def _generate_free_chat_response(
+    update: Update,
+    context: "ContextTypes.DEFAULT_TYPE",
+    user_text: str,
+) -> str:
+    user_id = str(update.effective_user.id) if update.effective_user else "0"
+
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    engine = _get_chat_engine(context)
+
+    def _ask() -> str:
+        return engine.chat(user_id, user_text)
+
+    try:
+        response = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        logger.error("Errore chat LLM: %s", exc, exc_info=True)
+        response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
+
+    logger.info("free_chat_response[%s]: %s", user_id, response[:120])
+    return response
+
+
+async def _respond_free_chat_output(
+    update: Update,
+    context: "ContextTypes.DEFAULT_TYPE",
+    response_text: str,
+    *,
+    input_mode: str,
+) -> None:
+    reply_markup = _chat_exit_keyboard() if context.user_data.get("chat_mode_active") else None
+
+    if _should_reply_with_voice(context, input_mode):
+        try:
+            try:
+                await update.effective_chat.send_action("record_voice")
+            except Exception:
+                pass
+            voice_audio = await text_to_speech_warm_male(context, response_text)
+            await _send_voice(
+                update,
+                voice_audio,
+                caption=_voice_caption(response_text),
+                reply_markup=reply_markup,
+            )
+            return
+        except Exception as exc:
+            logger.warning("Fallback a testo per risposta vocale: %s", exc, exc_info=True)
+            await _send(update, "🎙️ Risposta vocale non disponibile in questo momento. Ti rispondo in testo.")
+
+    await _send_chat_paginated(
+        update,
+        context,
+        response_text,
+        reply_markup=reply_markup,
+    )
+
+
+async def _handle_free_chat_turn(
+    update: Update,
+    context: "ContextTypes.DEFAULT_TYPE",
+    user_text: str,
+    *,
+    input_mode: str,
+) -> str:
+    response = await _generate_free_chat_response(update, context, user_text)
+    await _respond_free_chat_output(update, context, response, input_mode=input_mode)
+    return response
+
+
+async def voice_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+
+    requested = context.args[0].strip().lower() if getattr(context, "args", None) else ""
+    if not requested:
+        current = _voice_reply_mode(context)
+        await _send(
+            update,
+            "Modalità voce attuale: "
+            f"{current.upper()}\n"
+            "Usa /voice on, /voice off o /voice auto.\n"
+            "Per la lingua usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+        )
+        return
+
+    if requested not in _VOICE_MODE_ALLOWED:
+        await _send(update, "Uso corretto: /voice on | /voice off | /voice auto")
+        return
+
+    if requested == VOICE_MODE_AUTO:
+        context.user_data.pop("voice_mode_override", None)
+        await _send(update, "♻️ Modalità voce automatica attiva: testo→testo, vocale→vocale in chat libera.")
+        return
+
+    context.user_data["voice_mode_override"] = requested
+    if requested == VOICE_MODE_ON:
+        await _send(update, "🎙️ Modalità voce forzata attiva in chat libera: DELTAPLANO proverà a rispondere con un vocale anche ai messaggi testuali.")
+        return
+
+    await _send(update, "🔇 Modalità voce disattivata: i vocali saranno trascritti ma la risposta tornerà in testo.")
+
+
+async def _set_voice_language(update: Update, context: ContextTypes.DEFAULT_TYPE, requested: str) -> None:
+    if requested == VOICE_LANGUAGE_AUTO:
+        context.user_data.pop("voice_language_override", None)
+        await _send(update, "♻️ Lingua voce automatica attiva: DELTAPLANO sceglierà il pack italiano o inglese in base alla risposta.")
+        return
+
+    context.user_data["voice_language_override"] = requested
+    label = "italiano" if requested == VOICE_LANGUAGE_IT else "inglese"
+    await _send(update, f"🗣️ Lingua voce forzata su {label}. Da ora userò sempre il pack Piper corrispondente finché non imposti /voice_lang auto.")
+
+
+async def voice_language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+
+    requested = context.args[0].strip().lower() if getattr(context, "args", None) else ""
+    if not requested:
+        current = _voice_language_mode(context)
+        await _send(
+            update,
+            "Lingua voce attuale: "
+            f"{current.upper()}\n"
+            "Usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+        )
+        return
+
+    if requested not in _VOICE_LANGUAGE_ALLOWED:
+        await _send(update, "Uso corretto: /voice_lang it | /voice_lang en | /voice_lang auto")
+        return
+
+    await _set_voice_language(update, context, requested)
+
+
+async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        raise ApplicationHandlerStop
+    if not update.message or not update.message.voice:
+        raise ApplicationHandlerStop
+
+    if is_guided_diagnosis_mode(context):
+        await _send(update, _VOICE_GUIDED_DIAGNOSIS_REJECT)
+        raise ApplicationHandlerStop
+
+    if not _is_voice_free_chat_context(context):
+        await _send(update, _VOICE_FREE_CHAT_ONLY_REJECT)
+        raise ApplicationHandlerStop
+
+    await _maybe_send_voice_welcome(update, context)
+
+    try:
+        voice_bytes = await _download_voice_message_bytes(update)
+        transcript = await transcribe_audio(context, voice_bytes)
+    except Exception as exc:
+        logger.warning("Trascrizione vocale fallita: %s", exc, exc_info=True)
+        await _send(update, "Non riesco a trascrivere il messaggio vocale in questo momento. Puoi riprovare o scrivermi in testo?")
+        raise ApplicationHandlerStop
+
+    if not transcript.strip():
+        await _send(update, "Non sono riuscito a capire il messaggio vocale. Puoi ripetere?")
+        raise ApplicationHandlerStop
+
+    await _handle_free_chat_turn(update, context, transcript, input_mode="voice")
+    raise ApplicationHandlerStop
+
 # ──────────────────────────────────────────────────────────────
 # Handler per chat libera (domanda/risposta non strutturata)
 async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
@@ -123,32 +846,13 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         return
     block_reason = _free_chat_block_reason(context)
     if block_reason:
-        logger.debug("free_chat_handler: flusso strutturato attivo (%s), inibito", block_reason)
+        logger.info("free_chat_handler: flusso strutturato attivo (%s), invio feedback", block_reason)
+        await _send(update, _free_chat_block_message(block_reason))
         return
     user_text = update.message.text.strip()
     user_id = str(update.effective_user.id) if update.effective_user else "0"
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
-
-    # Usa lo stesso ChatEngine condiviso usato da tutto il bot
-    # (evita il problema del doppio engine con cache RAM separata).
-    engine = _get_chat_engine(context)
-
-    try:
-        await update.effective_chat.send_action("typing")
-    except Exception:
-        pass
-
-    def _ask():
-        return engine.chat(user_id, user_text)
-
-    try:
-        response = await asyncio.to_thread(_ask)
-    except Exception as exc:
-        logger.error(f"free_chat_handler: errore engine.chat: {exc}", exc_info=True)
-        response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
-
-    logger.info(f"free_chat_handler: risposta per {user_id}: {response[:80]}")
-    await _send_chat_paginated(update, context, response)
+    await _handle_free_chat_turn(update, context, user_text, input_mode="text")
 
 (
     STATE_DIAG_IMAGE_SOURCE,
@@ -192,6 +896,8 @@ CMD_ACADEMY = "CMD_ACADEMY"
 CMD_LICENSE = "CMD_LICENSE"
 CMD_BATCH = "CMD_BATCH"
 CMD_CHAT = "CMD_CHAT"
+CMD_VOICE_LANG_IT = "CMD_VOICE_LANG_IT"
+CMD_VOICE_LANG_EN = "CMD_VOICE_LANG_EN"
 CHAT_EXIT = "CHAT_EXIT"
 
 DIAG_IMAGE_UPLOAD = "DIAG_IMAGE_UPLOAD"
@@ -214,7 +920,7 @@ def _get_token() -> str:
 def _is_authorized(user_id: Optional[int], username: str) -> bool:
     if user_id is None and not username:
         return False
-    allowed_ids = set(TELEGRAM_CONFIG.get("authorized_users", []))
+    allowed_ids = _load_allowed_user_ids()
     allowed_names = _load_allowed_usernames()
     if not allowed_ids and not allowed_names:
         return True
@@ -233,6 +939,32 @@ def _normalize_username(value: str) -> str:
     norm = raw.lower()
     norm = norm.replace("_", "").replace("-", "").replace(".", "").replace(" ", "")
     return norm
+
+
+def _load_allowed_user_ids() -> Set[int]:
+    ids = set()
+    for value in TELEGRAM_CONFIG.get("authorized_users", []):
+        try:
+            ids.add(int(value))
+        except (TypeError, ValueError):
+            continue
+
+    file_path = TELEGRAM_CONFIG.get("authorized_users_file")
+    if not file_path:
+        return ids
+    try:
+        data = json.loads(Path(file_path).read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            for value in data:
+                try:
+                    ids.add(int(value))
+                except (TypeError, ValueError):
+                    continue
+    except FileNotFoundError:
+        return ids
+    except Exception as exc:
+        logger.warning("Errore lettura lista ID scientists: %s", exc)
+    return ids
 
 
 def _load_allowed_usernames() -> Set[str]:
@@ -275,6 +1007,12 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🎓 Academy", callback_data=CMD_ACADEMY),
             InlineKeyboardButton("📄 Licenza", callback_data=CMD_LICENSE),
         ],
+        [
+            InlineKeyboardButton("👩‍🔬 Cris (IT)", callback_data=CMD_VOICE_LANG_IT),
+        ],
+        [
+            InlineKeyboardButton("👨‍🔬 Ryan (EN)", callback_data=CMD_VOICE_LANG_EN),
+        ],
     ])
 
 
@@ -284,17 +1022,32 @@ async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboard
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     parse_mode = values.get('parse_mode', None)
+    chat = getattr(update, "effective_chat", None)
+    if chat is None:
+        raise RuntimeError("Chat Telegram non disponibile per l'invio del messaggio.")
     reply_args = {"reply_markup": reply_markup}
     if parse_mode is not None:
         reply_args["parse_mode"] = parse_mode
-    if update.message:
-        await update.message.reply_text(text, **reply_args)
-        return
-    if update.callback_query:
-        # Non richiamare answer() qui: ogni handler che genera una callback_query
-        # deve già aver chiamato query.answer() prima di invocare _send(),
-        # altrimenti si ottiene un doppio answer che causa "query id is invalid".
-        await update.callback_query.message.reply_text(text, **reply_args)
+    await chat.send_message(text, **reply_args)
+
+
+def _is_expired_callback_query_error(err: Exception) -> bool:
+    message = str(err).lower()
+    return "query is too old" in message or "query id is invalid" in message
+
+
+async def _answer_callback_query_safe(query, text: Optional[str] = None) -> bool:
+    try:
+        if text is None:
+            await query.answer()
+        else:
+            await query.answer(text)
+        return True
+    except Exception as err:
+        if _is_expired_callback_query_error(err):
+            logger.debug("Bot Telegram: callback query scaduta o già risposta (ignorata): %s", err)
+            return False
+        raise
 
 
 def _get_agent(context: ContextTypes.DEFAULT_TYPE):
@@ -311,6 +1064,40 @@ def _user_info(update: Update) -> Dict[str, Any]:
         "first_name": user.first_name,
         "last_name": user.last_name,
     }
+
+
+def _welcome_display_name(update: Update) -> str:
+    user = update.effective_user
+    if not user:
+        return "amico"
+    if user.first_name:
+        return user.first_name.strip()
+    if user.username:
+        return user.username.lstrip("@").strip()
+    return "amico"
+
+
+def _build_welcome_voice_text(update: Update) -> str:
+    display_name = _welcome_display_name(update)
+    return (
+        f"Ciao {display_name}, benvenuto in DELTAPLANO. "
+        "Sono pronto ad aiutarti con diagnosi delle piante, sensori, report e consigli agronomici. "
+        "Apri il menu e dimmi pure come posso aiutarti."
+    )
+
+
+async def _send_personalized_welcome_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    welcome_text = _build_welcome_voice_text(update)
+    caption = f"Benvenuto, {_welcome_display_name(update)}."
+    try:
+        try:
+            await update.effective_chat.send_action("record_voice")
+        except Exception:
+            pass
+        voice_audio = await text_to_speech_warm_male(context, welcome_text)
+        await _send_voice(update, voice_audio, caption=caption)
+    except Exception as exc:
+        logger.warning("Invio vocale di benvenuto fallito: %s", exc, exc_info=True)
 
 
 def _split_message(text: str, limit: int = 3500) -> List[str]:
@@ -440,10 +1227,7 @@ async def continue_diagnosis_message(update: Update, context: ContextTypes.DEFAU
     # Risponde alla callback query del pulsante inline se presente
     callback_query = getattr(update, "callback_query", None)
     if callback_query:
-        try:
-            await callback_query.answer()
-        except Exception:
-            pass
+        await _answer_callback_query_safe(callback_query)
 
     if not await _guard(update):
         return
@@ -875,31 +1659,7 @@ async def chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_text:
         return STATE_CHAT_WAITING
 
-    user_id = str(update.effective_user.id if update.effective_user else "0")
-
-    # Indicatore di digitazione
-    try:
-        await update.effective_chat.send_action("typing")
-    except Exception:
-        pass
-
-    engine = _get_chat_engine(context)
-
-    def _ask():
-        return engine.chat(user_id, user_text)
-
-    try:
-        response = await asyncio.to_thread(_ask)
-    except Exception as exc:
-        logger.error("Errore chat LLM: %s", exc, exc_info=True)
-        response = "Mi dispiace, si è verificato un errore. Riprova tra qualche secondo."
-
-    await _send_chat_paginated(
-        update,
-        context,
-        response,
-        reply_markup=_chat_exit_keyboard(),
-    )
+    await _handle_free_chat_turn(update, context, user_text, input_mode="text")
     return STATE_CHAT_WAITING
 
 
@@ -909,7 +1669,7 @@ async def chat_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return STATE_CHAT_WAITING
     query = update.callback_query
     if query:
-        await query.answer("Conversazione resettata ✓")
+        await _answer_callback_query_safe(query, "Conversazione resettata ✓")
     user_id = str(update.effective_user.id if update.effective_user else "0")
     engine = _get_chat_engine(context)
     engine.reset(user_id)
@@ -924,7 +1684,7 @@ async def chat_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _clear_chat_state(context)
     query = update.callback_query
     if query:
-        await query.answer("Chat terminata")
+        await _answer_callback_query_safe(query, "Chat terminata")
     await _send(update, "Chat terminata. Usa /menu per tornare al menu principale.", reply_markup=_menu_keyboard())
     return ConversationHandler.END
 
@@ -937,6 +1697,7 @@ async def chat_command_chiudi(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    logger.info("Telegram /start ricevuto da user_id=%s", update.effective_user.id if update.effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
     intro = (
@@ -946,6 +1707,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Usa /menu per vedere le azioni disponibili."
     )
     await _send(update, intro, reply_markup=_menu_keyboard())
+    await _send_personalized_welcome_voice(update, context)
     if was_chat_active:
         return ConversationHandler.END
 
@@ -953,6 +1715,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    logger.info("Telegram /menu ricevuto da user_id=%s", update.effective_user.id if update.effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
     await _send(update, "Menu principale:", reply_markup=_menu_keyboard())
@@ -1349,7 +2112,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     if not query:
         return ConversationHandler.END
-    await query.answer()
+    await _answer_callback_query_safe(query)
     if query.data == DIAG_IMAGE_UPLOAD:
         await _send(update, "Invia una foto (o un file immagine) per la diagnosi.")
         return STATE_DIAG_WAIT_PHOTO
@@ -1433,7 +2196,7 @@ async def choose_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     if not query:
         return ConversationHandler.END
-    await query.answer()
+    await _answer_callback_query_safe(query)
     if query.data == DIAG_SENSOR_AUTO:
         return await _run_diagnosis(update, context, None)
     if query.data == DIAG_SENSOR_MANUAL:
@@ -2312,7 +3075,12 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
-    await query.answer()
+    logger.info(
+        "Telegram callback menu ricevuta da user_id=%s data=%s",
+        update.effective_user.id if update.effective_user else "0",
+        query.data,
+    )
+    await _answer_callback_query_safe(query)
     if query.data == CMD_DIAGNOSE:
         await start_diagnosis(update, context)
     elif query.data == CMD_UPLOAD:
@@ -2335,6 +3103,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await license_text(update, context)
     elif query.data == CMD_BATCH:
         await batch_analyze(update, context)
+    elif query.data == CMD_VOICE_LANG_IT:
+        await _set_voice_language(update, context, VOICE_LANGUAGE_IT)
+    elif query.data == CMD_VOICE_LANG_EN:
+        await _set_voice_language(update, context, VOICE_LANGUAGE_EN)
 
 
 async def images(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2574,7 +3346,7 @@ async def academy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
-    await query.answer()
+    await _answer_callback_query_safe(query)
     data = query.data or ""
     if data == "ACAD_TUT_START":
         context.user_data["academy_tutorial_idx"] = 0
@@ -2861,7 +3633,7 @@ def run_telegram_bot(agent=None):
 
     if not API_CONFIG.get("enable_api", False):
         logger.warning("API REST disabilitata: il bot potrebbe non funzionare.")
-    if not TELEGRAM_CONFIG.get("authorized_users") and not _load_allowed_usernames():
+    if not _load_allowed_user_ids() and not _load_allowed_usernames():
         logger.warning("Lista autorizzazioni vuota: accesso aperto al bot.")
 
     # Forza la creazione della cartella logs/ se non esiste
@@ -2960,7 +3732,10 @@ def run_telegram_bot(agent=None):
     # Application + handlers vengono costruiti sul thread chiamante.
     # In modalità daemon, main.py chiamerà serve_telegram_polling() sul main thread,
     # dove run_polling() funziona correttamente (PTB v20+ è main-thread bound).
-    application = Application.builder().token(token).build()
+    builder = Application.builder().token(token)
+    if TELEGRAM_RATE_LIMITER_AVAILABLE:
+        builder = builder.rate_limiter(AIORateLimiter())
+    application = builder.build()
     application.bot_data["agent"] = agent
     logger.info("[DEBUG] run_telegram_bot: Application e bot_data inizializzati")
 
@@ -2973,6 +3748,8 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("export", export_excel))
     application.add_handler(CommandHandler("images", images))
     application.add_handler(CommandHandler("preflight", preflight))
+    application.add_handler(CommandHandler("voice", voice_mode_command))
+    application.add_handler(CommandHandler("voice_lang", voice_language_command))
     # /continua globale: funziona anche dopo END del ConversationHandler
     application.add_handler(CommandHandler("continua", continue_diagnosis_message))
     # Pulsante inline "Continua lettura" (CMD_CONTINUA) — stesso handler
@@ -2985,6 +3762,7 @@ def run_telegram_bot(agent=None):
     application.add_handler(chat_conv_handler)
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice_message), group=-1)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
     application.add_handler(CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"))
     application.add_handler(CallbackQueryHandler(chat_reset, pattern="^CHAT_RESET$"))

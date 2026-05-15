@@ -29,7 +29,7 @@ Built for researchers, agritech teams, biotech innovators, and venture capital a
 
 ## Website Preview
 
-The repository now includes a GitHub Pages-ready landing page in [index.html](index.html) with a cinematic space-meets-biology visual language, animated hero scene, ambient soundtrack controls, investor-facing storytelling, structured SEO metadata, and direct DELTAPLANO access.
+The repository now includes a GitHub Pages-ready landing page in [website/index.html](website/index.html) with a cinematic space-meets-biology visual language, animated hero scene, ambient soundtrack controls, investor-facing storytelling, structured SEO metadata, and direct DELTAPLANO access.
 
 <p align="center">
   <a href="https://proctor81.github.io/DELTA-PLANT/">
@@ -37,7 +37,7 @@ The repository now includes a GitHub Pages-ready landing page in [index.html](in
   </a>
 </p>
 
-![DELTA Plant Website Preview](https://www.image2url.com/r2/default/images/1778746172507-65d54433-1fec-459e-808b-141f7769e16c.png)
+![DELTA Plant Website Preview](website/assets/social-preview.png)
 
 | Preview Layer | What it Communicates |
 | --- | --- |
@@ -103,13 +103,23 @@ pip install -r requirements.txt
 python main.py --preflight --enable-api --enable-telegram --daemon
 ```
 
+Per usare la modalita voce del bot Telegram:
+
+- imposta `HF_API_TOKEN` e `HF_MODEL_NAME` per la chat
+- DELTAPLANO usa `Piper` come provider TTS gratuito locale predefinito
+- al primo utilizzo vocale, il modello italiano Piper viene scaricato automaticamente in `models/piper/`
+- `edge-tts` resta disponibile come fallback gratuito
+- opzionalmente imposta `ELEVENLABS_API_KEY` e `ELEVENLABS_VOICE_ID` solo se vuoi un provider premium
+- usa `/voice auto`, `/voice on` oppure `/voice off` dentro Telegram
+
 To preview the landing page locally:
 
 ```bash
+cd website
 python -m http.server 8080
 ```
 
-Then open `http://localhost:8080` and browse the landing page from [index.html](index.html).
+Then open `http://localhost:8080` and browse the landing page from [website/index.html](website/index.html).
 
 ## Documentation Hub
 
@@ -132,7 +142,7 @@ interface/          CLI, admin panel, API, and Telegram integration
 Manuale/            PDF manual generator and technical architecture docs
 tools/              Benchmarking, dissemination, and pipeline automation
 vision/             Vision backends including EfficientFormer classifier
-index.html          Premium GitHub Pages landing page
+website/            Landing page sources, SEO files, and social preview assets
 ```
 
 ## Audience Fit
@@ -146,9 +156,9 @@ DELTA Plant is designed to resonate with multiple high-value audiences without d
 
 ## Deployment Notes
 
-The landing page is intentionally built with plain HTML, Tailwind CSS via CDN, custom CSS, and vanilla JavaScript so it can deploy directly on GitHub Pages without a build step.
+The landing page is intentionally built with plain HTML, Tailwind CSS via CDN, custom CSS, and vanilla JavaScript inside [website/index.html](website/index.html) so it can deploy directly on GitHub Pages without a build step.
 
-The repository also includes a GitHub Actions workflow that republishes a minimal `gh-pages` branch whenever the landing page files or social preview assets change on `main`.
+The repository also includes a GitHub Actions workflow that republishes a minimal `gh-pages` branch whenever the landing page files or social preview assets under [website/](website/) change on `main`.
 
 ## License
 

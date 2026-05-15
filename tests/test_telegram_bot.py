@@ -2,11 +2,26 @@ import json
 import logging
 import os
 import types
+from io import BytesIO
 from pathlib import Path
 import asyncio
 
+import pytest
+
 import main
 import interface.telegram_bot as tg
+
+
+def test_is_authorized_accepts_local_authorized_user_id(tmp_path, monkeypatch):
+    ids_file = tmp_path / "telegram_scientists_ids.local.json"
+    ids_file.write_text("[1187900727]", encoding="utf-8")
+
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "authorized_users", [])
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "authorized_users_file", str(ids_file))
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "authorized_usernames", [])
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "authorized_usernames_file", str(tmp_path / "telegram_scientists.local.json"))
+
+    assert tg._is_authorized(1187900727, "@gipg") is True
 
 
 def test_labels_for_organ_uses_correct_sets(tmp_path, monkeypatch):
@@ -121,6 +136,82 @@ def test_send_long_forwards_parse_mode(monkeypatch):
     asyncio.run(tg._send_long(object(), "uno", parse_mode="HTML"))
 
     assert calls == [("uno", None, "HTML")]
+
+
+def test_build_welcome_voice_text_personalizes_first_name():
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(first_name="Luca", username="lucaplants"),
+    )
+
+    result = tg._build_welcome_voice_text(update)
+
+    assert result.startswith("Ciao Luca")
+    assert "DELTAPLANO" in result
+
+
+def test_send_personalized_welcome_voice_uses_tts_and_send_voice(monkeypatch):
+    calls = []
+
+    async def fake_tts(context, text):
+        calls.append(("tts", text))
+        payload = BytesIO(b"voice-bytes")
+        payload.name = "delta_voice_reply.wav"
+        return payload
+
+    async def fake_send_voice(update, voice_data, caption=None, reply_markup=None):
+        calls.append(("voice", voice_data.name, caption))
+
+    async def fake_send_action(action):
+        calls.append(("action", action))
+
+    monkeypatch.setattr(tg, "text_to_speech_warm_male", fake_tts)
+    monkeypatch.setattr(tg, "_send_voice", fake_send_voice)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(first_name="Luca", username="lucaplants"),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+
+    asyncio.run(
+        tg._send_personalized_welcome_voice(
+            update,
+            types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={})),
+        )
+    )
+
+    assert calls[0] == ("action", "record_voice")
+    assert calls[1][0] == "tts"
+    assert calls[2] == ("voice", "delta_voice_reply.wav", "Benvenuto, Luca.")
+
+
+def test_start_sends_intro_and_personalized_welcome_voice(monkeypatch):
+    sends = []
+    welcome_calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    async def fake_welcome(update, context):
+        welcome_calls.append(tg._welcome_display_name(update))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_send_personalized_welcome_voice", fake_welcome)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=77, first_name="Luca", username="lucaplants"),
+    )
+    context = types.SimpleNamespace(user_data={})
+
+    result = asyncio.run(tg.start(update, context))
+
+    assert result is None
+    assert len(sends) == 1
+    assert "Benvenuto in @DELTAPLANO_bot" in sends[0]
+    assert welcome_calls == ["Luca"]
 
 
 def test_send_diagnosis_paginated_short_closes_with_smile(monkeypatch):
@@ -442,11 +533,16 @@ def test_free_chat_handler_ignores_sensor_collection_markers(monkeypatch):
 
 
 def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):
+    sends = []
+
     async def fake_guard(update):
         return True
 
     async def fake_send_action(*args, **kwargs):
         return None
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
 
     update = types.SimpleNamespace(
         message=types.SimpleNamespace(text="ciao"),
@@ -464,6 +560,7 @@ def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):
     logger.propagate = False
 
     monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
     monkeypatch.setattr(
         tg,
         "_get_chat_engine",
@@ -476,11 +573,47 @@ def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):
         logger.handlers = old_handlers
         logger.propagate = old_propagate
 
+    assert sends == ["💬 La chat con DELTAPLANO è già attiva. Scrivi il tuo messaggio in chat oppure usa /chiudi per uscire."]
+
 
 def test_menu_keyboard_includes_chat_button():
     keyboard = tg._menu_keyboard()
     callback_data = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert tg.CMD_CHAT in callback_data
+    assert tg.CMD_VOICE_LANG_IT in callback_data
+    assert tg.CMD_VOICE_LANG_EN in callback_data
+    assert "👩‍🔬 Cris (IT)" in labels
+    assert "👨‍🔬 Ryan (EN)" in labels
+
+
+def test_menu_callback_continues_when_query_answer_is_expired(monkeypatch):
+    requested = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_set_voice_language(update, context, value):
+        requested.append(value)
+
+    class FakeQuery:
+        data = tg.CMD_VOICE_LANG_IT
+
+        async def answer(self, *args, **kwargs):
+            raise Exception("Query is too old and response timeout expired or query id is invalid")
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_set_voice_language", fake_set_voice_language)
+
+    update = types.SimpleNamespace(
+        callback_query=FakeQuery(),
+        effective_user=types.SimpleNamespace(id=123),
+    )
+    context = types.SimpleNamespace()
+
+    asyncio.run(tg.menu_callback(update, context))
+
+    assert requested == [tg.VOICE_LANGUAGE_IT]
 
 
 def test_clear_diagnosis_state_resets_flags_and_transient_markers():
@@ -512,11 +645,16 @@ def test_clear_diagnosis_state_resets_flags_and_transient_markers():
 
 
 def test_free_chat_handler_ignores_followup_and_upload_states(monkeypatch):
+    sends = []
+
     async def fake_guard(update):
         return True
 
     async def fake_send_action(*args, **kwargs):
         return None
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
 
     update = types.SimpleNamespace(
         message=types.SimpleNamespace(text="ciao"),
@@ -530,6 +668,7 @@ def test_free_chat_handler_ignores_followup_and_upload_states(monkeypatch):
     logger.propagate = False
 
     monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
     monkeypatch.setattr(
         tg,
         "_get_chat_engine",
@@ -546,6 +685,407 @@ def test_free_chat_handler_ignores_followup_and_upload_states(monkeypatch):
     finally:
         logger.handlers = old_handlers
         logger.propagate = old_propagate
+
+    assert sends == [
+        "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu.",
+        "📤 È in corso un upload guidato. Invia la foto richiesta oppure usa /annulla per uscire dal flusso.",
+    ]
+
+
+def test_free_chat_handler_warns_during_sensor_collection(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="70"),
+        effective_user=types.SimpleNamespace(id=88),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"sensor_index": 2},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+    assert sends == [
+        "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu.",
+    ]
+
+
+def test_is_guided_diagnosis_mode_detects_transient_markers():
+    context = types.SimpleNamespace(user_data={"diag_image_path": "input_images/foglia.jpg"})
+
+    assert tg.is_guided_diagnosis_mode(context) is True
+
+
+def test_should_reply_with_voice_respects_override_modes():
+    context = types.SimpleNamespace(user_data={})
+
+    assert tg._should_reply_with_voice(context, "voice") is True
+    assert tg._should_reply_with_voice(context, "text") is False
+
+    context.user_data["voice_mode_override"] = tg.VOICE_MODE_ON
+    assert tg._should_reply_with_voice(context, "text") is True
+
+    context.user_data["voice_mode_override"] = tg.VOICE_MODE_OFF
+    assert tg._should_reply_with_voice(context, "voice") is False
+
+
+def test_select_tts_provider_prefers_free_edge_when_configured(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_tts_provider", "edge_tts")
+    monkeypatch.setattr(tg, "EDGE_TTS_AVAILABLE", True)
+    monkeypatch.setattr(tg, "ELEVENLABS_AVAILABLE", True)
+    monkeypatch.setattr(tg, "_elevenlabs_api_key", lambda: "fake-key")
+
+    assert tg._select_tts_provider() == "edge_tts"
+
+
+def test_select_tts_provider_prefers_piper_when_configured(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_tts_provider", "piper")
+    monkeypatch.setattr(tg, "PIPER_AVAILABLE", True)
+    monkeypatch.setattr(tg, "EDGE_TTS_AVAILABLE", True)
+
+    assert tg._select_tts_provider() == "piper"
+
+
+def test_select_piper_voice_profile_detects_english_text(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_piper_default_profile", "it")
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_piper_auto_language", True)
+
+    assert tg._select_piper_voice_profile("Please check the leaf disease risk and water level.") == "en"
+    assert tg._select_piper_voice_profile("Controlla il rischio della foglia e l'umidita del terreno.") == "it"
+
+
+def test_select_piper_voice_profile_respects_manual_override(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_piper_default_profile", "it")
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_piper_auto_language", True)
+
+    context = types.SimpleNamespace(user_data={"voice_language_override": "it"})
+
+    assert tg._select_piper_voice_profile(
+        "Please check the leaf disease risk and water level.",
+        context=context,
+    ) == "it"
+
+
+def test_prepare_telegram_voice_payload_converts_mp3_to_ogg(monkeypatch):
+    calls = {}
+
+    class FakeSegment:
+        def export(self, output, format=None, codec=None, bitrate=None):
+            calls["export"] = (format, codec, bitrate)
+            output.write(b"ogg-bytes")
+
+    class FakeAudioSegment:
+        @staticmethod
+        def from_file(source, format=None):
+            calls["from_file"] = format
+            return FakeSegment()
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(tg, "PYDUB_AVAILABLE", True)
+    monkeypatch.setattr(tg, "AudioSegment", FakeAudioSegment)
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    payload = BytesIO(b"mp3-bytes")
+    payload.name = "delta_voice_reply.mp3"
+
+    result = asyncio.run(tg._prepare_telegram_voice_payload(payload))
+
+    assert calls["from_file"] == "mp3"
+    assert calls["export"] == ("ogg", "libopus", "48k")
+    assert result.getvalue() == b"ogg-bytes"
+    assert result.name == "delta_voice_reply.ogg"
+
+
+def test_send_uses_effective_chat_send_message():
+    sent = []
+
+    class FakeChat:
+        async def send_message(self, text, reply_markup=None, parse_mode=None):
+            sent.append((text, reply_markup, parse_mode))
+
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+
+    asyncio.run(tg._send(update, "ciao", parse_mode="Markdown"))
+
+    assert sent == [("ciao", None, "Markdown")]
+
+
+def test_send_voice_uses_prepared_ogg_payload(monkeypatch):
+    sent = []
+
+    async def fake_prepare(voice_data):
+        converted = BytesIO(b"ogg-bytes")
+        converted.name = "delta_voice_reply.ogg"
+        return converted
+
+    class FakeChat:
+        async def send_voice(self, voice, reply_markup=None, caption=None):
+            sent.append((voice.name, voice.read(), caption, reply_markup))
+
+    monkeypatch.setattr(tg, "_prepare_telegram_voice_payload", fake_prepare)
+
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+    payload = BytesIO(b"mp3-bytes")
+    payload.name = "delta_voice_reply.mp3"
+
+    asyncio.run(tg._send_voice(update, payload, caption="ciao"))
+
+    assert sent == [("delta_voice_reply.ogg", b"ogg-bytes", "ciao", None)]
+
+
+def test_spoken_voice_text_cleans_markdown_lists_and_urls(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "voice_reply_max_chars", 500)
+
+    text = """## Diagnosi\n- Temperatura: 24 C\n- Azione / follow-up\nVisita https://deltaplant.ai/docs"""
+
+    result = tg._spoken_voice_text(text)
+
+    assert "https://" not in result
+    assert "link disponibile in chat" in result
+    assert "Temperatura, 24 C" in result
+    assert "Azione oppure follow-up" in result
+    assert "##" not in result
+
+
+def test_tts_with_edge_uses_warmer_defaults(monkeypatch, tmp_path):
+    captured = {}
+
+    class FakeCommunicate:
+        def __init__(self, text, voice, rate, volume, pitch, boundary):
+            captured["args"] = {
+                "text": text,
+                "voice": voice,
+                "rate": rate,
+                "volume": volume,
+                "pitch": pitch,
+                "boundary": boundary,
+            }
+
+        async def save(self, path):
+            Path(path).write_bytes(b"fake-mp3")
+
+    monkeypatch.setattr(tg, "edge_tts", types.SimpleNamespace(Communicate=FakeCommunicate))
+    monkeypatch.setattr(tg, "_voice_temp_dir", lambda: tmp_path)
+
+    result = asyncio.run(tg._tts_with_edge("ciao"))
+
+    assert captured["args"] == {
+        "text": "ciao",
+        "voice": "it-IT-GiuseppeMultilingualNeural",
+        "rate": "-4%",
+        "volume": "+8%",
+        "pitch": "-8Hz",
+        "boundary": "SentenceBoundary",
+    }
+    assert result.getvalue() == b"fake-mp3"
+
+
+def test_tts_with_piper_returns_wav_buffer(monkeypatch):
+    class FakeVoice:
+        def synthesize_wav(self, text, wav_file):
+            assert text == "ciao"
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(22050)
+            wav_file.writeframes(b"\x00\x00" * 64)
+
+    async def fake_get_piper_voice(context, profile_id):
+        assert profile_id == "it"
+        return FakeVoice()
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(tg, "_get_piper_voice", fake_get_piper_voice)
+    monkeypatch.setattr(tg, "_select_piper_voice_profile", lambda text, context=None: "it")
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    result = asyncio.run(tg._tts_with_piper(types.SimpleNamespace(), "ciao"))
+
+    assert result.name == "delta_voice_reply_it.wav"
+    assert result.getvalue()[:4] == b"RIFF"
+
+
+def test_tts_with_piper_uses_english_profile_for_english_text(monkeypatch):
+    class FakeVoice:
+        def synthesize_wav(self, text, wav_file):
+            assert text == "Please check the leaf disease risk."
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(22050)
+            wav_file.writeframes(b"\x00\x00" * 32)
+
+    async def fake_get_piper_voice(context, profile_id):
+        assert profile_id == "en"
+        return FakeVoice()
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(tg, "_get_piper_voice", fake_get_piper_voice)
+    monkeypatch.setattr(tg, "_select_piper_voice_profile", lambda text, context=None: "en")
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    result = asyncio.run(tg._tts_with_piper(types.SimpleNamespace(), "Please check the leaf disease risk."))
+
+    assert result.name == "delta_voice_reply_en.wav"
+    assert result.getvalue()[:4] == b"RIFF"
+
+
+def test_voice_mode_command_sets_override(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace(message=types.SimpleNamespace(text="/voice off"))
+    context = types.SimpleNamespace(args=["off"], user_data={})
+
+    asyncio.run(tg.voice_mode_command(update, context))
+
+    assert context.user_data["voice_mode_override"] == tg.VOICE_MODE_OFF
+    assert "Modalità voce disattivata" in sends[0]
+
+
+def test_voice_language_command_sets_italian_override(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace(message=types.SimpleNamespace(text="/voice_lang it"))
+    context = types.SimpleNamespace(args=["it"], user_data={})
+
+    asyncio.run(tg.voice_language_command(update, context))
+
+    assert context.user_data["voice_language_override"] == tg.VOICE_LANGUAGE_IT
+    assert "Lingua voce forzata su italiano" in sends[0]
+
+
+def test_set_voice_language_helper_sets_english_override(monkeypatch):
+    sends = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={})
+
+    asyncio.run(tg._set_voice_language(update, context, tg.VOICE_LANGUAGE_EN))
+
+    assert context.user_data["voice_language_override"] == tg.VOICE_LANGUAGE_EN
+    assert "Lingua voce forzata su inglese" in sends[0]
+
+
+def test_handle_voice_message_rejects_guided_diagnosis(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(
+        tg,
+        "_download_voice_message_bytes",
+        lambda update: (_ for _ in ()).throw(AssertionError("la trascrizione non deve partire")),
+    )
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(voice=object()),
+        effective_user=types.SimpleNamespace(id=500),
+    )
+    context = types.SimpleNamespace(user_data={"diagnosis_active": True}, application=types.SimpleNamespace(bot_data={}))
+
+    with pytest.raises(tg.ApplicationHandlerStop):
+        asyncio.run(tg.handle_voice_message(update, context))
+
+    assert sends == [tg._VOICE_GUIDED_DIAGNOSIS_REJECT]
+
+
+def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
+    turns = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_download(update):
+        return b"voice-bytes"
+
+    async def fake_transcribe(context, audio_bytes, file_suffix=".ogg"):
+        assert audio_bytes == b"voice-bytes"
+        return "ciao DELTA"
+
+    async def fake_welcome(update, context):
+        return None
+
+    async def fake_handle_turn(update, context, user_text, input_mode):
+        turns.append((user_text, input_mode))
+        return "ok"
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_download_voice_message_bytes", fake_download)
+    monkeypatch.setattr(tg, "transcribe_audio", fake_transcribe)
+    monkeypatch.setattr(tg, "_maybe_send_voice_welcome", fake_welcome)
+    monkeypatch.setattr(tg, "_handle_free_chat_turn", fake_handle_turn)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(voice=object()),
+        effective_user=types.SimpleNamespace(id=501),
+    )
+    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+
+    with pytest.raises(tg.ApplicationHandlerStop):
+        asyncio.run(tg.handle_voice_message(update, context))
+
+    assert turns == [("ciao DELTA", "voice")]
 
 
 def test_receive_followup_answer_advances_state_machine(monkeypatch):

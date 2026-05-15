@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://deltaplant.ai/sitemap.xml

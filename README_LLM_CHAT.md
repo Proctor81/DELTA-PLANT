@@ -12,7 +12,7 @@ La release odierna e focalizzata soprattutto su Pipeline X, benchmark, evaluatio
 ## Componenti principali
 
 - `chat/chat_engine.py`: gestione conversazione, prompt orchestration e chiamate LLM
-- `bot/deltaplano_bot.py`: logica Telegram, sessioni, comandi e delivery dei messaggi
+- `interface/telegram_bot.py`: logica Telegram, sessioni, comandi, modalita voce e delivery dei messaggi
 - `router/router.py`: instradamento tra richieste chat e flussi vision/diagnosi
 - `vision/vision_service.py`: aggancio del backend di classificazione per il layer conversazionale
 - `memory/conversation_memory.py`: persistenza della memoria conversazionale per utente
@@ -35,12 +35,46 @@ Il layer chat conserva le garanzie introdotte nelle iterazioni precedenti:
 - routing piu stabile tra richieste libere e fasi guidate della diagnosi
 - compatibilita con la memoria persistente e con il backend vision attivo
 
+## Modalita voce Telegram
+
+La chat Telegram supporta ora un percorso vocale pensato per la chat libera, senza interferire con i flussi strutturati della diagnosi.
+
+- un messaggio vocale in chat libera viene trascritto con `faster-whisper`
+- la risposta DELTA usa il normale `ChatEngine`, quindi mantiene memoria e routing esistenti
+- in modalita `auto` il bot rispecchia l'input: vocale in ingresso, vocale in uscita; testo in ingresso, testo in uscita
+- durante diagnosi guidata, follow-up, upload immagine o altri stati strutturati il vocale viene rifiutato con un messaggio esplicito e il bot chiede testo
+- se la sintesi vocale fallisce, il bot risponde automaticamente in testo senza interrompere la sessione
+
+### Comandi operativi
+
+- `/voice auto`: comportamento predefinito, con mirroring tra input e output
+- `/voice on`: forza una risposta vocale anche ai messaggi testuali in chat libera
+- `/voice off`: disattiva la risposta vocale, ma mantiene la trascrizione dei vocali
+
+### Provider voce supportati
+
+- STT: `faster-whisper`
+- TTS predefinito: `Piper`, locale e gratuito, con modello italiano ONNX scaricato nel progetto
+- TTS fallback gratuito: `edge-tts`, usato se Piper non e disponibile o non e configurabile
+- TTS opzionale premium: `ElevenLabs`, solo se lo configuri esplicitamente
+
+### Variabili ambiente utili
+
+- `HF_API_TOKEN`: backend LLM per la chat
+- `HF_MODEL_NAME`: modello HuggingFace da usare per la conversazione
+- `Piper`: nessuna chiave API, ma richiede il pacchetto `piper-tts`; il modello viene scaricato automaticamente la prima volta
+- `ELEVENLABS_API_KEY`: opzionale, abilita il provider premium ElevenLabs
+- `ELEVENLABS_VOICE_ID`: opzionale, consente di scegliere la voce ElevenLabs
+
 ## Requisiti essenziali
 
 - Raspberry Pi 5 o ambiente Python 3.12 equivalente
 - `HF_API_TOKEN` valido nel file `.env`
 - `HF_MODEL_NAME` coerente con il backend HuggingFace scelto
 - Telegram bot configurato se si usa l'interfaccia bot
+- `piper-tts` installato per la risposta vocale locale gratuita
+- `edge-tts` installato come fallback gratuito aggiuntivo
+- `ELEVENLABS_API_KEY` solo se si vuole passare a un provider premium
 
 ## Relazione con la documentazione pubblica
 
