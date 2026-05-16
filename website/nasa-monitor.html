@@ -8,6 +8,7 @@
   <meta name='keywords' content='NASA agriculture AI, Sentinel-1 crop stress, plant disease early warning, SAR agronomy, Copernicus farm monitoring, DELTA Plant' />
   <meta name='robots' content='index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1' />
   <meta name='theme-color' content='#08111d' />
+  <meta name='deltaplant-api-base' content='' />
   <meta property='og:type' content='website' />
   <meta property='og:title' content='DELTA Plant NASA Monitor' />
   <meta property='og:description' content='Satellite-first agronomic intelligence blending NASA POWER, Sentinel-1 SAR, crop questioning, voice output, and privacy-aware runtime PDFs.' />
@@ -685,6 +686,34 @@
       padding: 0.85rem 1rem;
     }
 
+    .api-status-banner {
+      margin-top: 1.2rem;
+      padding: 1rem 1.2rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .api-status-banner strong {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem;
+    }
+
+    .api-status-banner p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .api-status-banner[data-mode='live'] {
+      border-color: rgba(127, 242, 174, 0.26);
+      background: rgba(11, 33, 24, 0.72);
+    }
+
+    .api-status-banner[data-mode='demo'] {
+      border-color: rgba(255, 187, 90, 0.24);
+      background: rgba(35, 23, 10, 0.72);
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -839,6 +868,11 @@
       <section class='trust-banner hero-card'>
         <strong>AI transparency</strong>
         <span>The service always returns a procedural diagnosis. LLM summaries and voice output activate only when the matching optional consent category is enabled.</span>
+      </section>
+
+      <section class='api-status-banner hero-card' id='api-mode-banner' data-mode='live'>
+        <strong id='api-mode-title'>Checking DELTA Plant connectivity...</strong>
+        <p id='api-mode-text'>The interface is probing the public API and will fall back to browser demo mode if the backend is not available.</p>
       </section>
 
       <section class='analysis-section' id='analyze'>
@@ -1004,6 +1038,8 @@
   <script defer src='https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js' crossorigin=''></script>
   <script>
     const state = {
+      apiBase: '',
+      apiAvailable: false,
       map: null,
       drawnItems: null,
       activeLayer: null,
@@ -1013,10 +1049,355 @@
       currentCandidates: [],
       currentProbableCrop: null,
       analysisResult: null,
+      demoArtifacts: {},
       narrativeMode: 'farmer',
     };
 
     const els = {};
+    const DEFAULT_CONSENT = { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+    const DEMO_QUESTION_FLOW = [
+      {
+        id: 'growth_form',
+        prompt: 'Which growth form dominates the selected field?',
+        options: ['tree', 'vine', 'herbaceous'],
+      },
+      {
+        id: 'canopy_density',
+        prompt: 'How dense is the canopy across the current scouting zone?',
+        options: ['sparse', 'balanced', 'dense'],
+      },
+      {
+        id: 'irrigation',
+        prompt: 'Which irrigation pattern best matches this field right now?',
+        options: ['none', 'drip', 'sprinkler', 'flood'],
+      },
+      {
+        id: 'symptom',
+        prompt: 'Which symptom is closest to the latest field notes?',
+        options: ['none', 'spots', 'yellowing', 'wilting'],
+      },
+      {
+        id: 'soil_state',
+        prompt: 'How does the topsoil behave 24 hours after irrigation or rain?',
+        options: ['dry', 'balanced', 'wet'],
+      },
+    ];
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeConsent(categories = {}) {
+      return { ...DEFAULT_CONSENT, ...categories, necessary: true };
+    }
+
+    function normalizeApiBase(value) {
+      return value ? value.trim().replace(/\/+$/, '') : '';
+    }
+
+    function getConfiguredApiBase() {
+      const params = new URLSearchParams(window.location.search);
+      const queryValue = params.get('apiBase');
+      if (queryValue) {
+        window.localStorage.setItem('deltaplant_api_base', queryValue);
+      }
+      const storedValue = window.localStorage.getItem('deltaplant_api_base');
+      const metaValue = document.querySelector('meta[name="deltaplant-api-base"]')?.getAttribute('content') || '';
+      return normalizeApiBase(queryValue || storedValue || metaValue);
+    }
+
+    function resolveApiUrl(path) {
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return state.apiBase ? `${state.apiBase}${normalizedPath}` : normalizedPath;
+    }
+
+    function backendLabel() {
+      if (!state.apiBase) {
+        return `${window.location.origin}/api`;
+      }
+      try {
+        return `${new URL(state.apiBase).origin}/api`;
+      } catch {
+        return `${state.apiBase}/api`;
+      }
+    }
+
+    function updateApiModeBanner(detail = '') {
+      if (!els.apiModeBanner) {
+        return;
+      }
+      const liveMode = state.apiAvailable;
+      els.apiModeBanner.dataset.mode = liveMode ? 'live' : 'demo';
+      els.apiModeTitle.textContent = liveMode
+        ? 'Live pipeline connected.'
+        : 'Browser demo mode enabled.';
+      els.apiModeText.textContent = liveMode
+        ? `The public interface is connected to ${backendLabel()} and can use the live NASA DeltaPlant backend.`
+        : `The page could not reach ${backendLabel()}${detail ? ` (${detail})` : ''}. Field drawing, crop questioning, consent, voice preview, and PDF export now run locally in the browser so deltaplant.ai stays usable on GitHub Pages.`;
+
+      if (els.runAnalysis) {
+        els.runAnalysis.textContent = liveMode ? 'Run NASA DeltaPlant analysis' : 'Run browser demo analysis';
+      }
+      if (els.heroVoiceDemo) {
+        els.heroVoiceDemo.textContent = liveMode ? 'Play voice demo' : 'Play browser voice preview';
+      }
+      if (els.analysisStatus && !state.analysisResult) {
+        els.analysisStatus.textContent = liveMode
+          ? 'Live API connected. Procedural diagnosis is always available. LLM and voice remain opt-in.'
+          : 'API unavailable on this host. Browser demo mode is active with local consent storage, local voice preview, and generated sample PDF reports.';
+      }
+    }
+
+    async function probeApiHealth() {
+      state.apiBase = getConfiguredApiBase();
+      try {
+        const response = await fetch(resolveApiUrl('/api/health'), { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        state.apiAvailable = true;
+        updateApiModeBanner();
+      } catch (error) {
+        state.apiAvailable = false;
+        updateApiModeBanner(error?.message || 'unreachable');
+      }
+    }
+
+    function toDisplayLabel(value) {
+      return String(value || '--').replace(/_/g, ' ');
+    }
+
+    function asciiSafe(value) {
+      return String(value || '')
+        .normalize('NFKD')
+      .replace(/[^\x20-\x7E]/g, ' ')
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)');
+    }
+
+    function buildSimplePdfBlob(title, lines) {
+      const contentLines = ['BT', '/F1 18 Tf', '1 0 0 1 72 760 Tm', `(${asciiSafe(title)}) Tj`, '/F1 11 Tf'];
+      let cursorY = 734;
+      lines.forEach((line) => {
+        if (cursorY < 72) {
+          return;
+        }
+        contentLines.push(`1 0 0 1 72 ${cursorY} Tm`);
+        contentLines.push(`(${asciiSafe(line)}) Tj`);
+        cursorY -= 16;
+      });
+      contentLines.push('ET');
+      const stream = contentLines.join('\n');
+      const objects = [
+        '1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj',
+        '2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj',
+        '3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>endobj',
+        `4 0 obj<< /Length ${stream.length} >>stream\n${stream}\nendstream\nendobj`,
+        '5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj',
+      ];
+      let pdf = '%PDF-1.4\n';
+      const offsets = [0];
+      objects.forEach((object) => {
+        offsets.push(pdf.length);
+        pdf += `${object}\n`;
+      });
+      const xrefStart = pdf.length;
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      offsets.slice(1).forEach((offset) => {
+        pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+      });
+      pdf += `trailer<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+      return new Blob([pdf], { type: 'application/pdf' });
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function inferDemoCrop(answers = []) {
+      const set = new Set(answers);
+      if (set.has('vine')) {
+        return set.has('spots')
+          ? { probableCrop: 'Grape_Black_rot', candidateCrops: ['Grape_Black_rot', 'Grape_healthy', 'Tomato_Early_blight'], confidenceBoost: 0.05 }
+          : { probableCrop: 'Grape_healthy', candidateCrops: ['Grape_healthy', 'Grape_Black_rot', 'Peach_healthy'], confidenceBoost: 0.08 };
+      }
+      if (set.has('tree')) {
+        return set.has('yellowing')
+          ? { probableCrop: 'Apple_Black_rot', candidateCrops: ['Apple_Black_rot', 'Apple_healthy', 'Peach_healthy'], confidenceBoost: 0.04 }
+          : { probableCrop: 'Peach_healthy', candidateCrops: ['Peach_healthy', 'Apple_healthy', 'Apple_Cedar_apple_rust'], confidenceBoost: 0.07 };
+      }
+      if (set.has('herbaceous')) {
+        if (set.has('spots')) {
+          return { probableCrop: 'Tomato_Early_blight', candidateCrops: ['Tomato_Early_blight', 'Tomato_healthy', 'Potato_Early_blight'], confidenceBoost: 0.05 };
+        }
+        if (set.has('wilting')) {
+          return { probableCrop: 'Potato_Late_blight', candidateCrops: ['Potato_Late_blight', 'Tomato_Late_blight', 'Tomato_healthy'], confidenceBoost: 0.04 };
+        }
+        return { probableCrop: 'Tomato_healthy', candidateCrops: ['Tomato_healthy', 'Potato_healthy', 'Pepper_bell_healthy'], confidenceBoost: 0.08 };
+      }
+      return { probableCrop: 'Tomato_healthy', candidateCrops: ['Tomato_healthy', 'Potato_healthy', 'Grape_healthy'], confidenceBoost: 0 };
+    }
+
+    function buildDemoWizardPayload(answers = []) {
+      const inference = inferDemoCrop(answers);
+      const question = DEMO_QUESTION_FLOW[answers.length];
+      return {
+        next_question: question
+          ? {
+              number: answers.length + 1,
+              id: question.id,
+              prompt: question.prompt,
+              options: question.options,
+            }
+          : null,
+        candidate_crops: inference.candidateCrops,
+        probable_crop: inference.probableCrop,
+        confidence: clamp(0.52 + (answers.length * 0.08) + inference.confidenceBoost, 0.52, 0.94),
+      };
+    }
+
+    function getDateWindowDays(startValue, endValue) {
+      const start = new Date(startValue);
+      const end = new Date(endValue);
+      const diff = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+      return clamp(Number.isFinite(diff) ? diff + 1 : 30, 1, 366);
+    }
+
+    function geometrySeed(geoData) {
+      if (geoData.type === 'circle') {
+        return Math.abs((geoData.center.lat * 13.17) + (geoData.center.lng * 7.31) + (geoData.radius / 100));
+      }
+      const points = geoData.geojson?.geometry?.coordinates?.[0] || [];
+      return Math.abs(points.slice(0, 6).reduce((sum, point, index) => sum + (((point[0] * 9.1) + (point[1] * 4.7)) * (index + 1)), 0));
+    }
+
+    function setDemoArtifacts(payload, areaHectares, windowDays) {
+      const diagnosis = payload.diagnosis;
+      state.demoArtifacts = {
+        'demo-farmer-report': {
+          filename: 'deltaplant-farmer-demo.pdf',
+          title: 'DELTA Plant Farmer Report',
+          lines: [
+            `Crop: ${toDisplayLabel(diagnosis.probable_crop)}`,
+            `Area: ${areaHectares.toFixed(1)} ha`,
+            `Window: ${windowDays} days`,
+            `Water stress: ${diagnosis.water_stress_level}`,
+            `Disease risk: ${diagnosis.disease_risk_level}`,
+            `Recommendation: ${diagnosis.irrigation_recommendation}`,
+            `Drainage: ${diagnosis.drainage_recommendation}`,
+            '',
+            diagnosis.report_farmer,
+          ],
+        },
+        'demo-scientist-report': {
+          filename: 'deltaplant-scientist-demo.pdf',
+          title: 'DELTA Plant Scientist Report',
+          lines: [
+            `Crop: ${toDisplayLabel(diagnosis.probable_crop)}`,
+            `Confidence: ${diagnosis.confidence_score.toFixed(2)}`,
+            `Area: ${areaHectares.toFixed(1)} ha`,
+            `Window: ${windowDays} days`,
+            `Moisture: ${payload.field_state.sar_features.soil_moisture_percent.toFixed(1)} %`,
+            `Biomass index: ${payload.field_state.sar_features.biomass_index.toFixed(1)}`,
+            `Disease risk: ${payload.field_state.sar_features.disease_risk_composite.toFixed(1)}`,
+            `Yield forecast: ${payload.field_state.sar_features.yield_forecast_index.toFixed(1)}`,
+            `Source: ${payload.field_state.raw_sar_summary.source}`,
+            '',
+            diagnosis.report_scientist,
+          ],
+        },
+      };
+    }
+
+    function buildDemoAnalysisPayload() {
+      const geoData = buildGeoPayload();
+      const areaHectares = computeApproxAreaHectares(state.activeLayer);
+      const windowDays = getDateWindowDays(els.dateStart.value, els.dateEnd.value);
+      const consent = getConsent();
+      const cropInference = inferDemoCrop(state.cropAnswers);
+      const seed = geometrySeed(geoData);
+      const symptomPenalty = state.cropAnswers.includes('spots') ? 18 : state.cropAnswers.includes('yellowing') ? 14 : state.cropAnswers.includes('wilting') ? 22 : 4;
+      const moisture = clamp(38 + (seed % 17) + Math.min(windowDays / 8, 7) - Math.min(areaHectares / 1600, 10), 18, 86);
+      const biomass = clamp(49 + (seed % 13) + (cropInference.probableCrop.includes('healthy') ? 9 : 3) + Math.min(areaHectares / 2200, 7), 18, 96);
+      const diseaseRisk = clamp(12 + symptomPenalty + Math.max(0, moisture - 55) * 0.65 + (windowDays > 40 ? 7 : 0), 5, 94);
+      const yieldForecast = clamp(72 + (biomass * 0.18) - (diseaseRisk * 0.32) - Math.max(0, 40 - moisture) * 0.25, 18, 95);
+      const waterStressLevel = moisture >= 58 ? 'low' : moisture >= 40 ? 'moderate' : 'high';
+      const diseaseRiskLevel = diseaseRisk >= 67 ? 'high' : diseaseRisk >= 40 ? 'moderate' : 'low';
+      const confidenceScore = clamp(0.56 + (state.cropAnswers.length * 0.06) + cropInference.confidenceBoost, 0.56, 0.93);
+      const anomalies = [];
+
+      if (diseaseRisk >= 60) {
+        anomalies.push('Localized disease pressure should be ground-truthed within 48 hours.');
+      }
+      if (moisture <= 35) {
+        anomalies.push('Surface moisture proxy is trending low for the selected date window.');
+      }
+      if (areaHectares > 3000) {
+        anomalies.push('Large geometry selected: split the field into scouting zones before acting.');
+      }
+
+      const reportFarmer = `${toDisplayLabel(cropInference.probableCrop)} shows ${waterStressLevel} water stress and ${diseaseRiskLevel} disease pressure in the browser fallback model. Prioritize a ground check in the hottest parcel, then tune irrigation in the next 24 hours.`;
+      const reportScientist = `Client-side fallback report for ${toDisplayLabel(cropInference.probableCrop)} over ${areaHectares.toFixed(1)} hectares and a ${windowDays}-day observation window. Moisture=${moisture.toFixed(1)}%, biomass=${biomass.toFixed(1)}, disease composite=${diseaseRisk.toFixed(1)}, yield forecast=${yieldForecast.toFixed(1)}. This summary is a deterministic browser preview, not a live satellite retrieval.`;
+
+      const payload = {
+        field_state: {
+          sar_features: {
+            soil_moisture_percent: Number(moisture.toFixed(1)),
+            biomass_index: Number(biomass.toFixed(1)),
+            disease_risk_composite: Number(diseaseRisk.toFixed(1)),
+            yield_forecast_index: Number(yieldForecast.toFixed(1)),
+          },
+          raw_sar_summary: {
+            source: 'Browser demo fallback',
+            available_channels: ['VV', 'VH'],
+            interpolation_method: 'client-side heuristic',
+            polarimetric_mode: 'pseudo-dual-pol-preview',
+            insar_available: false,
+          },
+        },
+        diagnosis: {
+          probable_crop: cropInference.probableCrop,
+          candidate_crops: cropInference.candidateCrops,
+          water_stress_level: waterStressLevel,
+          disease_risk_level: diseaseRiskLevel,
+          confidence_score: Number(confidenceScore.toFixed(2)),
+          irrigation_recommendation: moisture < 45 ? 'Increase irrigation frequency in short pulses.' : 'Maintain current irrigation and verify the driest scouting block.',
+          drainage_recommendation: moisture > 70 ? 'Inspect drainage and compaction in the lowest zones.' : 'No drainage intervention is suggested by the fallback model.',
+          anomalies,
+          report_farmer: reportFarmer,
+          report_scientist: reportScientist,
+          llm_used: consent.llm,
+        },
+        pdf_tokens: {
+          farmer: 'demo-farmer-report',
+          scientist: 'demo-scientist-report',
+          expires_in_minutes: 0,
+        },
+        llm_remaining_today: consent.llm ? 0 : 1,
+      };
+
+      setDemoArtifacts(payload, areaHectares, windowDays);
+      return payload;
+    }
+
+    function playBrowserVoice(text, language) {
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+        throw new Error('Browser voice preview is not available on this device.');
+      }
+      const utterance = new window.SpeechSynthesisUtterance(text);
+      utterance.lang = language === 'it' ? 'it-IT' : 'en-US';
+      utterance.rate = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
 
     function getCookie(name) {
       const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -1043,12 +1424,12 @@
     function getConsent() {
       const value = getCookie('deltaplant_consent');
       if (!value) {
-        return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+        return { ...DEFAULT_CONSENT };
       }
       try {
-        return JSON.parse(value);
+        return normalizeConsent(JSON.parse(value));
       } catch {
-        return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+        return { ...DEFAULT_CONSENT };
       }
     }
 
@@ -1057,6 +1438,9 @@
     }
 
     async function apiFetch(path, options = {}) {
+      if (!state.apiAvailable) {
+        throw new Error('Live API unavailable. Browser demo mode is active.');
+      }
       const method = (options.method || 'GET').toUpperCase();
       const headers = new Headers(options.headers || {});
       if (method !== 'GET') {
@@ -1068,7 +1452,7 @@
           headers.set('Content-Type', 'application/json');
         }
       }
-      const response = await fetch(path, {
+      const response = await fetch(resolveApiUrl(path), {
         credentials: 'include',
         ...options,
         headers,
@@ -1130,9 +1514,17 @@
 
     async function saveConsent(categories) {
       const user_token = getUserToken();
+      const normalized = normalizeConsent(categories);
+      if (!state.apiAvailable) {
+        setCookie('deltaplant_consent', JSON.stringify(normalized), 36 * 30 * 24 * 3600);
+        syncConsentUI();
+        maybeEnableMapTiles();
+        els.analysisStatus.textContent = 'Privacy preferences saved locally in browser demo mode.';
+        return { categories: normalized, source: 'local-demo', user_token };
+      }
       const response = await apiFetch('/api/privacy/consent', {
         method: 'POST',
-        body: JSON.stringify({ user_token, ...categories }),
+        body: JSON.stringify({ user_token, ...normalized }),
       });
       const payload = await response.json();
       setCookie('deltaplant_consent', JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
@@ -1259,6 +1651,10 @@
     async function initializeCropWizard() {
       state.cropAnswers = [];
       state.currentQuestionNumber = 0;
+      if (!state.apiAvailable) {
+        renderWizard(buildDemoWizardPayload([]), false);
+        return;
+      }
       const response = await apiFetch('/api/nisar/crop-question', {
         method: 'POST',
         body: JSON.stringify({ question_number: 0, answer: null, sar_signature: {} }),
@@ -1303,6 +1699,10 @@
     }
 
     async function answerCropQuestion(answer) {
+      if (!state.apiAvailable) {
+        renderWizard(buildDemoWizardPayload([...state.cropAnswers, answer]), answer);
+        return;
+      }
       const response = await apiFetch('/api/nisar/crop-question', {
         method: 'POST',
         body: JSON.stringify({
@@ -1324,23 +1724,29 @@
 
     async function runAnalysis() {
       try {
-        els.analysisStatus.textContent = 'Running analysis...';
-        const response = await apiFetch('/api/nisar/area-analysis', {
-          method: 'POST',
-          body: JSON.stringify({
-            geo_data: buildGeoPayload(),
-            date_range: {
-              start: els.dateStart.value,
-              end: els.dateEnd.value,
-            },
-            user_token: getUserToken(),
-            crop_answers: state.cropAnswers,
-          }),
-        });
-        const payload = await response.json();
+        els.analysisStatus.textContent = state.apiAvailable ? 'Running analysis...' : 'Running browser demo analysis...';
+        const payload = state.apiAvailable
+          ? await (async () => {
+              const response = await apiFetch('/api/nisar/area-analysis', {
+                method: 'POST',
+                body: JSON.stringify({
+                  geo_data: buildGeoPayload(),
+                  date_range: {
+                    start: els.dateStart.value,
+                    end: els.dateEnd.value,
+                  },
+                  user_token: getUserToken(),
+                  crop_answers: state.cropAnswers,
+                }),
+              });
+              return response.json();
+            })()
+          : buildDemoAnalysisPayload();
         state.analysisResult = payload;
         renderResults(payload);
-        els.analysisStatus.textContent = 'Analysis completed.';
+        els.analysisStatus.textContent = state.apiAvailable
+          ? 'Analysis completed.'
+          : 'Browser demo analysis completed. Connect a FastAPI backend later with ?apiBase=https://your-host to switch from demo data to live data.';
       } catch (error) {
         els.analysisStatus.textContent = error.message || 'Analysis failed.';
       }
@@ -1411,6 +1817,16 @@
 
     async function playVoice(text) {
       try {
+        if (!getConsent().voice) {
+          els.analysisStatus.textContent = 'Enable optional voice consent before starting audio playback.';
+          showPrivacyModal();
+          return;
+        }
+        if (!state.apiAvailable) {
+          playBrowserVoice(text, document.getElementById('voice-language').value);
+          els.analysisStatus.textContent = 'Playing browser voice preview.';
+          return;
+        }
         const response = await apiFetch('/api/nisar/voice', {
           method: 'POST',
           body: JSON.stringify({
@@ -1441,7 +1857,16 @@
       if (!token) {
         return;
       }
-      window.open(`/api/nisar/pdf/${token}`, '_blank', 'noopener');
+      if (!state.apiAvailable) {
+        const artifact = state.demoArtifacts[token];
+        if (!artifact) {
+          return;
+        }
+        downloadBlob(buildSimplePdfBlob(artifact.title, artifact.lines), artifact.filename);
+        els.analysisStatus.textContent = 'Generated a local PDF fallback report.';
+        return;
+      }
+      window.open(resolveApiUrl(`/api/nisar/pdf/${token}`), '_blank', 'noopener');
     }
 
     function wireEvents() {
@@ -1493,6 +1918,9 @@
     }
 
     function cacheElements() {
+      els.apiModeBanner = document.getElementById('api-mode-banner');
+      els.apiModeTitle = document.getElementById('api-mode-title');
+      els.apiModeText = document.getElementById('api-mode-text');
       els.managePrivacy = document.getElementById('manage-privacy');
       els.drawPolygon = document.getElementById('draw-polygon');
       els.drawCircle = document.getElementById('draw-circle');
@@ -1530,7 +1958,7 @@
     async function boot() {
       cacheElements();
       getUserToken();
-      await apiFetch('/api/health');
+      await probeApiHealth();
       syncConsentUI();
       setDateDefaults();
       wireEvents();

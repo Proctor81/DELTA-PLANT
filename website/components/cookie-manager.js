@@ -1,8 +1,41 @@
 export class CookieManager {
   constructor(apiBase = "") {
-    this.apiBase = apiBase;
+    this.apiBase = this.resolveApiBase(apiBase);
     this.userTokenCookie = "deltaplant_public_id";
     this.consentCookie = "deltaplant_consent";
+  }
+
+  normalizeApiBase(value) {
+    return value ? value.trim().replace(/\/+$/, "") : "";
+  }
+
+  resolveApiBase(explicitBase = "") {
+    const params = new URLSearchParams(window.location.search);
+    const queryValue = params.get("apiBase");
+    if (queryValue) {
+      window.localStorage.setItem("deltaplant_api_base", queryValue);
+    }
+    const storedValue = window.localStorage.getItem("deltaplant_api_base");
+    const metaValue = document.querySelector('meta[name="deltaplant-api-base"]')?.getAttribute("content") || "";
+    return this.normalizeApiBase(explicitBase || queryValue || storedValue || metaValue);
+  }
+
+  normalizeConsent(categories = {}) {
+    return {
+      necessary: true,
+      analytics: false,
+      maps: false,
+      voice: false,
+      llm: false,
+      ...categories,
+      necessary: true,
+    };
+  }
+
+  buildLocalConsentPayload(categories) {
+    const payload = { categories: this.normalizeConsent(categories), source: "local-demo" };
+    this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+    return payload;
   }
 
   getCookie(name) {
@@ -30,12 +63,12 @@ export class CookieManager {
   getConsent() {
     const value = this.getCookie(this.consentCookie);
     if (!value) {
-      return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+      return this.normalizeConsent();
     }
     try {
-      return JSON.parse(value);
+      return this.normalizeConsent(JSON.parse(value));
     } catch {
-      return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+      return this.normalizeConsent();
     }
   }
 
@@ -75,40 +108,63 @@ export class CookieManager {
 
   async saveConsent(categories) {
     const user_token = this.getOrCreateUserToken();
-    const response = await this.request("/api/privacy/consent", {
-      method: "POST",
-      body: JSON.stringify({ user_token, ...categories }),
-    });
-    const payload = await response.json();
-    this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
-    return payload;
+    try {
+      const normalized = this.normalizeConsent(categories);
+      const response = await this.request("/api/privacy/consent", {
+        method: "POST",
+        body: JSON.stringify({ user_token, ...normalized }),
+      });
+      const payload = await response.json();
+      this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      return payload;
+    } catch {
+      return this.buildLocalConsentPayload(categories);
+    }
   }
 
   async acceptAll() {
     const user_token = this.getOrCreateUserToken();
-    const response = await this.request("/api/cookies/accept-all", {
-      method: "POST",
-      body: JSON.stringify({ user_token }),
-    });
-    const payload = await response.json();
-    this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
-    return payload;
+    try {
+      const response = await this.request("/api/cookies/accept-all", {
+        method: "POST",
+        body: JSON.stringify({ user_token }),
+      });
+      const payload = await response.json();
+      this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      return payload;
+    } catch {
+      return this.buildLocalConsentPayload({ analytics: true, maps: true, voice: true, llm: true });
+    }
   }
 
   async rejectAll() {
     const user_token = this.getOrCreateUserToken();
-    const response = await this.request("/api/cookies/reject-all", {
-      method: "POST",
-      body: JSON.stringify({ user_token }),
-    });
-    const payload = await response.json();
-    this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
-    return payload;
+    try {
+      const response = await this.request("/api/cookies/reject-all", {
+        method: "POST",
+        body: JSON.stringify({ user_token }),
+      });
+      const payload = await response.json();
+      this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      return payload;
+    } catch {
+      return this.buildLocalConsentPayload({ analytics: false, maps: false, voice: false, llm: false });
+    }
   }
 
   async fetchPreferences() {
     const user_token = this.getOrCreateUserToken();
-    const response = await this.request(`/api/cookies/preferences?user_token=${encodeURIComponent(user_token)}`);
-    return response.json();
+    try {
+      const response = await this.request(`/api/cookies/preferences?user_token=${encodeURIComponent(user_token)}`);
+      return response.json();
+    } catch {
+      const consent = this.getConsent();
+      return {
+        user_token,
+        effective: consent,
+        stored: consent,
+        source: "local-demo",
+      };
+    }
   }
 }
