@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from api.cookie_utils import cookie_policy_for_request
 from api.cookie_routes import router as cookie_router
 from api.nisar_routes import router as nisar_router
 from api.privacy_routes import router as privacy_router
@@ -56,6 +57,7 @@ app = FastAPI(
 )
 app.state.orchestrator = orchestrator
 app.state.limiter = limiter
+app.state.settings = settings
 
 
 def _build_session_payload() -> dict[str, Any]:
@@ -82,12 +84,7 @@ app.state.decode_session_token = decode_session_token
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://deltaplant.ai",
-        "https://www.deltaplant.ai",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -95,7 +92,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "deltaplant.ai", "www.deltaplant.ai"],
+    allowed_hosts=settings.allowed_hosts,
 )
 
 
@@ -103,7 +100,7 @@ app.add_middleware(
 async def session_cookie_middleware(request: Request, call_next):
     cookie_name = "deltaplant_session"
     csrf_cookie_name = "deltaplant_csrf"
-    secure_cookie = request.url.scheme == "https" and request.url.hostname not in {"localhost", "127.0.0.1"}
+    cookie_policy = cookie_policy_for_request(request)
 
     session_token = request.cookies.get(cookie_name)
     request.state.session_payload = None
@@ -133,9 +130,7 @@ async def session_cookie_middleware(request: Request, call_next):
             request.state.new_session_token,
             max_age=7 * 24 * 3600,
             httponly=True,
-            secure=secure_cookie,
-            samesite="strict",
-            path="/",
+            **cookie_policy,
         )
     if request.state.new_csrf_token:
         response.set_cookie(
@@ -143,9 +138,7 @@ async def session_cookie_middleware(request: Request, call_next):
             request.state.new_csrf_token,
             max_age=24 * 3600,
             httponly=False,
-            secure=secure_cookie,
-            samesite="strict",
-            path="/",
+            **cookie_policy,
         )
     return response
 

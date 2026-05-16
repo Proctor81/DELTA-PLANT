@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: deltaplant-nasa-api
+    env: docker
+    plan: starter
+    autoDeploy: true
+    branch: main
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    disk:
+      name: deltaplant-nasa-data
+      mountPath: /var/lib/deltaplant
+      sizeGB: 1
+    envVars:
+      - key: EARTHDATA_USERNAME
+        sync: false
+      - key: EARTHDATA_PASSWORD
+        sync: false
+      - key: EARTHDATA_BASE_URL
+        value: https://urs.earthdata.nasa.gov
+      - key: COPERNICUS_USERNAME
+        sync: false
+      - key: COPERNICUS_PASSWORD
+        sync: false
+      - key: COPERNICUS_BASE_URL
+        value: https://dataspace.copernicus.eu
+      - key: NASA_POWER_BASE_URL
+        value: https://power.larc.nasa.gov/api/temporal/daily/point
+      - key: SECRET_KEY
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: PDF_TEMP_DIR
+        value: /var/lib/deltaplant/tmp
+      - key: PRIVACY_STORAGE_PATH
+        value: /var/lib/deltaplant/privacy/consents.enc
+      - key: PRIVACY_LOG_DIR
+        value: /var/lib/deltaplant/logs/privacy
+      - key: COOKIE_DOMAIN
+        value: .deltaplant.ai
+      - key: COOKIE_SAMESITE
+        value: strict
+      - key: CORS_ALLOW_ORIGINS
+        value: https://deltaplant.ai,https://www.deltaplant.ai
+      - key: ALLOWED_HOSTS
+        value: localhost,127.0.0.1,deltaplant.ai,*.deltaplant.ai
+      - key: REDIS_URL
+        sync: false

@@ -10,6 +10,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
+from api.cookie_utils import cookie_policy_for_request
+
 try:
     from slowapi import Limiter
 except Exception:  # pragma: no cover - optional dependency fallback
@@ -43,10 +45,6 @@ def _require_csrf(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Invalid CSRF token.")
 
 
-def _secure_cookie(request: Request) -> bool:
-    return request.url.scheme == "https" and request.url.hostname not in {"localhost", "127.0.0.1"}
-
-
 class UserTokenRequest(BaseModel):
     user_token: str
 
@@ -64,9 +62,7 @@ def _set_cookie(response: JSONResponse, request: Request, categories: dict[str, 
         json.dumps(categories, separators=(",", ":")),
         max_age=36 * 30 * 24 * 3600,
         httponly=False,
-        secure=_secure_cookie(request),
-        samesite="strict",
-        path="/",
+        **cookie_policy_for_request(request),
     )
     return response
 

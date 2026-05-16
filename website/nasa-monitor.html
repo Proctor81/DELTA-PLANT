@@ -8,7 +8,7 @@
   <meta name='keywords' content='NASA agriculture AI, Sentinel-1 crop stress, plant disease early warning, SAR agronomy, Copernicus farm monitoring, DELTA Plant' />
   <meta name='robots' content='index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1' />
   <meta name='theme-color' content='#08111d' />
-  <meta name='deltaplant-api-base' content='' />
+  <meta name='deltaplant-api-base' content='https://api.deltaplant.ai' />
   <meta property='og:type' content='website' />
   <meta property='og:title' content='DELTA Plant NASA Monitor' />
   <meta property='og:description' content='Satellite-first agronomic intelligence blending NASA POWER, Sentinel-1 SAR, crop questioning, voice output, and privacy-aware runtime PDFs.' />
@@ -1103,7 +1103,11 @@
       }
       const storedValue = window.localStorage.getItem('deltaplant_api_base');
       const metaValue = document.querySelector('meta[name="deltaplant-api-base"]')?.getAttribute('content') || '';
-      return normalizeApiBase(queryValue || storedValue || metaValue);
+      const hostname = window.location.hostname.toLowerCase();
+      const defaultValue = hostname === 'deltaplant.ai' || hostname.endsWith('.deltaplant.ai')
+        ? 'https://api.deltaplant.ai'
+        : '';
+      return normalizeApiBase(queryValue || storedValue || metaValue || defaultValue);
     }
 
     function resolveApiUrl(path) {
@@ -1405,8 +1409,12 @@
     }
 
     function setCookie(name, value, maxAgeSeconds = 31536000) {
+      const hostname = window.location.hostname.toLowerCase();
+      const domain = hostname === 'deltaplant.ai' || hostname.endsWith('.deltaplant.ai')
+        ? '; Domain=.deltaplant.ai'
+        : '';
       const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Strict${secure}`;
+      document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Strict${domain}${secure}`;
     }
 
     function getUserToken() {

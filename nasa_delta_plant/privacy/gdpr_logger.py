@@ -9,7 +9,7 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
 
-from nasa_delta_plant.config import ROOT_DIR
+from nasa_delta_plant.config import get_settings
 from nasa_delta_plant.privacy.retention_policy import RetentionPolicy
 
 
@@ -28,7 +28,7 @@ class _JsonFormatter(logging.Formatter):
 
 @lru_cache(maxsize=1)
 def get_gdpr_logger() -> logging.Logger:
-    log_dir = ROOT_DIR / "logs" / "privacy"
+    log_dir = get_settings().privacy_log_dir
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("nasa_delta_plant.gdpr")
     logger.setLevel(logging.INFO)

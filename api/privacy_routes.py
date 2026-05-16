@@ -10,6 +10,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
+from api.cookie_utils import cookie_policy_for_request
+
 try:
     from slowapi import Limiter
 except Exception:  # pragma: no cover - optional dependency fallback
@@ -41,10 +43,6 @@ def _require_csrf(request: Request) -> None:
     header_token = request.headers.get("X-CSRF-Token")
     if not request.app.state.orchestrator.consent_manager.validate_csrf(cookie_token, header_token):
         raise HTTPException(status_code=403, detail="Invalid CSRF token.")
-
-
-def _secure_cookie(request: Request) -> bool:
-    return request.url.scheme == "https" and request.url.hostname not in {"localhost", "127.0.0.1"}
 
 
 class ConsentRequest(BaseModel):
@@ -87,9 +85,7 @@ async def consent(request: Request, payload: ConsentRequest) -> JSONResponse:
         json.dumps(snapshot["categories"], separators=(",", ":")),
         max_age=36 * 30 * 24 * 3600,
         httponly=False,
-        secure=_secure_cookie(request),
-        samesite="strict",
-        path="/",
+        **cookie_policy_for_request(request),
     )
     return response
 
@@ -124,5 +120,9 @@ async def delete_user_data(request: Request, user_token: str) -> JSONResponse:
         raise HTTPException(status_code=422, detail="Invalid user_token format")
     deleted = request.app.state.orchestrator.consent_manager.delete_user_data(user_token)
     response = JSONResponse(content={"deleted": deleted})
-    response.delete_cookie("deltaplant_consent", path="/")
+    response.delete_cookie(
+        "deltaplant_consent",
+        path="/",
+        domain=cookie_policy_for_request(request)["domain"],
+    )
     return response

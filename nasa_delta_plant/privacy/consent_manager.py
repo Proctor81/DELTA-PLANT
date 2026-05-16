@@ -57,7 +57,7 @@ class ConsentManager:
         self.settings = settings or get_settings()
         self.retention = RetentionPolicy()
         self._lock = threading.RLock()
-        self.storage_path = storage_path or (ROOT_DIR / "data" / "privacy" / "consents.enc")
+        self.storage_path = storage_path or self.settings.privacy_storage_path
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         self._fernet = Fernet(self._derive_fernet_key(self.settings.secret_key.get_secret_value()))
 

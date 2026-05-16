@@ -228,6 +228,20 @@ def test_health_sets_security_headers_and_session_cookies(nasa_client):
     assert "deltaplant_csrf" in client.cookies
 
 
+def test_subdomain_health_shares_cookie_domain_and_allows_root_origin(monkeypatch):
+    fake_orchestrator = FakeOrchestrator()
+    monkeypatch.setattr(api_main, "orchestrator", fake_orchestrator)
+    monkeypatch.setattr(api_main.app.state, "orchestrator", fake_orchestrator)
+
+    with TestClient(api_main.app, base_url="https://api.deltaplant.ai") as client:
+        response = client.get("/api/health", headers={"Origin": "https://deltaplant.ai"})
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://deltaplant.ai"
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert any("Domain=.deltaplant.ai" in header for header in set_cookie_headers)
+
+
 def test_area_analysis_uses_llm_consent_state(nasa_client):
     client, fake_orchestrator = nasa_client
     user_token = "dp_user_token_1234567890"

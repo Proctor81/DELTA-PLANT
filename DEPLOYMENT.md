@@ -2,6 +2,18 @@
 
 ## API deployment
 
+The repository now includes a production-oriented backend container setup:
+
+- [Dockerfile](Dockerfile) for the NASA FastAPI service
+- [render.yaml](render.yaml) for a Render web service with persistent disk
+
+Recommended public topology:
+
+- static frontend on `https://deltaplant.ai/`
+- FastAPI backend on `https://api.deltaplant.ai/`
+
+That topology is important because the frontend uses cookies, CSRF, and consent state. A provider default hostname like `*.onrender.com` is a different site and will break the shared-cookie flow unless you deliberately relax the security model. The current implementation is prepared for a same-site subdomain deployment under `*.deltaplant.ai`.
+
 Recommended production command:
 
 `uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 1`
@@ -13,14 +25,31 @@ Minimum production expectations:
 - HTTPS enabled at the proxy level
 - persistent `.env` mounted outside version control
 - `requirements.txt` installed in the active virtual environment
-- filesystem write access for encrypted consent storage under `data/privacy/`
-- filesystem write access for rotating GDPR logs under `logs/privacy/`
+- filesystem write access for encrypted consent storage via `PRIVACY_STORAGE_PATH`
+- filesystem write access for rotating GDPR logs via `PRIVACY_LOG_DIR`
+- backend served from a same-site domain such as `api.deltaplant.ai`
 
 Optional production improvements:
 
 - set `REDIS_URL` to share LLM usage quotas across replicas
 - pin proxy hostnames to `deltaplant.ai` and `www.deltaplant.ai`
 - monitor outbound access to NASA POWER and Copernicus Data Space
+
+## Render deployment
+
+The quickest supported path from this repository is Render via [render.yaml](render.yaml).
+
+Suggested sequence:
+
+1. Create a new Render Blueprint from this repository.
+2. Provision the web service defined in [render.yaml](render.yaml).
+3. Set the required secret env vars in Render:
+	`EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD`, `COPERNICUS_USERNAME`, `COPERNICUS_PASSWORD`, `SECRET_KEY`, and optionally `REDIS_URL`.
+4. Attach the custom domain `api.deltaplant.ai` to that Render service.
+5. Create the DNS record for `api.deltaplant.ai` in the `deltaplant.ai` zone.
+6. Keep `COOKIE_DOMAIN=.deltaplant.ai` and `COOKIE_SAMESITE=strict` so the frontend and backend remain same-site.
+
+The frontend is already prepared to probe `https://api.deltaplant.ai` by default and will fall back to browser demo mode until the subdomain becomes reachable.
 
 ## GitHub Pages deployment
 
@@ -39,6 +68,8 @@ To publish website changes:
 2. Push to `main`.
 3. Wait for the Pages action to publish the `site-dist/` bundle to `gh-pages`.
 
+The public NASA monitor now defaults to `https://api.deltaplant.ai` as its backend target. Until that host is live, it automatically stays in browser demo mode.
+
 ## Runtime artifacts and retention
 
 - PDFs are not persisted as files and expire after 60 minutes.
@@ -52,5 +83,6 @@ After deployment, verify:
 1. `GET /api/health` returns `status=ok`.
 2. the root page at `https://deltaplant.ai/` loads the NASA monitor.
 3. legal pages open correctly.
-4. drawing a polygon and running `/api/nisar/area-analysis` returns a JSON payload.
-5. voice and LLM remain unavailable until consent is granted.
+4. `https://api.deltaplant.ai/api/health` responds over HTTPS.
+5. drawing a polygon on `https://deltaplant.ai/` and running `/api/nisar/area-analysis` returns a JSON payload from the live backend instead of the browser demo fallback.
+6. voice and LLM remain unavailable until consent is granted.

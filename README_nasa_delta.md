@@ -82,6 +82,22 @@ The workflow now publishes:
 - `website/Raspberrypi/index.html`
 - legal pages and `website/components/*.js`
 
+The public site now defaults to `https://api.deltaplant.ai` as the backend base for the NASA monitor. If that host is not yet reachable, the website stays usable in browser demo mode and automatically switches to the live backend once the subdomain comes online.
+
+## Backend deployment path
+
+Repository-side deployment assets now included:
+
+- [Dockerfile](Dockerfile) for the FastAPI service
+- [render.yaml](render.yaml) for a Render Blueprint deployment
+
+Recommended live topology:
+
+- `https://deltaplant.ai/` for the GitHub Pages frontend
+- `https://api.deltaplant.ai/` for the FastAPI backend
+
+This same-site subdomain layout matters because the frontend relies on shared cookies for CSRF and consent state. A provider default hostname on another registrable domain is not enough for the secure cookie model used by the current implementation.
+
 ## Notes on SAR processing
 
 - Sentinel-1 is the primary SAR source in the current implementation.

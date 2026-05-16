@@ -17,7 +17,11 @@ export class CookieManager {
     }
     const storedValue = window.localStorage.getItem("deltaplant_api_base");
     const metaValue = document.querySelector('meta[name="deltaplant-api-base"]')?.getAttribute("content") || "";
-    return this.normalizeApiBase(explicitBase || queryValue || storedValue || metaValue);
+    const hostname = window.location.hostname.toLowerCase();
+    const defaultValue = hostname === "deltaplant.ai" || hostname.endsWith(".deltaplant.ai")
+      ? "https://api.deltaplant.ai"
+      : "";
+    return this.normalizeApiBase(explicitBase || queryValue || storedValue || metaValue || defaultValue);
   }
 
   normalizeConsent(categories = {}) {
@@ -44,8 +48,12 @@ export class CookieManager {
   }
 
   setCookie(name, value, maxAgeSeconds = 31536000) {
+    const hostname = window.location.hostname.toLowerCase();
+    const domain = hostname === "deltaplant.ai" || hostname.endsWith(".deltaplant.ai")
+      ? "; Domain=.deltaplant.ai"
+      : "";
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Strict${secure}`;
+    document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Strict${domain}${secure}`;
   }
 
   getOrCreateUserToken() {
