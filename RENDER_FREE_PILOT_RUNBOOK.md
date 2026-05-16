@@ -21,12 +21,11 @@ and the exact follow-up to move back to Starter.
 
 Run these checks at least weekly during the pilot:
 
-1. `https://api.deltaplant.ai/api/health` returns `200 OK`
+1. run `python3 tools/check_render_free_pilot.py` locally or trigger `.github/workflows/check-render-free-pilot.yml`
 2. `https://deltaplant.ai/` shows the live backend banner instead of browser demo mode
 3. polygon analysis from the public frontend completes successfully
 4. PDF generation works end-to-end
-5. privacy and cookie pages load correctly
-6. Render does not suspend the service for bandwidth or build overages
+5. Render does not suspend the service for bandwidth or build overages
 
 ## Switch back to Starter
 

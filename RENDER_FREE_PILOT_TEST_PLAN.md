@@ -25,12 +25,11 @@ upgrading the backend to Starter and re-enabling persistent storage.
 
 ## Weekly checks
 
-1. open `https://deltaplant.ai/` and confirm `Live pipeline connected`
-2. call `https://api.deltaplant.ai/api/health`
+1. run `python3 tools/check_render_free_pilot.py` or trigger `.github/workflows/check-render-free-pilot.yml`
+2. open `https://deltaplant.ai/` and confirm `Live pipeline connected`
 3. run one smoke analysis from the public UI
 4. download one PDF report
-5. confirm the legal pages still load correctly
-6. review Render dashboard events for suspensions, restarts, or repeated failures
+5. review Render dashboard events for suspensions, restarts, or repeated failures
 
 ## Exit decision after 30 days
 
