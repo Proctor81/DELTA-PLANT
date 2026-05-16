@@ -49,6 +49,17 @@ Suggested sequence:
 5. Create the DNS record for `api.deltaplant.ai` in the `deltaplant.ai` zone.
 6. Keep `COOKIE_DOMAIN=.deltaplant.ai` and `COOKIE_SAMESITE=strict` so the frontend and backend remain same-site.
 
+Expected Render default hostname after service creation:
+
+- `proctor81-deltaplant-nasa-api.onrender.com`
+
+Exact DNS record to create in Aruba for the subdomain:
+
+- type: `CNAME`
+- host/name: `api`
+- target/value: `proctor81-deltaplant-nasa-api.onrender.com`
+- ttl: default Aruba value or `3600`
+
 The frontend is already prepared to probe `https://api.deltaplant.ai` by default and will fall back to browser demo mode until the subdomain becomes reachable.
 
 ## GitHub Pages deployment

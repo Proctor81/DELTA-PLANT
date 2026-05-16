@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: deltaplant-nasa-api
+    name: proctor81-deltaplant-nasa-api
     env: docker
     plan: starter
     autoDeploy: true
