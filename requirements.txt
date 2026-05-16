@@ -73,6 +73,7 @@ redis>=5.0.0
 reportlab>=4.2.0
 shapely>=2.0.4
 tifffile>=2024.5.22
+zstandard>=0.23.0
 pykrige>=1.7.0
 scikit-image>=0.22.0
 
