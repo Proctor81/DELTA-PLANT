@@ -13,7 +13,7 @@
   <meta property='og:title' content='DELTA Plant NASA Monitor' />
   <meta property='og:description' content='Satellite-first agronomic intelligence blending NASA POWER, Sentinel-1 SAR, crop questioning, voice output, and privacy-aware runtime PDFs.' />
   <meta property='og:url' content='https://deltaplant.ai/' />
-  <meta property='og:image' content='https://deltaplant.ai/assets/social-preview.png' />
+  <meta property='og:image' content='https://deltaplant.ai/assets/social-preview-wa-20260514.png' />
   <meta name='twitter:card' content='summary_large_image' />
   <meta name='twitter:title' content='DELTA Plant NASA Monitor' />
   <meta name='twitter:description' content='Satellite-first agronomic monitoring with privacy-aware AI summaries.' />
@@ -75,6 +75,216 @@
     ::selection {
       background: rgba(25, 245, 193, 0.28);
       color: white;
+    }
+
+    .hero-shell {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      padding-top: 6rem;
+    }
+
+    .hero-shell-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+    }
+
+    .aurora {
+      position: absolute;
+      inset: -18% -12% auto;
+      height: 78vh;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 38%, rgba(25, 245, 193, 0.22), transparent 28%),
+        radial-gradient(circle at 72% 20%, rgba(121, 231, 255, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 60%, rgba(155, 255, 131, 0.12), transparent 20%);
+      filter: blur(48px);
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .hero-fade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(2, 7, 13, 0.35) 0%, rgba(2, 7, 13, 0.62) 44%, rgba(2, 7, 13, 0.92) 100%),
+        radial-gradient(circle at center, transparent 0%, rgba(2, 7, 13, 0.12) 56%, rgba(2, 7, 13, 0.74) 100%);
+    }
+
+    .hero-noise {
+      position: absolute;
+      inset: 0;
+      opacity: 0.13;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.15) 0 0.6px, transparent 0.7px),
+        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.12) 0 0.55px, transparent 0.65px),
+        radial-gradient(circle at 55% 75%, rgba(255, 255, 255, 0.1) 0 0.5px, transparent 0.6px);
+      background-size: 170px 170px, 210px 210px, 250px 250px;
+      mix-blend-mode: screen;
+    }
+
+    .scan-beam {
+      position: absolute;
+      inset: 12% 10% auto;
+      height: 280px;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0), rgba(121, 231, 255, 0.14), rgba(25, 245, 193, 0));
+      filter: blur(8px);
+      animation: scan 9s ease-in-out infinite;
+    }
+
+    .hero-ring,
+    .hero-ring::before,
+    .hero-ring::after {
+      position: absolute;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      content: '';
+    }
+
+    .hero-ring {
+      inset: 14% auto auto 58%;
+      width: 420px;
+      height: 420px;
+      opacity: 0.38;
+      animation: spin 36s linear infinite;
+    }
+
+    .hero-ring::before {
+      inset: 36px;
+      border-style: dashed;
+      animation: spinReverse 22s linear infinite;
+    }
+
+    .hero-ring::after {
+      inset: 94px;
+      border-color: rgba(25, 245, 193, 0.24);
+      box-shadow: 0 0 48px rgba(25, 245, 193, 0.1);
+    }
+
+    .bio-leaf {
+      position: absolute;
+      width: 148px;
+      height: 230px;
+      border-radius: 100% 0 100% 0;
+      transform-origin: center center;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0.2), rgba(25, 245, 193, 0.05));
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      box-shadow: inset 0 0 24px rgba(121, 231, 255, 0.08), 0 0 64px rgba(25, 245, 193, 0.08);
+      filter: blur(0.2px);
+      opacity: 0.42;
+      overflow: hidden;
+    }
+
+    .bio-leaf::before,
+    .bio-leaf::after {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: inherit;
+    }
+
+    .bio-leaf::before {
+      border-left: 1px solid rgba(155, 255, 131, 0.22);
+      border-bottom: 1px solid rgba(121, 231, 255, 0.12);
+      transform: skewX(-10deg);
+    }
+
+    .bio-leaf::after {
+      inset: 54px 62px 54px 62px;
+      background: linear-gradient(180deg, rgba(155, 255, 131, 0.32), rgba(121, 231, 255, 0));
+      filter: blur(12px);
+    }
+
+    .leaf-a {
+      top: 18%;
+      right: 8%;
+      transform: rotate(22deg);
+      animation: floatLeaf 16s ease-in-out infinite;
+    }
+
+    .leaf-b {
+      bottom: 6%;
+      left: 4%;
+      width: 124px;
+      height: 188px;
+      transform: rotate(-26deg);
+      animation: floatLeaf 19s ease-in-out infinite reverse;
+    }
+
+    .leaf-c {
+      top: 34%;
+      left: 48%;
+      width: 90px;
+      height: 142px;
+      opacity: 0.28;
+      transform: rotate(18deg);
+      animation: floatLeaf 14s ease-in-out infinite;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(18px);
+      opacity: 0.48;
+    }
+
+    .orb-a {
+      width: 240px;
+      height: 240px;
+      top: 10%;
+      right: 14%;
+      background: radial-gradient(circle, rgba(121, 231, 255, 0.2), rgba(121, 231, 255, 0));
+      animation: drift 17s ease-in-out infinite alternate;
+    }
+
+    .orb-b {
+      width: 180px;
+      height: 180px;
+      bottom: 14%;
+      left: 12%;
+      background: radial-gradient(circle, rgba(25, 245, 193, 0.16), rgba(25, 245, 193, 0));
+      animation: drift 14s ease-in-out infinite alternate-reverse;
+    }
+
+    .orb-c {
+      width: 130px;
+      height: 130px;
+      top: 44%;
+      left: 52%;
+      background: radial-gradient(circle, rgba(155, 255, 131, 0.14), rgba(155, 255, 131, 0));
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    .chip {
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background: rgba(7, 17, 29, 0.52);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 999px;
+      background: var(--accent);
+      flex: none;
+    }
+
+    .headline-glow {
+      text-shadow: 0 0 32px rgba(25, 245, 193, 0.12), 0 0 18px rgba(121, 231, 255, 0.1);
+    }
+
+    .gradient-text {
+      background: linear-gradient(90deg, #f6fdff 0%, #79e7ff 42%, #19f5c1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
 
     a { color: inherit; }
@@ -293,6 +503,18 @@
       background: rgba(255, 255, 255, 0.05);
       color: var(--text);
       border: 1px solid rgba(121, 231, 255, 0.12);
+    }
+
+    .cta-primary {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      color: #04131c;
+      box-shadow: 0 0 0 1px rgba(121, 231, 255, 0.18), 0 20px 48px rgba(25, 245, 193, 0.2);
+    }
+
+    .cta-secondary {
+      background: rgba(9, 24, 35, 0.58);
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      color: #edf7ff;
     }
 
     .hero-grid {
@@ -771,6 +993,66 @@
       border: 0;
     }
 
+    @keyframes drift {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      100% {
+        transform: translate3d(22px, -18px, 0) scale(1.06);
+      }
+    }
+
+    @keyframes scan {
+      0%, 100% {
+        transform: translateY(0) scaleY(0.92);
+        opacity: 0.32;
+      }
+      50% {
+        transform: translateY(160px) scaleY(1.08);
+        opacity: 0.86;
+      }
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spinReverse {
+      from {
+        transform: rotate(360deg);
+      }
+      to {
+        transform: rotate(0deg);
+      }
+    }
+
+    @keyframes floatLeaf {
+      0%, 100% {
+        transform: translateY(0) rotate(18deg);
+      }
+      50% {
+        transform: translateY(-14px) rotate(24deg);
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .hero-ring {
+        inset: auto auto 12% 52%;
+        width: 300px;
+        height: 300px;
+      }
+
+      .leaf-a,
+      .leaf-c {
+        display: none;
+      }
+    }
+
     @media (max-width: 1100px) {
       .site-header {
         align-items: flex-start;
@@ -793,6 +1075,21 @@
       .details-grid,
       .control-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero-ring {
+        left: auto;
+        right: -24px;
+        bottom: 20%;
+        width: 220px;
+        height: 220px;
+      }
+
+      .leaf-b {
+        left: -20px;
+        bottom: 18%;
       }
     }
 
@@ -855,6 +1152,9 @@
         font-size: 1rem;
         line-height: 1.7;
       }
+      .hero-shell {
+        padding-top: 5.25rem;
+      }
       .toolbar,
       .result-toolbar,
       .mode-toggle,
@@ -893,6 +1193,7 @@
   </style>
 </head>
 <body>
+  <a href='#content' class='sr-only'>Skip to content</a>
   <div class='site-shell'>
     <header class='site-header'>
       <a class='brand' href='/'>
@@ -914,18 +1215,32 @@
       </nav>
     </header>
 
-    <main>
+    <main id='content'>
+      <section id='home' class='hero-shell'>
+        <div class='aurora'></div>
+        <div class='hero-fade'></div>
+        <div class='hero-noise'></div>
+        <div class='scan-beam'></div>
+        <div class='hero-ring'></div>
+        <div class='bio-leaf leaf-a'></div>
+        <div class='bio-leaf leaf-b'></div>
+        <div class='bio-leaf leaf-c'></div>
+        <div class='orb orb-a'></div>
+        <div class='orb orb-b'></div>
+        <div class='orb orb-c'></div>
+
+        <div class='hero-shell-inner'>
       <section class='hero'>
         <article class='hero-card hero-copy'>
           <div>
-            <span class='eyebrow'>NASA POWER + Sentinel-1 + DELTA Voice</span>
-            <h1>See crop stress before the canopy tells you.</h1>
+            <span class='eyebrow chip'><span class='eyebrow-dot'></span>NASA POWER + Sentinel-1 + DELTA Voice</span>
+            <h1 class='headline-glow'><span class='gradient-text'>DELTA Plant</span><br />See crop stress before the canopy tells you.</h1>
             <p class='lead'>DELTA Plant blends daily NASA POWER climate forcing, Sentinel-1 SAR backscatter, interpolated soil moisture, crop questioning, and privacy-gated AI reporting into one decision surface designed for real fields, not demo dashboards.</p>
           </div>
 
           <div class='hero-actions'>
-            <a class='primary' href='#analyze'>Start field analysis</a>
-            <button class='secondary' type='button' id='hero-voice-demo'>Play voice demo</button>
+            <a class='primary cta-primary' href='#analyze'>Start field analysis</a>
+            <button class='secondary cta-secondary' type='button' id='hero-voice-demo'>Play voice demo</button>
           </div>
 
           <div class='hero-grid'>
@@ -962,6 +1277,8 @@
               <p>JWT sessions, CSRF, voice streaming, and ephemeral artifact tokens.</p>
             </article>
           </div>
+        </div>
+      </section>
         </div>
       </section>
 
