@@ -149,7 +149,7 @@ class SentinelClient:
         bundles: list[SentinelRasterBundle] = []
         for product in products:
             product_bytes = await self.download_product(product)
-            bundles.append(self._parse_safe_bundle(product, product_bytes))
+            bundles.append(await asyncio.to_thread(self._parse_safe_bundle, product, product_bytes))
 
         return {
             "source": "Sentinel-1",
