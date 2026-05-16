@@ -5,11 +5,13 @@ on:
     branches:
       - main
     paths:
-      - website/root-index.html
+      - website/nasa-monitor.html
       - website/Raspberrypi/index.html
       - website/privacy.html
       - website/privacy-policy.html
       - website/cookie-policy.html
+      - website/terms-of-service.html
+      - website/components/**
       - website/CNAME
       - website/.nojekyll
       - website/robots.txt
@@ -38,12 +40,15 @@ jobs:
 
       - name: Prepare minimal Pages bundle
         run: |
-          mkdir -p site-dist/assets site-dist/Raspberrypi
-          cp website/root-index.html site-dist/index.html
+          mkdir -p site-dist/assets site-dist/Raspberrypi site-dist/components
+          cp website/nasa-monitor.html site-dist/index.html
+          cp website/nasa-monitor.html site-dist/
           cp website/Raspberrypi/index.html site-dist/Raspberrypi/
           cp website/privacy.html site-dist/
           cp website/privacy-policy.html site-dist/
           cp website/cookie-policy.html site-dist/
+          cp website/terms-of-service.html site-dist/
+          cp website/components/*.js site-dist/components/
           cp website/CNAME site-dist/
           cp website/.nojekyll site-dist/
           cp website/robots.txt site-dist/
