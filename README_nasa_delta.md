@@ -91,6 +91,11 @@ Repository-side deployment assets now included:
 - [Dockerfile](Dockerfile) for the FastAPI service
 - [render.yaml](render.yaml) for a Render Blueprint deployment
 
+The committed [render.yaml](render.yaml) is intentionally pinned to a temporary `Free`
+pilot rollout for the first public month. After the test window, move the service
+to `Starter` and restore the persistent disk so privacy and consent data become
+operationally durable across restarts.
+
 Recommended live topology:
 
 - `https://deltaplant.ai/` for the GitHub Pages frontend

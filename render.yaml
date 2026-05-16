@@ -2,16 +2,14 @@ services:
   - type: web
     name: proctor81-deltaplant-nasa-api
     env: docker
-    plan: starter
+    # Temporary one-month public pilot on Free. Move back to Starter and
+    # restore the persistent disk after the validation window.
+    plan: free
     autoDeploy: true
     branch: main
     dockerContext: .
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
-    disk:
-      name: deltaplant-nasa-data
-      mountPath: /var/lib/deltaplant
-      sizeGB: 1
     envVars:
       - key: EARTHDATA_USERNAME
         sync: false

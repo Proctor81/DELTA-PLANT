@@ -5,7 +5,7 @@
 The repository now includes a production-oriented backend container setup:
 
 - [Dockerfile](Dockerfile) for the NASA FastAPI service
-- [render.yaml](render.yaml) for a Render web service with persistent disk
+- [render.yaml](render.yaml) for the current Render Free pilot rollout
 
 Recommended public topology:
 
@@ -38,6 +38,18 @@ Optional production improvements:
 ## Render deployment
 
 The quickest supported path from this repository is Render via [render.yaml](render.yaml).
+
+Current repository default:
+
+- Render plan: `Free`
+- no persistent disk attached during the one-month public test window
+- same-site backend still served from `https://api.deltaplant.ai`
+
+Planned post-test upgrade path:
+
+- move the Render web service to `Starter`
+- re-enable the `disk:` block in [render.yaml](render.yaml)
+- keep `PRIVACY_STORAGE_PATH` and `PRIVACY_LOG_DIR` on `/var/lib/deltaplant`
 
 To print the exact cutover bundle from the local `.env`, including the DNS target and all Render env keys, run:
 
@@ -92,6 +104,7 @@ The public NASA monitor now defaults to `https://api.deltaplant.ai` as its backe
 - PDFs are not persisted as files and expire after 60 minutes.
 - consent snapshots are encrypted and retained for 36 months.
 - GDPR audit logs rotate daily and keep 30 days of history.
+- during the temporary `Free` pilot, consent and privacy logs live on ephemeral container storage and are not durable across restarts, redeploys, or idle spin-down events.
 
 ## Operational checks
 
