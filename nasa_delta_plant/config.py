@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -49,8 +49,14 @@ class Settings(BaseSettings):
         default=ROOT_DIR / "logs" / "privacy",
         alias="PRIVACY_LOG_DIR",
     )
-    cors_allow_origins: list[str] = Field(default_factory=lambda: list(DEFAULT_CORS_ALLOW_ORIGINS), alias="CORS_ALLOW_ORIGINS")
-    allowed_hosts: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_HOSTS), alias="ALLOWED_HOSTS")
+    cors_allow_origins: Annotated[
+        list[str],
+        NoDecode,
+    ] = Field(default_factory=lambda: list(DEFAULT_CORS_ALLOW_ORIGINS), alias="CORS_ALLOW_ORIGINS")
+    allowed_hosts: Annotated[
+        list[str],
+        NoDecode,
+    ] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_HOSTS), alias="ALLOWED_HOSTS")
     cookie_domain: str | None = Field(default=None, alias="COOKIE_DOMAIN")
     cookie_samesite: str = Field(default="strict", alias="COOKIE_SAMESITE")
 
