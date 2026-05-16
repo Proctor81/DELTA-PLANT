@@ -296,3 +296,95 @@ def test_pdf_download_handles_missing_and_present_tokens(nasa_client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF-1.4")
+
+
+def test_cookie_accept_export_delete_and_reject_flow(nasa_client):
+    client, _ = nasa_client
+    user_token = "dp_user_token_1234567890"
+    client.get("/api/health")
+    csrf_token = client.cookies["deltaplant_csrf"]
+
+    accept_response = client.post(
+        "/api/cookies/accept-all",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"user_token": user_token},
+    )
+
+    assert accept_response.status_code == 200
+    accepted_categories = accept_response.json()["categories"]
+    assert accepted_categories["analytics"] is True
+    assert accepted_categories["maps"] is True
+    assert accepted_categories["voice"] is True
+    assert accepted_categories["llm"] is True
+
+    export_response = client.get(
+        f"/api/privacy/export/{user_token}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert export_response.status_code == 200
+    exported_categories = export_response.json()["categories"]
+    assert exported_categories["voice"] is True
+    assert exported_categories["llm"] is True
+
+    delete_response = client.delete(
+        f"/api/privacy/delete/{user_token}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"deleted": True}
+
+    status_after_delete = client.get(f"/api/privacy/consent-status?user_token={user_token}")
+
+    assert status_after_delete.status_code == 200
+    deleted_categories = status_after_delete.json()["categories"]
+    assert deleted_categories["necessary"] is True
+    assert deleted_categories["analytics"] is False
+    assert deleted_categories["maps"] is False
+    assert deleted_categories["voice"] is False
+    assert deleted_categories["llm"] is False
+
+    reject_response = client.post(
+        "/api/cookies/reject-all",
+        headers={"X-CSRF-Token": csrf_token},
+        json={"user_token": user_token},
+    )
+
+    assert reject_response.status_code == 200
+    rejected_categories = reject_response.json()["categories"]
+    assert rejected_categories["necessary"] is True
+    assert rejected_categories["analytics"] is False
+    assert rejected_categories["maps"] is False
+    assert rejected_categories["voice"] is False
+    assert rejected_categories["llm"] is False
+
+
+def test_area_analysis_pdf_token_allows_positive_download_with_filename(nasa_client):
+    client, _ = nasa_client
+    user_token = "dp_user_token_1234567890"
+    client.get("/api/health")
+    client.cookies.set(
+        "deltaplant_consent",
+        json.dumps({"necessary": True, "llm": True, "voice": False, "maps": False, "analytics": False}),
+    )
+
+    analysis_response = client.post(
+        "/api/nisar/area-analysis",
+        json={
+            "geo_data": {"type": "circle", "center": {"lat": 45.46, "lng": 9.19}, "radius": 250.0},
+            "date_range": {"start": "2026-04-01", "end": "2026-04-30"},
+            "user_token": user_token,
+            "crop_answers": ["herbaceous"],
+        },
+    )
+
+    assert analysis_response.status_code == 200
+    pdf_token = analysis_response.json()["pdf_tokens"]["farmer"]
+
+    pdf_response = client.get(f"/api/nisar/pdf/{pdf_token}")
+
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["content-type"] == "application/pdf"
+    assert pdf_response.headers["content-disposition"] == 'attachment; filename="report.pdf"'
+    assert pdf_response.content == b"%PDF-1.4 fake pdf"
