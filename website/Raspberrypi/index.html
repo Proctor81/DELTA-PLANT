@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DELTA Plant | Edge AI for Plant Health | Precision Agriculture</title>
+  <meta name="description" content="Edge AI for plant health with 89.33% top-1 accuracy, 99.00% top-3 accuracy, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
+  <meta name="keywords" content="DELTA Plant, DELTAPLANO, AI Plant Health, Robotics Orchestrator, Leaf Disease Detection, Precision Agriculture, Agritech, Deep Tech, Edge AI, LayerCAM, EfficientFormer, Space Biology, Raspberry Pi 5" />
+  <meta name="author" content="Proctor81" />
+  <meta name="application-name" content="DELTA Plant" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#07111d" />
+  <link rel="canonical" href="https://deltaplant.ai/Raspberrypi/" />
+  <link rel="icon" type="image/png" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
+  <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="DELTA Plant" />
+  <meta property="og:url" content="https://deltaplant.ai/Raspberrypi/" />
+  <meta property="og:title" content="DELTA Plant | Edge AI for Plant Health | Precision Agriculture" />
+  <meta property="og:description" content="Edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
+  <meta property="og:image" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
+  <meta property="og:image:url" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
+  <meta property="og:image:secure_url" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="640" />
+  <meta property="og:image:height" content="360" />
+  <meta property="og:image:alt" content="DELTA Plant cinematic preview with public benchmarks, LayerCAM explainability, and Raspberry Pi 5 deployment" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DELTA Plant | Edge AI for Plant Health | Precision Agriculture" />
+  <meta name="twitter:description" content="Edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
+  <meta name="twitter:image" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
+  <meta name="twitter:image:alt" content="DELTA Plant cinematic preview with public benchmarks, LayerCAM explainability, and Raspberry Pi 5 deployment" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/assets/contact-relay-config.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Space Grotesk', 'sans-serif'],
+            body: ['Manrope', 'sans-serif']
+          },
+          colors: {
+            space: {
+              950: '#02070d',
+              900: '#06111c',
+              850: '#081722',
+              800: '#0d2230'
+            },
+            cyanedge: '#79e7ff',
+            neonleaf: '#19f5c1',
+            bioglow: '#9bff83'
+          },
+          boxShadow: {
+            halo: '0 0 0 1px rgba(121, 231, 255, 0.16), 0 20px 80px rgba(4, 13, 24, 0.55)',
+            pulse: '0 0 48px rgba(25, 245, 193, 0.22)',
+            panel: '0 18px 80px rgba(2, 7, 13, 0.55)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --space-950: #02070d;
+      --space-900: #06111c;
+      --space-850: #081722;
+      --space-800: #0d2230;
+      --neonleaf: #19f5c1;
+      --cyanedge: #79e7ff;
+      --bioglow: #9bff83;
+      --text-main: #edf7ff;
+      --text-soft: rgba(220, 236, 246, 0.78);
+      --panel: rgba(7, 17, 29, 0.7);
+      --panel-strong: rgba(8, 23, 34, 0.84);
+      --stroke: rgba(121, 231, 255, 0.14);
+      --glow: rgba(25, 245, 193, 0.24);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text-main);
+      font-family: 'Manrope', sans-serif;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(25, 245, 193, 0.16), transparent 34%),
+        radial-gradient(circle at 82% 12%, rgba(121, 231, 255, 0.14), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(155, 255, 131, 0.08), transparent 26%),
+        linear-gradient(180deg, #02070d 0%, #05111b 36%, #041723 68%, #02070d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 90px 90px;
+      mask-image: radial-gradient(circle at center, black, transparent 88%);
+    }
+
+    ::selection {
+      background: rgba(25, 245, 193, 0.28);
+      color: white;
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(10, 24, 36, 0.84), rgba(6, 17, 29, 0.6));
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      box-shadow: 0 18px 80px rgba(2, 7, 13, 0.52);
+      backdrop-filter: blur(18px);
+    }
+
+    .glass-soft {
+      background: linear-gradient(180deg, rgba(9, 24, 35, 0.58), rgba(5, 16, 27, 0.36));
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      box-shadow: 0 14px 48px rgba(2, 7, 13, 0.4);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-shell {
+      min-height: 100vh;
+    }
+
+    .aurora {
+      position: absolute;
+      inset: -18% -12% auto;
+      height: 78vh;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 38%, rgba(25, 245, 193, 0.22), transparent 28%),
+        radial-gradient(circle at 72% 20%, rgba(121, 231, 255, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 60%, rgba(155, 255, 131, 0.12), transparent 20%);
+      filter: blur(48px);
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .hero-fade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(2, 7, 13, 0.35) 0%, rgba(2, 7, 13, 0.62) 44%, rgba(2, 7, 13, 0.92) 100%),
+        radial-gradient(circle at center, transparent 0%, rgba(2, 7, 13, 0.12) 56%, rgba(2, 7, 13, 0.74) 100%);
+    }
+
+    .hero-noise {
+      position: absolute;
+      inset: 0;
+      opacity: 0.13;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.15) 0 0.6px, transparent 0.7px),
+        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.12) 0 0.55px, transparent 0.65px),
+        radial-gradient(circle at 55% 75%, rgba(255, 255, 255, 0.1) 0 0.5px, transparent 0.6px);
+      background-size: 170px 170px, 210px 210px, 250px 250px;
+      mix-blend-mode: screen;
+    }
+
+    .scan-beam {
+      position: absolute;
+      inset: 12% 10% auto;
+      height: 280px;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0), rgba(121, 231, 255, 0.14), rgba(25, 245, 193, 0));
+      filter: blur(8px);
+      animation: scan 9s ease-in-out infinite;
+    }
+
+    .hero-ring,
+    .hero-ring::before,
+    .hero-ring::after {
+      position: absolute;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      content: '';
+    }
+
+    .hero-ring {
+      inset: 14% auto auto 58%;
+      width: 420px;
+      height: 420px;
+      opacity: 0.38;
+      animation: spin 36s linear infinite;
+    }
+
+    .hero-ring::before {
+      inset: 36px;
+      border-style: dashed;
+      animation: spinReverse 22s linear infinite;
+    }
+
+    .hero-ring::after {
+      inset: 94px;
+      border-color: rgba(25, 245, 193, 0.24);
+      box-shadow: 0 0 48px rgba(25, 245, 193, 0.1);
+    }
+
+    .bio-leaf {
+      position: absolute;
+      width: 148px;
+      height: 230px;
+      border-radius: 100% 0 100% 0;
+      transform-origin: center center;
+      background: linear-gradient(180deg, rgba(121, 231, 255, 0.2), rgba(25, 245, 193, 0.05));
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      box-shadow: inset 0 0 24px rgba(121, 231, 255, 0.08), 0 0 64px rgba(25, 245, 193, 0.08);
+      filter: blur(0.2px);
+      opacity: 0.42;
+      overflow: hidden;
+    }
+
+    .bio-leaf::before,
+    .bio-leaf::after {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: inherit;
+    }
+
+    .bio-leaf::before {
+      border-left: 1px solid rgba(155, 255, 131, 0.22);
+      border-bottom: 1px solid rgba(121, 231, 255, 0.12);
+      transform: skewX(-10deg);
+    }
+
+    .bio-leaf::after {
+      inset: 54px 62px 54px 62px;
+      background: linear-gradient(180deg, rgba(155, 255, 131, 0.32), rgba(121, 231, 255, 0));
+      filter: blur(12px);
+    }
+
+    .leaf-a {
+      top: 18%;
+      right: 8%;
+      transform: rotate(22deg);
+      animation: floatLeaf 16s ease-in-out infinite;
+    }
+
+    .leaf-b {
+      bottom: 6%;
+      left: 4%;
+      width: 124px;
+      height: 188px;
+      transform: rotate(-26deg);
+      animation: floatLeaf 19s ease-in-out infinite reverse;
+    }
+
+    .leaf-c {
+      top: 34%;
+      left: 48%;
+      width: 90px;
+      height: 142px;
+      opacity: 0.28;
+      transform: rotate(18deg);
+      animation: floatLeaf 14s ease-in-out infinite;
+    }
+
+    .chip {
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background: rgba(7, 17, 29, 0.52);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(14px);
+    }
+
+    .headline-glow {
+      text-shadow: 0 0 32px rgba(25, 245, 193, 0.12), 0 0 18px rgba(121, 231, 255, 0.1);
+    }
+
+    .gradient-text {
+      background: linear-gradient(90deg, #f6fdff 0%, #79e7ff 42%, #19f5c1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .section-kicker {
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-size: 0.74rem;
+      color: rgba(121, 231, 255, 0.78);
+    }
+
+    .feature-card,
+    .docs-card,
+    .impact-card,
+    .tech-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .feature-card:hover,
+    .docs-card:hover,
+    .impact-card:hover,
+    .tech-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(25, 245, 193, 0.26);
+      box-shadow: 0 24px 84px rgba(2, 7, 13, 0.48), 0 0 36px rgba(25, 245, 193, 0.08);
+    }
+
+    .feature-card::after,
+    .docs-card::after,
+    .impact-card::after,
+    .tech-card::after {
+      content: '';
+      position: absolute;
+      inset: auto -20% -54% auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(25, 245, 193, 0.12), rgba(25, 245, 193, 0));
+      pointer-events: none;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 700ms ease, transform 700ms ease;
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .nav-blur {
+      background: rgba(4, 12, 22, 0.42);
+      border-bottom: 1px solid rgba(121, 231, 255, 0.08);
+      backdrop-filter: blur(16px);
+      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .nav-solid {
+      background: rgba(4, 12, 22, 0.84);
+      border-color: rgba(121, 231, 255, 0.14);
+      box-shadow: 0 12px 60px rgba(2, 7, 13, 0.36);
+    }
+
+    .audio-dock {
+      background: linear-gradient(180deg, rgba(8, 23, 34, 0.9), rgba(4, 12, 22, 0.76));
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      box-shadow: 0 18px 60px rgba(2, 7, 13, 0.42), 0 0 32px rgba(25, 245, 193, 0.08);
+      backdrop-filter: blur(16px);
+    }
+
+    .audio-panel {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .privacy-banner-shell {
+      position: fixed;
+      left: 1rem;
+      bottom: 1rem;
+      z-index: 60;
+      width: min(460px, calc(100vw - 1.5rem));
+      padding: 1rem;
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(8, 23, 34, 0.94), rgba(4, 12, 22, 0.92));
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      box-shadow: 0 20px 60px rgba(2, 7, 13, 0.52), 0 0 28px rgba(25, 245, 193, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .privacy-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: rgba(2, 7, 13, 0.68);
+      backdrop-filter: blur(10px);
+    }
+
+    .privacy-modal-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 75;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .privacy-modal-card {
+      width: min(680px, 100%);
+      padding: 1.4rem;
+      border-radius: 32px;
+    }
+
+    .privacy-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .privacy-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #edf7ff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .privacy-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(25, 245, 193, 0.28);
+      color: #19f5c1;
+    }
+
+    .privacy-button-primary {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      color: #04131c;
+      border-color: transparent;
+      box-shadow: 0 0 0 1px rgba(121, 231, 255, 0.14), 0 16px 32px rgba(25, 245, 193, 0.18);
+    }
+
+    .privacy-button-primary:hover {
+      color: #04131c;
+    }
+
+    .privacy-button-quiet {
+      background: rgba(7, 17, 29, 0.76);
+    }
+
+    .privacy-option {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1rem 0;
+      border-top: 1px solid rgba(121, 231, 255, 0.08);
+    }
+
+    .privacy-option:first-of-type {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .privacy-state-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(121, 231, 255, 0.08);
+      color: rgba(237, 247, 255, 0.92);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .privacy-toggle {
+      position: relative;
+      flex: none;
+      width: 56px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      transition: background 180ms ease, border-color 180ms ease;
+    }
+
+    .privacy-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #edf7ff;
+      box-shadow: 0 6px 16px rgba(2, 7, 13, 0.28);
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .privacy-toggle.is-active {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      border-color: transparent;
+    }
+
+    .privacy-toggle.is-active::after {
+      transform: translateX(24px);
+      background: #04131c;
+    }
+
+    .privacy-manage {
+      position: fixed;
+      left: 1rem;
+      bottom: 1rem;
+      z-index: 58;
+    }
+
+    .privacy-manage-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.8rem;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(8, 23, 34, 0.9);
+      color: #edf7ff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 12px 36px rgba(2, 7, 13, 0.34);
+      backdrop-filter: blur(16px);
+    }
+
+    .privacy-manage-button:hover {
+      color: #19f5c1;
+      border-color: rgba(25, 245, 193, 0.26);
+    }
+
+    input[type='range'] {
+      accent-color: var(--neonleaf);
+    }
+
+    .stat-line {
+      background: linear-gradient(90deg, rgba(121, 231, 255, 0), rgba(121, 231, 255, 0.62), rgba(25, 245, 193, 0));
+      height: 1px;
+      opacity: 0.7;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(18px);
+      opacity: 0.48;
+    }
+
+    .orb-a {
+      width: 240px;
+      height: 240px;
+      top: 10%;
+      right: 14%;
+      background: radial-gradient(circle, rgba(121, 231, 255, 0.2), rgba(121, 231, 255, 0));
+      animation: drift 17s ease-in-out infinite alternate;
+    }
+
+    .orb-b {
+      width: 180px;
+      height: 180px;
+      bottom: 14%;
+      left: 12%;
+      background: radial-gradient(circle, rgba(25, 245, 193, 0.16), rgba(25, 245, 193, 0));
+      animation: drift 14s ease-in-out infinite alternate-reverse;
+    }
+
+    .orb-c {
+      width: 130px;
+      height: 130px;
+      top: 44%;
+      left: 52%;
+      background: radial-gradient(circle, rgba(155, 255, 131, 0.14), rgba(155, 255, 131, 0));
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    .cta-primary {
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.98));
+      color: #04131c;
+      box-shadow: 0 0 0 1px rgba(121, 231, 255, 0.18), 0 20px 48px rgba(25, 245, 193, 0.2);
+    }
+
+    .cta-secondary {
+      background: rgba(9, 24, 35, 0.58);
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      color: #edf7ff;
+    }
+
+    .footer-grid a,
+    .doc-link,
+    .nav-link {
+      transition: color 160ms ease, opacity 160ms ease;
+    }
+
+    .footer-grid a:hover,
+    .doc-link:hover,
+    .nav-link:hover {
+      color: #19f5c1;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      100% {
+        transform: translate3d(22px, -18px, 0) scale(1.06);
+      }
+    }
+
+    @keyframes scan {
+      0%, 100% {
+        transform: translateY(0) scaleY(0.92);
+        opacity: 0.32;
+      }
+      50% {
+        transform: translateY(160px) scaleY(1.08);
+        opacity: 0.86;
+      }
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spinReverse {
+      from {
+        transform: rotate(360deg);
+      }
+      to {
+        transform: rotate(0deg);
+      }
+    }
+
+    @keyframes floatLeaf {
+      0%, 100% {
+        transform: translateY(0) rotate(18deg);
+      }
+      50% {
+        transform: translateY(-14px) rotate(24deg);
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .hero-ring {
+        inset: auto auto 12% 52%;
+        width: 300px;
+        height: 300px;
+      }
+
+      .leaf-a,
+      .leaf-c {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .audio-dock {
+        position: absolute !important;
+        width: min(290px, calc(100vw - 1.5rem)) !important;
+        left: 0.75rem !important;
+        right: 0.75rem !important;
+        bottom: 0.75rem !important;
+      }
+
+      .hero-ring {
+        left: auto;
+        right: -24px;
+        bottom: 20%;
+        width: 220px;
+        height: 220px;
+      }
+
+      .privacy-banner-shell {
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        width: auto;
+      }
+
+      .privacy-manage {
+        left: 0.75rem;
+        bottom: 0.75rem;
+      }
+
+      body.privacy-banner-visible .audio-dock {
+        bottom: 14rem !important;
+      }
+
+      body.privacy-manage-visible .audio-dock {
+        bottom: 5.5rem !important;
+      }
+
+      .leaf-b {
+        left: -20px;
+        bottom: 18%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "DELTA Plant",
+          "url": "https://deltaplant.ai/",
+          "image": "https://deltaplant.ai/assets/social-preview-wa-20260514.png",
+          "description": "DELTA Plant delivers edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment.",
+          "keywords": [
+            "DELTA Plant",
+            "DELTAPLANO",
+            "Edge AI",
+            "AI Plant Health",
+            "Leaf Disease Detection",
+            "Precision Agriculture",
+            "Agritech",
+            "Deep Tech",
+            "Sensor Fusion",
+            "LayerCAM",
+            "EfficientFormer"
+          ],
+          "publisher": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          }
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "DELTA Plant",
+          "codeRepository": "https://github.com/proctor81/delta-plant",
+          "programmingLanguage": ["Python", "HTML", "JavaScript"],
+          "runtimePlatform": "Raspberry Pi 5",
+          "applicationCategory": "AgriculturalTechnology",
+          "description": "Open repository for edge AI plant health workflows, TFLite export, public benchmarking, DELTAPLANO access, and explainable diagnostics.",
+          "license": "https://github.com/proctor81/delta-plant/blob/main/LICENSE"
+        },
+        {
+          "@type": "TechArticle",
+          "name": "DELTA Plant Public 600-Image Benchmark",
+          "url": "https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md",
+          "description": "Public 600-image, 33-class benchmark with 89.33% top-1 accuracy, 99.00% top-3 accuracy, and 41.36 ms mean edge latency.",
+          "about": [
+            "Leaf Disease Detection",
+            "Edge AI",
+            "Raspberry Pi 5",
+            "Explainable AI"
+          ]
+        },
+        {
+          "@type": "Organization",
+          "name": "DELTA Plant",
+          "url": "https://deltaplant.ai/",
+          "logo": "https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png",
+          "sameAs": [
+            "https://deltaplant.ai/",
+            "https://github.com/proctor81/delta-plant",
+            "https://t.me/DELTAPLANO_bot"
+          ],
+          "knowsAbout": [
+            "AI Plant Health",
+            "Precision Agriculture",
+            "Leaf Disease Detection",
+            "Explainable AI",
+            "Edge Inference",
+            "Agritech",
+            "Deep Tech"
+          ]
+        }
+      ]
+    }
+  </script>
+</head>
+<body class="font-body text-slate-100 antialiased">
+  <a href="#content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-slate-950">Skip to content</a>
+
+  <header id="site-header" class="nav-blur fixed inset-x-0 top-0 z-50">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
+      <a href="#home" class="flex items-center gap-3 sm:gap-4">
+        <span class="flex h-[clamp(4rem,12vw,5.5rem)] w-[clamp(4rem,12vw,5.5rem)] items-center justify-center overflow-hidden rounded-[1.8rem] border border-cyan-300/20 bg-slate-950/70 p-1 shadow-halo">
+          <img src="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" alt="DELTA Plant logo" class="h-full w-full rounded-[1.5rem] object-cover" loading="eager" decoding="async" fetchpriority="high" />
+        </span>
+        <span>
+          <span class="block font-display text-lg font-semibold tracking-wide text-white">DELTA Plant</span>
+          <span class="block text-xs uppercase tracking-[0.28em] text-cyan-200/60">Deep Agritech</span>
+        </span>
+      </a>
+
+      <nav class="hidden items-center gap-8 text-sm text-slate-200/80 lg:flex">
+        <a class="nav-link" href="#home">Home</a>
+        <a class="nav-link" href="#features">Features</a>
+        <a class="nav-link" href="#technology">Technology</a>
+        <a class="nav-link" href="#demo">Demo</a>
+        <a class="nav-link" href="#docs">Docs</a>
+        <a class="nav-link" href="#contact">Contact</a>
+        <a class="nav-link" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+
+      <button id="menu-toggle" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/15 bg-slate-950/60 text-cyan-100 lg:hidden" aria-expanded="false" aria-controls="mobile-menu" aria-label="Toggle navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 7H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M4 12H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M4 17H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div id="mobile-menu" class="mx-4 mb-4 hidden rounded-3xl border border-cyan-300/10 bg-slate-950/88 p-4 shadow-panel lg:hidden">
+      <div class="flex flex-col gap-3 text-sm text-slate-200/80">
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#home">Home</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#features">Features</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#technology">Technology</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#demo">Demo</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#docs">Docs</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#contact">Contact</a>
+        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="content">
+    <section id="home" class="hero-shell relative flex items-center overflow-hidden pt-24">
+      <canvas id="cosmos-canvas" class="absolute inset-0 h-full w-full"></canvas>
+      <div class="aurora"></div>
+      <div class="hero-fade"></div>
+      <div class="hero-noise"></div>
+      <div class="scan-beam"></div>
+      <div class="hero-ring hidden xl:block"></div>
+      <div class="bio-leaf leaf-a hidden lg:block"></div>
+      <div class="bio-leaf leaf-b"></div>
+      <div class="bio-leaf leaf-c hidden xl:block"></div>
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+
+      <div class="relative z-10 mx-auto grid w-full max-w-7xl gap-14 px-6 pb-72 pt-10 lg:grid-cols-[1.2fr_0.88fr] lg:px-10 lg:pb-28">
+        <div class="max-w-3xl">
+          <div class="reveal flex flex-wrap gap-3">
+            <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
+              <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
+              Edge AI for Plant Health
+            </span>
+            <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Raspberry Pi 5 Ready</span>
+          </div>
+
+          <h1 class="reveal headline-glow mt-8 font-display text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
+            <span class="gradient-text">DELTA Plant</span><br />
+            Edge AI for Plant Health Operations.
+          </h1>
+
+          <p class="reveal mt-7 max-w-2xl text-lg leading-8 text-slate-200/78 sm:text-xl">
+            Explainable leaf disease detection, real-time sensor fusion, and conversational workflows for Raspberry Pi 5 edge deployment.
+          </p>
+
+          <p class="reveal mt-5 max-w-2xl text-base leading-7 text-slate-300/72 sm:text-lg">
+            From field capture to actionable recommendations - transparent, offline-capable, and ready for operators.
+          </p>
+
+          <div class="reveal mt-9 flex flex-col gap-4 sm:flex-row">
+            <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em] sm:text-lg">
+              Open DELTAPLANO on Telegram ->
+            </a>
+            <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer" class="cta-secondary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold">
+              Explore GitHub Repository
+            </a>
+          </div>
+
+          <div class="reveal mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-1 accuracy</div>
+              <div class="mt-3 font-display text-3xl text-white">89.33%</div>
+              <div class="mt-2 text-sm text-slate-300/72">600-image, 33-class public benchmark.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-3 accuracy</div>
+              <div class="mt-3 font-display text-3xl text-white">99.00%</div>
+              <div class="mt-2 text-sm text-slate-300/72">High-confidence shortlisting for fast operator review.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Mean edge latency</div>
+              <div class="mt-3 font-display text-3xl text-white">41.36 ms</div>
+              <div class="mt-2 text-sm text-slate-300/72">Measured public runtime profile on edge hardware.</div>
+            </div>
+            <div class="glass-soft rounded-3xl p-5">
+              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Deployment</div>
+              <div class="mt-3 font-display text-3xl text-white">Raspberry Pi 5</div>
+              <div class="mt-2 text-sm text-slate-300/72">Offline-capable execution with production-oriented TFLite export paths.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal relative lg:pt-10">
+          <div class="glass rounded-[32px] p-6 sm:p-8">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="section-kicker">Value proposition</div>
+                <h2 class="mt-2 font-display text-2xl text-white">A complete bio-digital orchestration platform.</h2>
+              </div>
+              <div class="rounded-full border border-neonleaf/20 bg-neonleaf/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-neonleaf">v3.2 live</div>
+            </div>
+
+            <p class="mt-4 text-base leading-7 text-slate-300/72">DELTA Plant combines edge computer vision, LayerCAM explainability, environmental sensor intelligence, and DELTAPLANO conversational operations into one deployable system.</p>
+            <p class="mt-3 text-sm leading-7 text-slate-300/68">Move beyond black-box classification with transparent diagnoses you can trust in the field or lab.</p>
+
+            <div class="mt-7 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5">
+              <div class="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-cyan-200/60">
+                <span>Platform core</span>
+                <span>Field ready</span>
+              </div>
+              <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Vision core</div>
+                  <div class="mt-3 text-lg font-semibold text-white">MobileNetV2 + EfficientFormerV2-S1</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Hybrid inference tuned for Raspberry Pi 5 and offline deployment.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Explainer</div>
+                  <div class="mt-3 text-lg font-semibold text-white">LayerCAM overlays</div>
+                  <div class="mt-2 text-sm text-slate-300/68">See where the model focused before acting on the diagnosis.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Operations</div>
+                  <div class="mt-3 text-lg font-semibold text-white">DELTAPLANO + Admin + API</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Natural-language diagnostics and follow-up workflows for operators.</div>
+                </div>
+                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Signals</div>
+                  <div class="mt-3 text-lg font-semibold text-white">7 sensor channels + agronomic rules</div>
+                  <div class="mt-2 text-sm text-slate-300/68">Environmental context turns classification into actionable recommendations.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-7 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <div class="section-kicker">Proven performance</div>
+                <div class="mt-3 grid gap-3">
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">Benchmark scope</span>
+                    <span class="font-semibold text-white">600 images | 33 classes</span>
+                  </div>
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">General model</span>
+                    <span class="font-semibold text-white">89.33% top-1 | 99.00% top-3</span>
+                  </div>
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">EfficientFormer estimate</span>
+                    <span class="font-semibold text-white">92.91% top-1 | 100.00% top-3</span>
+                  </div>
+                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
+                    <span class="text-slate-300/70">Mean edge latency</span>
+                    <span class="font-semibold text-white">41.36 ms</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mx-auto flex h-28 w-28 items-center justify-center rounded-full border border-neonleaf/20 bg-gradient-to-br from-neonleaf/15 via-cyan-300/8 to-transparent shadow-pulse">
+                <div class="flex h-20 w-20 items-center justify-center rounded-full border border-cyan-300/16 bg-slate-950/70 text-center">
+                  <span class="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100/72">Leaf<br />Signal</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="audio-dock fixed bottom-5 right-5 z-40 w-[min(290px,calc(100vw-1rem))] rounded-[26px] p-3 sm:w-[min(320px,calc(100vw-1rem))] sm:p-4">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <button id="audio-toggle" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-300/14 bg-white/5 text-cyan-100" aria-label="Toggle soundtrack">
+            <svg id="audio-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 10V14H8L12 18V6L8 10H5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path d="M16.5 8.5C17.7 9.4 18.5 10.9 18.5 12.5C18.5 14.1 17.7 15.6 16.5 16.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path d="M14.4 10.2C15 10.7 15.4 11.5 15.4 12.4C15.4 13.3 15 14.1 14.4 14.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path id="audio-slash" d="M4 4L20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </button>
+          <div class="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100/72 sm:hidden">Audio</div>
+          <div class="hidden min-w-0 flex-1 sm:block">
+            <div class="text-[10px] uppercase tracking-[0.26em] text-cyan-200/60">Hero soundtrack</div>
+            <div class="mt-1 text-sm font-semibold text-white">Space Epic Cinematic Journey</div>
+            <div id="audio-status" class="mt-1 text-xs text-slate-300/68">Muted loop active</div>
+          </div>
+          <button id="audio-panel-toggle" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-300/14 bg-white/5 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100" aria-expanded="false" aria-controls="audio-panel" aria-label="Show soundtrack controls">Vol</button>
+        </div>
+        <div id="audio-panel" class="audio-panel mt-3 hidden border-t border-cyan-300/8 pt-3">
+          <a href="https://pixabay.com/music/main-title-space-epic-cinematic-journey-174145/" target="_blank" rel="noreferrer" class="block text-xs text-slate-300/68">Royalty-free Pixabay track, muted by default for browser policy.</a>
+          <div>
+            <div class="mb-2 flex items-center justify-between text-xs text-slate-300/65">
+            <span id="audio-volume-label">35%</span>
+            </div>
+            <input id="audio-volume" type="range" min="0" max="100" value="35" class="h-2 w-full cursor-pointer rounded-full bg-white/10" aria-label="Soundtrack volume" />
+          </div>
+        </div>
+      </div>
+
+      <audio id="hero-audio" loop muted playsinline preload="none" data-src="https://cdn.pixabay.com/download/audio/2023/10/31/audio_a56deec5d8.mp3?filename=rockot-space-epic-cinematic-journey-174145.mp3"></audio>
+    </section>
+
+    <section id="features" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-3xl">
+          <div class="section-kicker">Core capabilities</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Clear edge AI capabilities for operators, researchers, and partners.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">DELTA Plant brings vision, explainability, sensor fusion, and conversational workflows into one system that is easier to deploy, audit, and scale.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">01</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Edge-native visual intelligence</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Hybrid inference with a MobileNetV2 baseline and EfficientFormerV2-S1 advanced path, optimized for Raspberry Pi 5 and offline use.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">02</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Explainable diagnosis</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">LayerCAM heatmaps show where the model looks on the leaf, improving operator confidence and research traceability.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">03</div>
+            <h3 class="mt-4 font-display text-2xl text-white">DELTAPLANO conversational operations</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Run diagnostics, ask follow-up questions, and move through workflows directly in Telegram.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">04</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Sensor and rule fusion</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Combine leaf images with 7 environmental channels and agronomic rules for contextual recommendations.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">05</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Research-to-release pipeline</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Training, TFLite export, benchmarking, and documentation stay reproducible and fast to iterate.</p>
+          </article>
+          <article class="feature-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">06</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Investor-ready documentation</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Model cards, manuals, benchmarks, and public artifacts support pilots, partnerships, and funding conversations.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="technology" class="relative py-24 sm:py-28">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="grid gap-8 xl:grid-cols-[1fr_1.05fr] xl:items-start">
+          <div class="reveal max-w-2xl">
+            <div class="section-kicker">Technology stack</div>
+            <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">A practical stack for explainable plant health on the edge.</h2>
+            <p class="mt-5 text-lg leading-8 text-slate-300/72">Production baseline, advanced transformer path, LayerCAM explainability, DELTAPLANO operations, and Raspberry Pi 5 deployment in one auditable architecture.</p>
+
+            <div class="mt-10 grid gap-5 sm:grid-cols-2">
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Vision</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">MobileNetV2 production baseline plus EfficientFormerV2-S1 advanced backend with int8 and float32 TFLite export.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Explainability</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">LayerCAM heatmaps and overlays show where the model focused on the leaf.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Operations</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">DELTAPLANO on Telegram, admin tooling, and API endpoints keep the workflow operator-friendly.</p>
+              </div>
+              <div class="tech-card glass rounded-[28px] p-6">
+                <div class="section-kicker">Sensors and rules</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">Seven environmental channels and agronomic rules add context for better decisions.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div class="section-kicker">How it works</div>
+                <h3 class="mt-3 font-display text-3xl text-white">Capture, diagnose, and act</h3>
+              </div>
+              <div class="rounded-full border border-cyan-300/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.24em] text-cyan-100/62">Built for agritech pilots</div>
+            </div>
+
+            <div class="mt-8 space-y-4">
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">1. Capture</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Take leaf photos and optional sensor readings in the field, greenhouse, or lab.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">Input</div>
+                </div>
+              </div>
+              <div class="stat-line"></div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">2. Diagnose</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Run edge inference with LayerCAM explainability and agronomic context.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">AI</div>
+                </div>
+              </div>
+              <div class="stat-line"></div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-semibold text-white">3. Act</div>
+                    <div class="mt-1 text-sm text-slate-300/68">Receive clear recommendations and continue through DELTAPLANO follow-up.</div>
+                  </div>
+                  <div class="text-xs uppercase tracking-[0.24em] text-cyan-200/60">Ops</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-8 grid gap-4 sm:grid-cols-3">
+              <div class="rounded-[24px] border border-neonleaf/10 bg-neonleaf/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-neonleaf/68">Top-1</div>
+                <div class="mt-3 font-display text-3xl text-white">89.33%</div>
+                <div class="mt-2 text-sm text-slate-300/68">Public benchmark reference on 600 validation images.</div>
+              </div>
+              <div class="rounded-[24px] border border-cyan-300/10 bg-cyan-300/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-cyan-200/68">Top-3</div>
+                <div class="mt-3 font-display text-3xl text-white">99.00%</div>
+                <div class="mt-2 text-sm text-slate-300/68">High-confidence support for fast operator review.</div>
+              </div>
+              <div class="rounded-[24px] border border-bioglow/10 bg-bioglow/5 p-5">
+                <div class="text-sm uppercase tracking-[0.2em] text-bioglow/68">Edge latency</div>
+                <div class="mt-3 font-display text-3xl text-white">41.36 ms</div>
+                <div class="mt-2 text-sm text-slate-300/68">Mean measured edge inference for the public runtime profile.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="demo" class="relative py-28 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-4xl">
+          <div class="section-kicker">Resources and next steps</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Launch DELTAPLANO, inspect the evidence, and move toward pilots.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">Start with the Telegram workflow, inspect the public benchmark, and review the repository, manual, and model card.</p>
+        </div>
+
+        <div class="mt-16 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="section-kicker">Start here</div>
+            <div class="mt-6 grid gap-5 md:grid-cols-3">
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Next step 1</div>
+                <h3 class="mt-3 font-display text-xl text-white">Try DELTAPLANO</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Open the Telegram bot and test the operator-facing workflow in seconds.</p>
+              </div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Next step 2</div>
+                <h3 class="mt-3 font-display text-xl text-white">Review the benchmark</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Inspect the 600-image, 33-class public benchmark and reported edge latency.</p>
+              </div>
+              <div class="rounded-[24px] border border-white/5 bg-white/5 p-5">
+                <div class="text-sm uppercase tracking-[0.22em] text-cyan-200/60">Next step 3</div>
+                <h3 class="mt-3 font-display text-xl text-white">Audit the stack</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-300/68">Read the code, manual, model card, and release notes in the public repository.</p>
+              </div>
+            </div>
+
+            <div class="mt-8 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5 sm:p-6">
+              <div class="section-kicker">Deployment snapshot</div>
+              <pre class="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7 text-slate-200/82">python main.py --preflight --enable-api --enable-telegram --daemon</pre>
+              <p class="mt-4 text-sm leading-7 text-slate-300/68">Designed for GitHub Pages storytelling and Raspberry Pi 5 runtime execution.</p>
+            </div>
+          </div>
+
+          <div class="grid gap-6">
+            <a class="docs-card reveal glass rounded-[32px] p-7 sm:p-8" href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">
+              <div class="section-kicker">Live access</div>
+              <h3 class="mt-3 font-display text-2xl text-white">Launch DELTAPLANO</h3>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">Move straight into the conversational workflow most relevant to operators and field teams.</p>
+              <div class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Open Telegram bot <span aria-hidden="true">-></span></div>
+            </a>
+            <a class="docs-card reveal glass rounded-[32px] p-7 sm:p-8" href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">
+              <div class="section-kicker">Code and evidence</div>
+              <h3 class="mt-3 font-display text-2xl text-white">Explore GitHub repository</h3>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">Review code, benchmark reports, the manual, release notes, and the model card in one place.</p>
+              <div class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Explore GitHub <span aria-hidden="true">-></span></div>
+            </a>
+            <a class="docs-card reveal glass rounded-[32px] p-7 sm:p-8" href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">
+              <div class="section-kicker">Benchmark source</div>
+              <h3 class="mt-3 font-display text-2xl text-white">Open public benchmark report</h3>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">Inspect the public 600-image benchmark report behind the headline performance claims.</p>
+              <div class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">View benchmark <span aria-hidden="true">-></span></div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="impact" class="relative py-28 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-4xl">
+          <div class="section-kicker">Use cases</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Use cases across greenhouse operations, field scouting, research, and investment.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">A single platform that stays legible to growers, researchers, and capital partners.</p>
+        </div>
+
+        <div class="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Greenhouse operations</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Protected crops and greenhouses</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Continuous, lightweight monitoring with explainable insights for controlled environments.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Field scouting</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Fast portable triage</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Portable disease checks and recommendation loops without cloud dependency.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Research and experimentation</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Explainable AI studies</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">A reliable platform for benchmarking, explainability, and deployment-aware experimentation.</p>
+          </article>
+          <article class="impact-card reveal glass rounded-[28px] p-7">
+            <div class="section-kicker">Deep-tech and investment</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Pilots and partnerships</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">An auditable narrative for pilots, partnerships, and funding conversations.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="docs" class="relative py-28 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="reveal max-w-4xl">
+          <div class="section-kicker">Trust and documentation</div>
+          <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Everything needed to validate the claims.</h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300/72">Code, benchmarks, model card, release notes, and the manual stay public and auditable.</p>
+        </div>
+
+        <div class="mt-16 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/README.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Repository guide</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Repository</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Product framing, quick start, benchmark snapshot, and the main technical entry points.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Model transparency</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Model Card</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Deployment assumptions, benchmark framing, and model-performance communication.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Operations manual</div>
+            <h3 class="mt-4 font-display text-2xl text-white">User Manual PDF</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">Runtime setup, interfaces, telemetry, and explainability details for real deployments.</p>
+          </a>
+          <a class="docs-card reveal glass rounded-[28px] p-7" href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">
+            <div class="section-kicker">Benchmark source</div>
+            <h3 class="mt-4 font-display text-2xl text-white">Public benchmark report</h3>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">The 600-image benchmark report behind the headline accuracy and latency metrics.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="relative py-28 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-10">
+        <div class="grid gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="section-kicker">Contact and support</div>
+            <h2 class="mt-4 max-w-xl font-display text-4xl leading-tight text-white sm:text-5xl">Use the protected relay or the active DELTA Plant support channels.</h2>
+            <p class="mt-5 max-w-2xl text-lg leading-8 text-slate-300/72">Use the secure form for partnerships, pilot discussions, research collaborations, and follow-up. Use DELTAPLANO for operator feedback and GitHub for reproducible technical issues.</p>
+
+            <div class="mt-8 grid gap-4 sm:grid-cols-2">
+              <div class="glass-soft rounded-[28px] p-5 sm:p-6">
+                <div class="section-kicker">Secure relay</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">Website requests are routed through a protected relay. The destination mailbox is not exposed on the public page.</p>
+                <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Protected inbound channel <span aria-hidden="true">-></span></div>
+              </div>
+
+              <a class="glass-soft rounded-[28px] p-5 sm:p-6 transition hover:border-cyan-300/20 hover:bg-slate-900/50" href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">
+                <div class="section-kicker">Operator feedback</div>
+                <p class="mt-4 text-base leading-7 text-slate-300/72">For runtime observations, open DELTAPLANO and use the <span class="font-semibold text-white">/feedback</span> command inside the bot conversation.</p>
+                <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-neonleaf">Open Telegram bot <span aria-hidden="true">-></span></div>
+              </a>
+            </div>
+
+            <div class="mt-6 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5 sm:p-6">
+              <div class="section-kicker">Technical path</div>
+              <p class="mt-4 text-base leading-7 text-slate-300/72">For reproducible bugs, feature requests, or evidence-backed collaboration, use the public GitHub repository and issues. For due diligence, start from the model card, benchmark report, and manual.</p>
+              <div class="mt-5 flex flex-wrap gap-3 text-sm font-semibold text-neonleaf">
+                <a href="https://github.com/proctor81/delta-plant/issues" target="_blank" rel="noreferrer">GitHub issues</a>
+                <span class="text-slate-500">/</span>
+                <a href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">Model card</a>
+                <span class="text-slate-500">/</span>
+                <a href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">Manual</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal glass rounded-[32px] p-7 sm:p-8">
+            <div class="section-kicker">Contact form</div>
+            <form id="contact-form" class="mt-6 grid gap-5" novalidate>
+              <input type="hidden" name="_subject" value="New message from DELTA Plant website" />
+              <input type="hidden" name="_captcha" value="false" />
+              <input type="hidden" name="_template" value="table" />
+              <input type="text" name="_honey" class="hidden" tabindex="-1" autocomplete="off" />
+
+              <div class="grid gap-5 md:grid-cols-2">
+                <label class="grid gap-2">
+                  <span class="text-sm font-semibold text-slate-200/82">Full name</span>
+                  <input name="name" type="text" required class="rounded-2xl border border-cyan-300/12 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-400/60" placeholder="Your name" />
+                </label>
+                <label class="grid gap-2">
+                  <span class="text-sm font-semibold text-slate-200/82">Email address</span>
+                  <input name="email" type="email" required class="rounded-2xl border border-cyan-300/12 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-400/60" placeholder="name@example.com" />
+                </label>
+              </div>
+
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-slate-200/82">Organisation</span>
+                <select name="organization" class="rounded-2xl border border-cyan-300/12 bg-slate-950/60 px-4 py-3 text-base text-white">
+                  <option value="" selected>Select organisation type</option>
+                  <option value="Company">Company</option>
+                  <option value="Lab">Lab</option>
+                  <option value="University">University</option>
+                  <option value="Farm">Farm</option>
+                  <option value="Government body">Government body</option>
+                  <option value="Venture capital fund">Venture capital fund</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-slate-200/82">Subject</span>
+                <input name="topic" type="text" required class="rounded-2xl border border-cyan-300/12 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-400/60" placeholder="Partnership, pilot, research or support" />
+              </label>
+
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-slate-200/82">Message</span>
+                <textarea name="message" rows="6" required class="rounded-[24px] border border-cyan-300/12 bg-white/5 px-4 py-3 text-base leading-7 text-white placeholder:text-slate-400/60" placeholder="Tell us what you need and how DELTA Plant can help."></textarea>
+              </label>
+
+              <label class="flex items-start gap-3 rounded-[24px] border border-cyan-300/10 bg-white/5 p-4 text-sm leading-6 text-slate-300/72">
+                <input id="contact-consent" type="checkbox" required class="mt-1 h-4 w-4 rounded border border-cyan-300/20 bg-transparent" />
+                <span>I consent to the processing of the submitted information for the sole purpose of handling this request, as described in the <a href="/privacy.html" class="text-cyan-100 underline decoration-cyan-300/40 underline-offset-4 hover:text-neonleaf">Privacy Policy</a> and <a href="/cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/40 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>.</span>
+              </label>
+
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p id="contact-form-status" class="text-sm text-slate-300/72" aria-live="polite">Requests are submitted through a protected contact relay.</p>
+                <button id="contact-form-submit" type="submit" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em]">Send message</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="relative border-t border-cyan-300/8 py-12">
+    <div class="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10">
+      <div>
+        <div class="flex items-center gap-3 sm:gap-4">
+          <span class="flex h-[clamp(4rem,12vw,5.5rem)] w-[clamp(4rem,12vw,5.5rem)] items-center justify-center overflow-hidden rounded-[1.8rem] border border-cyan-300/20 bg-slate-950/70 p-1 shadow-halo">
+            <img src="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" alt="DELTA Plant logo" class="h-full w-full rounded-[1.5rem] object-cover" loading="lazy" decoding="async" />
+          </span>
+          <div>
+            <div class="font-display text-xl text-white">DELTA Plant</div>
+            <div class="text-sm text-slate-300/62">Edge AI orchestration for precision agriculture</div>
+          </div>
+        </div>
+
+        <p class="mt-5 max-w-2xl text-base leading-8 text-slate-300/68">Transparent. Deployable. Built for real-world impact. Privacy-first and fully auditable through the public repository.</p>
+      </div>
+
+      <div class="footer-grid grid gap-8 sm:grid-cols-2">
+        <div>
+          <div class="section-kicker">Quick links</div>
+          <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
+            <a href="https://deltaplant.ai/Raspberrypi/" target="_blank" rel="noreferrer">Live website</a>
+            <a href="/privacy.html">Privacy Policy</a>
+            <a href="/cookie-policy.html">Cookie Policy</a>
+            <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">Access DELTAPLANO</a>
+            <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer">GitHub repository</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/RELEASE.md" target="_blank" rel="noreferrer">Release notes</a>
+          </div>
+        </div>
+        <div>
+          <div class="section-kicker">Research assets</div>
+          <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
+            <a href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">Model card</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">User manual PDF</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">Public benchmark report</a>
+            <a href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/comparison_summary.json" target="_blank" rel="noreferrer">Benchmark JSON</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mx-auto mt-12 flex max-w-7xl flex-col gap-3 border-t border-cyan-300/8 px-6 pt-6 text-sm text-slate-400/70 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+      <span>Copyright <span id="footer-year"></span> DELTA Plant. Deep-tech landing page built with HTML, Tailwind CDN, and vanilla JavaScript.</span>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span>Music credit: Pixabay - Space Epic Cinematic Journey.</span>
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/cookie-policy.html">Cookie Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="privacy-manage" class="privacy-manage hidden">
+    <button id="privacy-manage-button" type="button" class="privacy-manage-button">Privacy & cookies</button>
+  </div>
+
+  <div id="privacy-backdrop" class="privacy-backdrop hidden"></div>
+
+  <section id="privacy-banner" class="privacy-banner-shell hidden" aria-label="Privacy and cookie banner" aria-live="polite">
+    <div class="section-kicker">Privacy & cookies</div>
+    <h2 class="mt-3 font-display text-2xl leading-tight text-white">Control optional media and stored preferences.</h2>
+    <p class="mt-3 text-sm leading-6 text-slate-300/76">DELTA Plant stores one local preference record to remember your choice. Optional third-party media is limited to the hero soundtrack. You can continue with essential-only browsing or open the Privacy Preference Center.</p>
+    <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-300/72">
+      <a href="/privacy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Privacy Policy</a>
+      <a href="/cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>
+    </div>
+    <div class="privacy-action-row">
+      <button id="privacy-essential-only" type="button" class="privacy-button privacy-button-quiet">Essential only</button>
+      <button id="privacy-open-center" type="button" class="privacy-button">Preferences</button>
+      <button id="privacy-accept-all" type="button" class="privacy-button privacy-button-primary">Accept all</button>
+    </div>
+  </section>
+
+  <section id="privacy-modal" class="privacy-modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" aria-describedby="privacy-modal-copy">
+    <div class="privacy-modal-card glass">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="section-kicker">Privacy Preference Center</div>
+          <h2 id="privacy-modal-title" class="mt-3 font-display text-3xl leading-tight text-white sm:text-4xl">Choose what DELTA Plant can load on this page.</h2>
+        </div>
+        <button id="privacy-close-modal" type="button" class="privacy-button privacy-button-quiet">Close</button>
+      </div>
+
+      <p id="privacy-modal-copy" class="mt-4 max-w-3xl text-sm leading-7 text-slate-300/76">The website itself stays browseable without marketing cookies. The only optional third-party request controlled here is the hero soundtrack media. Your choice is stored locally in this browser so the banner does not reappear on every visit.</p>
+
+      <div class="mt-8">
+        <div class="privacy-option">
+          <div>
+            <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">Essential storage</div>
+            <p class="mt-2 text-sm leading-6 text-slate-300/72">Required to remember your privacy choice and keep the preference center consistent between visits.</p>
+          </div>
+          <span class="privacy-state-pill">Always on</span>
+        </div>
+
+        <div class="privacy-option">
+          <div>
+            <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">Optional soundtrack media</div>
+            <p class="mt-2 text-sm leading-6 text-slate-300/72">Allows the page to load the Pixabay-hosted hero soundtrack when you decide to play it. If disabled, no soundtrack media request is made.</p>
+            <p id="privacy-summary" class="mt-3 text-sm leading-6 text-slate-300/82"></p>
+          </div>
+          <button id="privacy-media-toggle" type="button" class="privacy-toggle" aria-pressed="false" aria-label="Toggle optional soundtrack media"></button>
+        </div>
+      </div>
+
+      <div class="privacy-action-row">
+        <button id="privacy-modal-essential" type="button" class="privacy-button privacy-button-quiet">Essential only</button>
+        <button id="privacy-save-preferences" type="button" class="privacy-button">Save preferences</button>
+        <button id="privacy-modal-accept" type="button" class="privacy-button privacy-button-primary">Accept all</button>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-300/72">
+        <a href="/privacy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Privacy Policy</a>
+        <a href="/cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const menuToggle = document.getElementById('menu-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = mobileMenu.querySelectorAll('a');
+    const siteHeader = document.getElementById('site-header');
+
+    menuToggle.addEventListener('click', () => {
+      const expanded = menuToggle.getAttribute('aria-expanded') === 'true';
+      menuToggle.setAttribute('aria-expanded', String(!expanded));
+      mobileMenu.classList.toggle('hidden');
+    });
+
+    mobileLinks.forEach((link) => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.add('hidden');
+        menuToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    const updateHeader = () => {
+      if (window.scrollY > 20) {
+        siteHeader.classList.add('nav-solid');
+      } else {
+        siteHeader.classList.remove('nav-solid');
+      }
+    };
+
+    updateHeader();
+    window.addEventListener('scroll', updateHeader, { passive: true });
+
+    const reveals = document.querySelectorAll('.reveal');
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' });
+
+    reveals.forEach((element, index) => {
+      element.style.transitionDelay = `${Math.min(index * 40, 240)}ms`;
+      if (prefersReducedMotion) {
+        element.classList.add('is-visible');
+      } else {
+        revealObserver.observe(element);
+      }
+    });
+
+    const audio = document.getElementById('hero-audio');
+    const audioToggle = document.getElementById('audio-toggle');
+    const audioPanel = document.getElementById('audio-panel');
+    const audioPanelToggle = document.getElementById('audio-panel-toggle');
+    const audioStatus = document.getElementById('audio-status');
+    const audioVolume = document.getElementById('audio-volume');
+    const audioVolumeLabel = document.getElementById('audio-volume-label');
+    const audioSlash = document.getElementById('audio-slash');
+    const contactForm = document.getElementById('contact-form');
+    const contactFormStatus = document.getElementById('contact-form-status');
+    const contactFormSubmit = document.getElementById('contact-form-submit');
+
+    audio.volume = Number(audioVolume.value) / 100;
+
+    const setAudioState = (enabled) => {
+      audio.muted = !enabled;
+      audioSlash.style.opacity = enabled ? '0' : '1';
+      audioStatus.textContent = enabled ? 'Soundtrack enabled' : 'Muted loop active';
+    };
+
+    const setAudioPanel = (expanded) => {
+      audioPanel.classList.toggle('hidden', !expanded);
+      audioPanelToggle.setAttribute('aria-expanded', String(expanded));
+      audioPanelToggle.textContent = expanded ? 'Hide' : 'Vol';
+    };
+
+    const privacyStorageKey = 'delta-privacy-preferences';
+    const pageBody = document.body;
+    const privacyBanner = document.getElementById('privacy-banner');
+    const privacyBackdrop = document.getElementById('privacy-backdrop');
+    const privacyModal = document.getElementById('privacy-modal');
+    const privacyManage = document.getElementById('privacy-manage');
+    const privacyManageButton = document.getElementById('privacy-manage-button');
+    const privacyAcceptAll = document.getElementById('privacy-accept-all');
+    const privacyEssentialOnly = document.getElementById('privacy-essential-only');
+    const privacyOpenCenter = document.getElementById('privacy-open-center');
+    const privacyModalAccept = document.getElementById('privacy-modal-accept');
+    const privacyModalEssential = document.getElementById('privacy-modal-essential');
+    const privacySavePreferences = document.getElementById('privacy-save-preferences');
+    const privacyCloseModal = document.getElementById('privacy-close-modal');
+    const privacyMediaToggle = document.getElementById('privacy-media-toggle');
+    const privacySummary = document.getElementById('privacy-summary');
+
+    let privacyPreferences = null;
+    let draftPrivacyPreferences = { essential: true, media: false };
+    let modalInvoker = null;
+
+    const normalizePrivacyPreferences = (value) => ({
+      essential: true,
+      media: Boolean(value && value.media)
+    });
+
+    const readPrivacyPreferences = () => {
+      try {
+        const rawValue = window.localStorage.getItem(privacyStorageKey);
+        if (!rawValue) {
+          return null;
+        }
+
+        const parsedValue = JSON.parse(rawValue);
+        if (parsedValue && typeof parsedValue === 'object') {
+          if (parsedValue.categories && typeof parsedValue.categories.media === 'boolean') {
+            return normalizePrivacyPreferences(parsedValue.categories);
+          }
+
+          if (typeof parsedValue.media === 'boolean') {
+            return normalizePrivacyPreferences(parsedValue);
+          }
+        }
+      } catch (error) {
+        return null;
+      }
+
+      return null;
+    };
+
+    const syncPrivacyLayout = () => {
+      pageBody.classList.toggle('privacy-banner-visible', !privacyBanner.classList.contains('hidden'));
+      pageBody.classList.toggle('privacy-manage-visible', !privacyManage.classList.contains('hidden'));
+    };
+
+    const showPrivacyBanner = (visible) => {
+      privacyBanner.classList.toggle('hidden', !visible);
+      syncPrivacyLayout();
+    };
+
+    const showPrivacyManage = (visible) => {
+      privacyManage.classList.toggle('hidden', !visible);
+      syncPrivacyLayout();
+    };
+
+    const setPrivacyModalVisibility = (visible) => {
+      privacyBackdrop.classList.toggle('hidden', !visible);
+      privacyModal.classList.toggle('hidden', !visible);
+      pageBody.style.overflow = visible ? 'hidden' : '';
+
+      if (!visible && modalInvoker instanceof HTMLElement) {
+        modalInvoker.focus();
+        modalInvoker = null;
+      }
+    };
+
+    const unloadOptionalAudio = () => {
+      audio.pause();
+      audio.currentTime = 0;
+
+      if (audio.getAttribute('src')) {
+        audio.removeAttribute('src');
+        audio.load();
+      }
+    };
+
+    const ensureOptionalAudioSource = () => {
+      if (audio.getAttribute('src')) {
+        return;
+      }
+
+      const source = audio.dataset.src;
+      if (source) {
+        audio.src = source;
+        audio.load();
+      }
+    };
+
+    const updatePrivacyModalState = () => {
+      const mediaEnabled = Boolean(draftPrivacyPreferences.media);
+      privacyMediaToggle.classList.toggle('is-active', mediaEnabled);
+      privacyMediaToggle.setAttribute('aria-pressed', String(mediaEnabled));
+      privacySummary.textContent = mediaEnabled
+        ? 'Optional soundtrack media is allowed. The track can load only after you choose to play it.'
+        : 'Only essential storage is enabled. Optional soundtrack media stays blocked until you allow it.';
+    };
+
+    const updateAudioAvailability = () => {
+      if (!privacyPreferences) {
+        unloadOptionalAudio();
+        setAudioState(false);
+        audioStatus.textContent = 'Review privacy settings to enable the soundtrack';
+        return;
+      }
+
+      if (!privacyPreferences.media) {
+        unloadOptionalAudio();
+        setAudioState(false);
+        audioStatus.textContent = 'Optional soundtrack disabled by privacy settings';
+        return;
+      }
+
+      if (!audio.getAttribute('src')) {
+        audioStatus.textContent = 'Soundtrack allowed - tap to play';
+      } else if (audio.paused) {
+        audioStatus.textContent = 'Soundtrack ready - tap to play';
+      } else if (audio.muted) {
+        audioStatus.textContent = 'Soundtrack loaded - tap to unmute';
+      } else {
+        audioStatus.textContent = 'Soundtrack enabled';
+      }
+    };
+
+    const applyPrivacyPreferences = () => {
+      updatePrivacyModalState();
+      updateAudioAvailability();
+    };
+
+    const persistPrivacyPreferences = (nextPreferences) => {
+      privacyPreferences = normalizePrivacyPreferences(nextPreferences);
+      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences);
+
+      try {
+        window.localStorage.setItem(privacyStorageKey, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          categories: privacyPreferences
+        }));
+      } catch (error) {
+        // Ignore storage failures and keep the in-memory preference for the current page.
+      }
+
+      showPrivacyBanner(false);
+      showPrivacyManage(true);
+      setPrivacyModalVisibility(false);
+      applyPrivacyPreferences();
+    };
+
+    const openPrivacyCenter = (invoker) => {
+      modalInvoker = invoker instanceof HTMLElement ? invoker : document.activeElement;
+      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+      updatePrivacyModalState();
+      setPrivacyModalVisibility(true);
+      window.requestAnimationFrame(() => {
+        privacyMediaToggle.focus();
+      });
+    };
+
+    const closePrivacyCenter = () => {
+      setPrivacyModalVisibility(false);
+      if (!privacyPreferences) {
+        showPrivacyBanner(true);
+      }
+    };
+
+    setAudioState(false);
+    setAudioPanel(false);
+
+    privacyPreferences = readPrivacyPreferences();
+    draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+    showPrivacyBanner(!privacyPreferences);
+    showPrivacyManage(Boolean(privacyPreferences));
+    applyPrivacyPreferences();
+
+    privacyAcceptAll.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: true });
+    });
+
+    privacyEssentialOnly.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: false });
+    });
+
+    privacyOpenCenter.addEventListener('click', () => {
+      openPrivacyCenter(privacyOpenCenter);
+    });
+
+    privacyManageButton.addEventListener('click', () => {
+      openPrivacyCenter(privacyManageButton);
+    });
+
+    privacyMediaToggle.addEventListener('click', () => {
+      draftPrivacyPreferences = normalizePrivacyPreferences({ media: !draftPrivacyPreferences.media });
+      updatePrivacyModalState();
+    });
+
+    privacyModalAccept.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: true });
+    });
+
+    privacyModalEssential.addEventListener('click', () => {
+      persistPrivacyPreferences({ media: false });
+    });
+
+    privacySavePreferences.addEventListener('click', () => {
+      persistPrivacyPreferences(draftPrivacyPreferences);
+    });
+
+    privacyCloseModal.addEventListener('click', () => {
+      closePrivacyCenter();
+    });
+
+    privacyBackdrop.addEventListener('click', () => {
+      closePrivacyCenter();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !privacyModal.classList.contains('hidden')) {
+        closePrivacyCenter();
+      }
+    });
+
+    audioToggle.addEventListener('click', async () => {
+      if (!privacyPreferences || !privacyPreferences.media) {
+        audioStatus.textContent = privacyPreferences
+          ? 'Allow optional media in Privacy & cookies settings'
+          : 'Choose a privacy option to enable the soundtrack';
+
+        if (privacyPreferences) {
+          openPrivacyCenter(audioToggle);
+        } else {
+          showPrivacyBanner(true);
+        }
+        return;
+      }
+
+      ensureOptionalAudioSource();
+
+      const shouldEnable = audio.muted || audio.paused;
+      if (audio.paused) {
+        try {
+          await audio.play();
+        } catch (error) {
+          audioStatus.textContent = 'Playback blocked - tap again';
+          return;
+        }
+      }
+      setAudioState(shouldEnable);
+      updateAudioAvailability();
+    });
+
+    audioPanelToggle.addEventListener('click', () => {
+      const expanded = audioPanelToggle.getAttribute('aria-expanded') === 'true';
+      setAudioPanel(!expanded);
+    });
+
+    audioVolume.addEventListener('input', () => {
+      const value = Number(audioVolume.value);
+      audio.volume = value / 100;
+      audioVolumeLabel.textContent = `${value}%`;
+      if (value === 0) {
+        setAudioState(false);
+      } else if (audio.muted && audio.getAttribute('src')) {
+        setAudioState(true);
+      }
+      updateAudioAvailability();
+    });
+
+    audio.addEventListener('error', () => {
+      audioStatus.textContent = 'Soundtrack source unavailable';
+      audioToggle.disabled = true;
+      audioToggle.classList.add('opacity-50');
+    });
+
+    const getNormalizedContactRelay = () => {
+      const relayConfig = window.DELTA_CONTACT_RELAY || {};
+      return {
+        endpoint: typeof relayConfig.endpoint === 'string' && relayConfig.endpoint.trim()
+          ? relayConfig.endpoint.trim()
+          : 'https://api.web3forms.com/submit',
+        accessKey: typeof relayConfig.accessKey === 'string' ? relayConfig.accessKey.trim() : '',
+        fromName: typeof relayConfig.fromName === 'string' ? relayConfig.fromName.trim() : 'DELTA Plant website',
+        subjectPrefix: typeof relayConfig.subjectPrefix === 'string' ? relayConfig.subjectPrefix.trim() : 'DELTA Plant website',
+        successMessage: typeof relayConfig.successMessage === 'string' && relayConfig.successMessage.trim()
+          ? relayConfig.successMessage.trim()
+          : 'Message sent successfully. We will review it and reply through the appropriate channel.'
+      };
+    };
+
+    const updateContactRelayAvailability = () => {
+      const relay = getNormalizedContactRelay();
+      const hasConfiguredContactRelay = Boolean(relay.endpoint && relay.accessKey);
+
+      if (contactFormStatus) {
+        contactFormStatus.textContent = hasConfiguredContactRelay
+          ? 'Requests are submitted through a protected contact relay.'
+          : 'Secure contact relay is initializing.';
+      }
+
+      if (contactFormSubmit) {
+        contactFormSubmit.disabled = false;
+        contactFormSubmit.classList.remove('opacity-50');
+        contactFormSubmit.title = '';
+      }
+
+      return { relay, hasConfiguredContactRelay };
+    };
+
+    const refreshContactRelayAvailability = () => {
+      updateContactRelayAvailability();
+      window.setTimeout(updateContactRelayAvailability, 250);
+      window.setTimeout(updateContactRelayAvailability, 1000);
+    };
+
+    refreshContactRelayAvailability();
+    window.addEventListener('load', refreshContactRelayAvailability);
+
+    if (contactForm && contactFormStatus && contactFormSubmit) {
+      contactForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const { relay: normalizedContactRelay, hasConfiguredContactRelay } = updateContactRelayAvailability();
+
+        if (!hasConfiguredContactRelay) {
+          contactFormStatus.textContent = 'Secure contact relay is still initializing. Please retry in a few seconds.';
+          return;
+        }
+
+        if (!contactForm.reportValidity()) {
+          contactFormStatus.textContent = 'Please complete all required fields before sending.';
+          return;
+        }
+
+        const consentField = document.getElementById('contact-consent');
+        if (!consentField || !consentField.checked) {
+          contactFormStatus.textContent = 'You must consent before sending the message.';
+          return;
+        }
+
+        const formData = new FormData(contactForm);
+        contactFormSubmit.disabled = true;
+        contactFormSubmit.classList.add('opacity-50');
+        contactFormStatus.textContent = 'Sending message...';
+
+        try {
+          formData.append('access_key', normalizedContactRelay.accessKey);
+          formData.append('from_name', normalizedContactRelay.fromName);
+          formData.append('subject', `${normalizedContactRelay.subjectPrefix}: ${formData.get('topic') || 'Website contact'}`);
+
+          const response = await fetch(normalizedContactRelay.endpoint, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json'
+            },
+            body: formData
+          });
+
+          let payload = {};
+          try {
+            payload = await response.json();
+          } catch (error) {
+            payload = {};
+          }
+
+          if (!response.ok || payload.success !== true) {
+            throw new Error(payload.message || 'Submission failed');
+          }
+
+          contactForm.reset();
+          contactFormStatus.textContent = normalizedContactRelay.successMessage;
+        } catch (error) {
+          const message = error instanceof Error && error.message
+            ? error.message
+            : 'Unable to send the message right now. Please try again later.';
+          contactFormStatus.textContent = `Unable to send the message: ${message}`;
+        } finally {
+          contactFormSubmit.disabled = false;
+          contactFormSubmit.classList.remove('opacity-50');
+        }
+      });
+    }
+
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+    const canvas = document.getElementById('cosmos-canvas');
+    const ctx = canvas.getContext('2d');
+    const pointer = { x: 0, y: 0, active: false };
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let particles = [];
+
+    const createParticle = () => {
+      const leafMode = Math.random() > 0.9;
+      return {
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * (leafMode ? 0.16 : 0.24),
+        vy: (Math.random() - 0.5) * (leafMode ? 0.12 : 0.2),
+        r: leafMode ? 2.2 + Math.random() * 2.6 : 0.6 + Math.random() * 1.8,
+        leafMode,
+        hue: leafMode ? 160 + Math.random() * 28 : 182 + Math.random() * 20,
+        alpha: leafMode ? 0.24 + Math.random() * 0.24 : 0.18 + Math.random() * 0.34
+      };
+    };
+
+    const resizeCanvas = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const particleCount = prefersReducedMotion ? 34 : Math.max(52, Math.min(96, Math.floor((width * height) / 18000)));
+      particles = Array.from({ length: particleCount }, createParticle);
+    };
+
+    const drawLeaf = (x, y, size, rotation, color, alpha) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.bezierCurveTo(size * 0.8, -size * 0.45, size * 0.85, size * 0.65, 0, size);
+      ctx.bezierCurveTo(-size * 0.85, size * 0.65, -size * 0.8, -size * 0.45, 0, -size);
+      ctx.fillStyle = `hsla(${color}, 90%, 68%, ${alpha})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, -size * 0.74);
+      ctx.lineTo(0, size * 0.74);
+      ctx.strokeStyle = `hsla(${color - 25}, 90%, 74%, ${alpha * 1.3})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawVines = (time) => {
+      const vines = [
+        [width * 0.1, height * 0.88, width * 0.26, height * 0.58, width * 0.44, height * 0.68, width * 0.62, height * 0.34],
+        [width * 0.32, height * 0.95, width * 0.42, height * 0.72, width * 0.58, height * 0.78, width * 0.76, height * 0.44],
+        [width * 0.7, height * 0.98, width * 0.72, height * 0.72, width * 0.78, height * 0.64, width * 0.9, height * 0.28]
+      ];
+
+      vines.forEach((points, index) => {
+        const gradient = ctx.createLinearGradient(points[0], points[1], points[6], points[7]);
+        gradient.addColorStop(0, 'rgba(25, 245, 193, 0.08)');
+        gradient.addColorStop(0.55, 'rgba(121, 231, 255, 0.22)');
+        gradient.addColorStop(1, 'rgba(155, 255, 131, 0.08)');
+        ctx.beginPath();
+        ctx.moveTo(points[0], points[1]);
+        ctx.bezierCurveTo(points[2], points[3], points[4], points[5], points[6], points[7]);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        for (let step = 0; step <= 4; step += 1) {
+          const t = step / 4;
+          const x = Math.pow(1 - t, 3) * points[0] + 3 * Math.pow(1 - t, 2) * t * points[2] + 3 * (1 - t) * Math.pow(t, 2) * points[4] + Math.pow(t, 3) * points[6];
+          const y = Math.pow(1 - t, 3) * points[1] + 3 * Math.pow(1 - t, 2) * t * points[3] + 3 * (1 - t) * Math.pow(t, 2) * points[5] + Math.pow(t, 3) * points[7];
+          drawLeaf(x + Math.sin(time * 0.0007 + step + index) * 4, y, 6 + step * 0.8, (time * 0.0003 + step) * 0.8, 155 + index * 12, 0.12 + step * 0.02);
+        }
+      });
+    };
+
+    const animate = (time) => {
+      ctx.clearRect(0, 0, width, height);
+      drawVines(time);
+
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < -30) p.x = width + 30;
+        if (p.x > width + 30) p.x = -30;
+        if (p.y < -30) p.y = height + 30;
+        if (p.y > height + 30) p.y = -30;
+
+        if (pointer.active) {
+          const dx = p.x - pointer.x;
+          const dy = p.y - pointer.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 120) {
+            const force = (120 - distance) / 1200;
+            p.x += (dx / distance) * force * 12;
+            p.y += (dy / distance) * force * 12;
+          }
+        }
+
+        if (p.leafMode) {
+          drawLeaf(p.x, p.y, p.r, time * 0.0005 + i, p.hue, p.alpha);
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 100%, 82%, ${p.alpha})`;
+          ctx.fill();
+        }
+
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const q = particles[j];
+          const dx = p.x - q.x;
+          const dy = p.y - q.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 112) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.strokeStyle = `rgba(121, 231, 255, ${0.12 * (1 - distance / 112)})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
+        }
+      }
+
+      if (!prefersReducedMotion) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    resizeCanvas();
+    if (!prefersReducedMotion) {
+      requestAnimationFrame(animate);
+    } else {
+      animate(0);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('pointermove', (event) => {
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      pointer.active = true;
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => {
+      pointer.active = false;
+    });
+  </script>
+</body>
+</html>
