@@ -39,6 +39,12 @@ Optional production improvements:
 
 The quickest supported path from this repository is Render via [render.yaml](render.yaml).
 
+To print the exact cutover bundle from the local `.env`, including the DNS target and all Render env keys, run:
+
+`/home/proctor81/Desktop/DELTA-PLANT/.venv/bin/python tools/render_cutover_bundle.py`
+
+Add `--reveal-secrets` only when you want the command to print the real secret values from the local environment instead of masked placeholders.
+
 Suggested sequence:
 
 1. Create a new Render Blueprint from this repository.
