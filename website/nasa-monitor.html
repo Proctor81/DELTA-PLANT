@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>DELTA Plant | NASA Crop Stress and Disease Monitor</title>
+  <meta name='description' content='NASA POWER + Sentinel-1 agronomic monitoring with SAR-derived moisture, biomass, crop stress, crop questioning, voice reports, and runtime-only PDFs.' />
+  <meta name='keywords' content='NASA agriculture AI, Sentinel-1 crop stress, plant disease early warning, SAR agronomy, Copernicus farm monitoring, DELTA Plant' />
+  <meta name='robots' content='index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1' />
+  <meta name='theme-color' content='#08111d' />
+  <meta property='og:type' content='website' />
+  <meta property='og:title' content='DELTA Plant NASA Monitor' />
+  <meta property='og:description' content='Satellite-first agronomic intelligence blending NASA POWER, Sentinel-1 SAR, crop questioning, voice output, and privacy-aware runtime PDFs.' />
+  <meta property='og:url' content='https://deltaplant.ai/' />
+  <meta property='og:image' content='https://deltaplant.ai/assets/social-preview.png' />
+  <meta name='twitter:card' content='summary_large_image' />
+  <meta name='twitter:title' content='DELTA Plant NASA Monitor' />
+  <meta name='twitter:description' content='Satellite-first agronomic monitoring with privacy-aware AI summaries.' />
+  <meta name='twitter:image' content='https://deltaplant.ai/assets/social-preview.png' />
+  <link rel='canonical' href='https://deltaplant.ai/' />
+  <link rel='preconnect' href='https://fonts.googleapis.com' />
+  <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin />
+  <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap' />
+  <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' crossorigin='' />
+  <link rel='stylesheet' href='https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css' crossorigin='' />
+  <script type='application/ld+json'>{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"DELTA Plant","url":"https://deltaplant.ai/","sameAs":["https://github.com/proctor81/delta-plant"]},{"@type":"WebApplication","name":"DELTA Plant NASA Monitor","applicationCategory":"AgricultureApplication","operatingSystem":"Web","url":"https://deltaplant.ai/","description":"Agronomic monitoring platform that fuses NASA POWER climate data and Sentinel-1 SAR analytics for crop stress, disease risk, voice reports, and privacy-aware PDF delivery.","featureList":["Sentinel-1 SAR preprocessing","NASA POWER ET0 and fungal risk","Crop wizard with up to five questions","Runtime PDF export","Consent-gated LLM and voice synthesis"]}]}</script>
+  <style>
+    :root {
+      --bg-0: #08111d;
+      --bg-1: #0f1f30;
+      --panel: rgba(10, 25, 38, 0.72);
+      --panel-strong: rgba(8, 18, 28, 0.92);
+      --line: rgba(126, 230, 255, 0.18);
+      --text: #f5f8f6;
+      --muted: #9bb1bb;
+      --accent: #c8ff72;
+      --accent-2: #7ee6ff;
+      --accent-3: #ffbb5a;
+      --danger: #ff7d7d;
+      --success: #7ff2ae;
+      --shadow: 0 32px 80px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'IBM Plex Sans', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(126, 230, 255, 0.12), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(200, 255, 114, 0.11), transparent 26%),
+        linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; }
+    img { max-width: 100%; display: block; }
+    button, input, select, textarea { font: inherit; }
+
+    .site-shell {
+      width: min(1380px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding-bottom: 5rem;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      margin-top: 1rem;
+      backdrop-filter: blur(18px);
+      background: rgba(8, 16, 24, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .brand {
+      text-decoration: none;
+      display: flex;
+      gap: 0.9rem;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 2.8rem;
+      aspect-ratio: 1;
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(126, 230, 255, 0.24), rgba(200, 255, 114, 0.2));
+      display: grid;
+      place-items: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-family: 'Space Grotesk', sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+    }
+
+    .brand-copy span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-nav {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .header-nav a,
+    .header-nav button {
+      text-decoration: none;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      padding: 0.7rem 1rem;
+      cursor: pointer;
+    }
+
+    .hero {
+      min-height: calc(100vh - 7rem);
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+      gap: 1.2rem;
+      align-items: stretch;
+      padding: 1.2rem 0 0;
+    }
+
+    .hero-card,
+    .panel,
+    .metric-card,
+    .result-card,
+    .detail-card,
+    .stack-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-copy {
+      padding: clamp(1.6rem, 4vw, 3rem);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .hero-copy::before {
+      content: '';
+      position: absolute;
+      inset: auto -10% -20% auto;
+      width: 20rem;
+      height: 20rem;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200, 255, 114, 0.18), transparent 68%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 0.65rem;
+      align-items: center;
+      border: 1px solid rgba(200, 255, 114, 0.28);
+      border-radius: 999px;
+      padding: 0.45rem 0.9rem;
+      color: var(--accent);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      width: fit-content;
+    }
+
+    .hero-copy h1 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(3.1rem, 8vw, 6.6rem);
+      line-height: 0.92;
+      letter-spacing: -0.04em;
+      max-width: 10ch;
+    }
+
+    .hero-copy p.lead {
+      color: var(--muted);
+      font-size: clamp(1rem, 1.8vw, 1.22rem);
+      line-height: 1.8;
+      max-width: 64ch;
+      margin: 0;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .hero-actions a,
+    .hero-actions button,
+    .tool-button,
+    .chip-button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.95rem 1.2rem;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .hero-actions .primary,
+    .tool-button.primary,
+    .chip-button.active {
+      background: var(--accent);
+      color: #031017;
+    }
+
+    .hero-actions .secondary,
+    .tool-button.secondary,
+    .chip-button {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+
+    .metric-pill {
+      border-radius: 22px;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .metric-pill strong {
+      display: block;
+      font-size: 1.35rem;
+      font-family: 'Space Grotesk', sans-serif;
+      margin-bottom: 0.25rem;
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 1rem;
+      grid-template-rows: 1.3fr 0.7fr;
+    }
+
+    .hero-visual {
+      padding: 1.3rem;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 1rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .visual-orbit {
+      height: 18rem;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        radial-gradient(circle at 35% 35%, rgba(126, 230, 255, 0.34), transparent 14%),
+        radial-gradient(circle at 65% 65%, rgba(200, 255, 114, 0.26), transparent 18%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .visual-orbit::before,
+    .visual-orbit::after {
+      content: '';
+      position: absolute;
+      inset: 18% 10%;
+      border: 1px solid rgba(126, 230, 255, 0.16);
+      border-radius: 50%;
+      animation: pulse 6s ease-in-out infinite;
+    }
+
+    .visual-orbit::after {
+      inset: 29% 20%;
+      animation-delay: -2s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.05); opacity: 1; }
+    }
+
+    .hero-stack {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+
+    .stack-card {
+      padding: 1rem;
+      min-height: 9rem;
+    }
+
+    .stack-card span {
+      display: block;
+      color: var(--accent-2);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    .stack-card strong {
+      display: block;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.08rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .stack-card p {
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.65;
+      font-size: 0.93rem;
+    }
+
+    .trust-banner {
+      padding: 1rem 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      color: var(--muted);
+    }
+
+    .analysis-section,
+    .results-section {
+      margin-top: 1rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .analysis-section {
+      grid-template-columns: 1.08fr 0.92fr;
+    }
+
+    .panel {
+      padding: 1.25rem;
+    }
+
+    .panel h2,
+    .panel h3,
+    .result-card h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      margin: 0 0 0.6rem;
+    }
+
+    .panel p,
+    .panel li,
+    .result-card p,
+    .detail-card p,
+    .detail-card li {
+      color: var(--muted);
+      line-height: 1.72;
+    }
+
+    .toolbar,
+    .result-toolbar,
+    .mode-toggle {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #map {
+      height: 32rem;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 1rem;
+      background: linear-gradient(180deg, #12273a 0%, #0c1620 100%);
+    }
+
+    .map-caption,
+    .status-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-top: 0.8rem;
+    }
+
+    .control-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 1rem;
+    }
+
+    .field,
+    .wizard-card,
+    .result-card,
+    .detail-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 24px;
+      padding: 1rem;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.55rem;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      background: rgba(4, 10, 15, 0.75);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 0.95rem 1rem;
+    }
+
+    .wizard-options,
+    .candidate-list,
+    .tag-list {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .candidate,
+    .tag {
+      display: inline-flex;
+      gap: 0.45rem;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      padding: 0.55rem 0.9rem;
+      font-size: 0.9rem;
+    }
+
+    .primary-action {
+      width: 100%;
+      border: 0;
+      border-radius: 22px;
+      padding: 1rem 1.2rem;
+      margin-top: 1rem;
+      background: linear-gradient(90deg, var(--accent), #ebffbd);
+      color: #061118;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .results-section[hidden] {
+      display: none;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+
+    .metric-card {
+      padding: 1rem;
+      min-height: 8rem;
+    }
+
+    .metric-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    .metric-card strong {
+      display: block;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.5rem, 4vw, 2.35rem);
+      margin-bottom: 0.5rem;
+    }
+
+    .result-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1rem;
+    }
+
+    .narrative {
+      font-size: 1.02rem;
+      line-height: 1.9;
+      color: #d8e4e8;
+      white-space: pre-wrap;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .voice-row {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 0.8rem;
+      filter: hue-rotate(12deg);
+    }
+
+    .transparency-bar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    .transparency-card {
+      border-radius: 24px;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .site-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      color: var(--muted);
+      padding: 1.2rem 0 0;
+    }
+
+    .site-footer nav {
+      display: flex;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .dp-cookie-banner {
+      position: fixed;
+      left: 1rem;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 50;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 1rem;
+      padding: 1rem 1.2rem;
+      border-radius: 24px;
+      background: rgba(5, 10, 16, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: var(--shadow);
+    }
+
+    .dp-cookie-banner__copy p {
+      margin: 0.25rem 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .dp-cookie-banner__actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .dp-cookie-banner button,
+    .dp-privacy-modal button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.8rem 1rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .dp-cookie-banner button:last-child,
+    .dp-privacy-modal [data-action='save'] {
+      background: var(--accent);
+      color: #051018;
+    }
+
+    .dp-privacy-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+    }
+
+    .dp-privacy-modal[hidden] {
+      display: none;
+    }
+
+    .dp-privacy-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.62);
+    }
+
+    .dp-privacy-modal__panel {
+      position: relative;
+      width: min(580px, calc(100vw - 2rem));
+      margin: 9vh auto 0;
+      background: rgba(7, 15, 24, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .dp-privacy-modal__panel header,
+    .dp-privacy-modal__panel footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .dp-privacy-modal__panel header p {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.2rem;
+    }
+
+    .dp-privacy-modal__panel section {
+      margin: 1rem 0;
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .dp-privacy-modal__panel label {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 0.85rem 1rem;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .analysis-section,
+      .result-layout {
+        grid-template-columns: 1fr;
+      }
+      .hero-side,
+      .hero-stack,
+      .hero-grid,
+      .results-grid,
+      .transparency-bar,
+      .details-grid,
+      .control-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .site-shell {
+        width: min(100vw - 1rem, 100%);
+      }
+      .site-header,
+      .hero-copy,
+      .hero-visual,
+      .panel,
+      .metric-card,
+      .result-card,
+      .detail-card,
+      .stack-card {
+        border-radius: 22px;
+      }
+      .hero-side,
+      .hero-stack,
+      .hero-grid,
+      .results-grid,
+      .transparency-bar,
+      .details-grid,
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+      #map {
+        height: 24rem;
+      }
+      .dp-cookie-banner {
+        grid-template-columns: 1fr;
+      }
+      .dp-cookie-banner__actions {
+        justify-content: stretch;
+      }
+      .dp-cookie-banner__actions button {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class='site-shell'>
+    <header class='site-header'>
+      <a class='brand' href='/'>
+        <span class='brand-mark'>DP</span>
+        <span class='brand-copy'>
+          <strong>DELTA Plant</strong>
+          <span>NASA-aware agronomic intelligence for field-scale monitoring</span>
+        </span>
+      </a>
+      <nav class='header-nav'>
+        <a href='#analyze'>Analyze field</a>
+        <a href='/Raspberrypi/'>Raspberry Pi</a>
+        <a href='/privacy-policy.html'>Privacy</a>
+        <a href='/cookie-policy.html'>Cookies</a>
+        <a href='/terms-of-service.html'>Terms</a>
+        <button type='button' id='manage-privacy'>Manage privacy</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class='hero'>
+        <article class='hero-card hero-copy'>
+          <div>
+            <span class='eyebrow'>NASA POWER + Sentinel-1 + DELTA Voice</span>
+            <h1>See crop stress before the canopy tells you.</h1>
+            <p class='lead'>DELTA Plant blends daily NASA POWER climate forcing, Sentinel-1 SAR backscatter, interpolated soil moisture, crop questioning, and privacy-gated AI reporting into one decision surface designed for real fields, not demo dashboards.</p>
+          </div>
+
+          <div class='hero-actions'>
+            <a class='primary' href='#analyze'>Start field analysis</a>
+            <button class='secondary' type='button' id='hero-voice-demo'>Play voice demo</button>
+          </div>
+
+          <div class='hero-grid'>
+            <div class='metric-pill'>
+              <strong>50,000 ha</strong>
+              <span>validated maximum geometry per request</span>
+            </div>
+            <div class='metric-pill'>
+              <strong>60 min</strong>
+              <span>runtime-only PDF retention window</span>
+            </div>
+            <div class='metric-pill'>
+              <strong>1 LLM/day</strong>
+              <span>consent-gated narrative quota per user token</span>
+            </div>
+          </div>
+        </article>
+
+        <div class='hero-side'>
+          <article class='hero-card hero-visual'>
+            <div>
+              <h2>Area-scale disease prevention and stress detection</h2>
+              <p>Deploy the pipeline on the web, then move to edge hardware without changing the agronomic logic.</p>
+            </div>
+            <div class='visual-orbit' aria-hidden='true'></div>
+            <div class='tag-list'>
+              <span class='tag'>Pauli decomposition</span>
+              <span class='tag'>InSAR coherence</span>
+              <span class='tag'>ET0 and fungal risk</span>
+              <span class='tag'>Voice report</span>
+            </div>
+          </article>
+
+          <div class='hero-stack'>
+            <article class='stack-card'>
+              <span>Climate</span>
+              <strong>NASA POWER</strong>
+              <p>Daily ET0, GDD, stress balance, and fungal pressure.</p>
+            </article>
+            <article class='stack-card'>
+              <span>SAR</span>
+              <strong>Sentinel-1</strong>
+              <p>Backscatter, decomposition products, coherence, displacement.</p>
+            </article>
+            <article class='stack-card'>
+              <span>Delivery</span>
+              <strong>FastAPI + Runtime PDFs</strong>
+              <p>JWT sessions, CSRF, voice streaming, and ephemeral artifact tokens.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class='trust-banner hero-card'>
+        <strong>AI transparency</strong>
+        <span>The service always returns a procedural diagnosis. LLM summaries and voice output activate only when the matching optional consent category is enabled.</span>
+      </section>
+
+      <section class='analysis-section' id='analyze'>
+        <article class='panel'>
+          <div class='toolbar'>
+            <button class='tool-button secondary' type='button' id='draw-polygon'>Draw polygon</button>
+            <button class='tool-button secondary' type='button' id='draw-circle'>Draw circle</button>
+            <button class='tool-button secondary' type='button' id='clear-map'>Reset geometry</button>
+          </div>
+          <div id='map' aria-label='Interactive field map'></div>
+          <div class='map-caption'>
+            <span id='map-hint'>Draw one polygon or one circle. Maximum area: 50,000 hectares.</span>
+            <span id='map-area'>No geometry selected.</span>
+          </div>
+        </article>
+
+        <article class='panel'>
+          <h2>Configure the field request</h2>
+          <p>Pick the observation window, answer up to five crop questions, then trigger the fused NASA + SAR workflow.</p>
+
+          <div class='control-grid'>
+            <div class='field'>
+              <label for='date-start'>Start date</label>
+              <input id='date-start' type='date' />
+            </div>
+            <div class='field'>
+              <label for='date-end'>End date</label>
+              <input id='date-end' type='date' />
+            </div>
+          </div>
+
+          <div class='wizard-card' style='margin-top: 1rem;'>
+            <h3>Crop question flow</h3>
+            <p id='wizard-prompt'>Initializing crop wizard...</p>
+            <div class='wizard-options' id='wizard-options'></div>
+            <div class='status-line'>
+              <span id='wizard-status'>Waiting for the first question.</span>
+              <button class='tool-button secondary' type='button' id='restart-wizard'>Restart questions</button>
+            </div>
+            <div class='candidate-list' id='candidate-list' style='margin-top: 1rem;'></div>
+          </div>
+
+          <div class='wizard-card' style='margin-top: 1rem;'>
+            <h3>Privacy and execution mode</h3>
+            <div class='tag-list'>
+              <span class='tag' id='consent-llm'>LLM: off</span>
+              <span class='tag' id='consent-voice'>Voice: off</span>
+              <span class='tag' id='consent-maps'>Map tiles: off</span>
+            </div>
+            <p id='analysis-status'>The procedural diagnosis is always available. LLM and voice remain opt-in.</p>
+          </div>
+
+          <button class='primary-action' id='run-analysis' type='button'>Run NASA DeltaPlant analysis</button>
+        </article>
+      </section>
+
+      <section class='results-section panel' id='results' hidden>
+        <div class='result-toolbar'>
+          <div class='mode-toggle'>
+            <button class='chip-button active' type='button' data-mode='farmer'>Farmer mode</button>
+            <button class='chip-button' type='button' data-mode='scientist'>Scientist mode</button>
+          </div>
+          <div class='voice-row'>
+            <select id='voice-language' aria-label='Voice language'>
+              <option value='it'>Italian</option>
+              <option value='en'>English</option>
+            </select>
+            <button class='tool-button secondary' type='button' id='play-voice'>Play voice</button>
+            <button class='tool-button secondary' type='button' id='download-farmer-pdf'>Download farmer PDF</button>
+            <button class='tool-button secondary' type='button' id='download-scientist-pdf'>Download scientist PDF</button>
+          </div>
+        </div>
+
+        <div class='results-grid' id='results-grid'>
+          <article class='metric-card'><span>Soil moisture</span><strong id='metric-moisture'>--</strong><p>Interpolated grid output from SAR backscatter.</p></article>
+          <article class='metric-card'><span>Biomass index</span><strong id='metric-biomass'>--</strong><p>Volume scattering weighted by climate support.</p></article>
+          <article class='metric-card'><span>Disease risk</span><strong id='metric-disease'>--</strong><p>Fungal pressure and canopy wetness composite.</p></article>
+          <article class='metric-card'><span>Yield forecast</span><strong id='metric-yield'>--</strong><p>Composite forecast from moisture, biomass, and stress.</p></article>
+        </div>
+
+        <div class='result-layout'>
+          <article class='result-card'>
+            <h3 id='narrative-title'>Farmer report</h3>
+            <p class='narrative' id='narrative-text'>Run an analysis to generate the narrative.</p>
+            <audio id='voice-player' controls hidden></audio>
+          </article>
+
+          <article class='result-card'>
+            <h3>Operational summary</h3>
+            <div class='tag-list'>
+              <span class='tag' id='tag-crop'>Crop: --</span>
+              <span class='tag' id='tag-water'>Water stress: --</span>
+              <span class='tag' id='tag-confidence'>Confidence: --</span>
+            </div>
+            <p id='recommendation-text'>Recommendations will appear after the first run.</p>
+            <p id='drainage-text'></p>
+          </article>
+        </div>
+
+        <div class='details-grid'>
+          <article class='detail-card'>
+            <h3>Candidate classes</h3>
+            <div class='candidate-list' id='result-candidates'></div>
+          </article>
+          <article class='detail-card'>
+            <h3>Anomalies</h3>
+            <ul id='anomaly-list'></ul>
+          </article>
+          <article class='detail-card'>
+            <h3>Transparency</h3>
+            <ul id='transparency-list'></ul>
+          </article>
+        </div>
+
+        <div class='transparency-bar'>
+          <article class='transparency-card'>
+            <h3>Data stack</h3>
+            <p id='stack-summary'>Awaiting first acquisition request.</p>
+          </article>
+          <article class='transparency-card'>
+            <h3>Voice state</h3>
+            <p id='voice-summary'>Voice output requires explicit consent.</p>
+          </article>
+          <article class='transparency-card'>
+            <h3>NASA disclaimer</h3>
+            <p>Outputs are agronomic decision support only and inherit the uncertainty of external satellite and climate feeds.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class='site-footer'>
+      <p>DELTA Plant NASA Monitor is a privacy-aware research interface built for area-scale crop monitoring and stress prevention.</p>
+      <nav>
+        <a href='/privacy-policy.html'>Privacy Policy</a>
+        <a href='/cookie-policy.html'>Cookie Policy</a>
+        <a href='/terms-of-service.html'>Terms of Service</a>
+      </nav>
+    </footer>
+  </div>
+
+  <div class='dp-privacy-modal' id='privacy-modal' hidden>
+    <div class='dp-privacy-modal__backdrop' data-close='true'></div>
+    <div class='dp-privacy-modal__panel' role='dialog' aria-modal='true' aria-labelledby='privacy-modal-title'>
+      <header>
+        <p id='privacy-modal-title'>Privacy controls</p>
+        <button type='button' data-close='true' aria-label='Close privacy controls'>Close</button>
+      </header>
+      <section>
+        <label><input type='checkbox' checked disabled /> Necessary security cookies</label>
+        <label><input type='checkbox' name='maps' /> Interactive map tiles</label>
+        <label><input type='checkbox' name='voice' /> Voice synthesis</label>
+        <label><input type='checkbox' name='llm' /> LLM narratives</label>
+        <label><input type='checkbox' name='analytics' /> Privacy-safe analytics</label>
+      </section>
+      <footer>
+        <button type='button' class='tool-button primary' data-action='save-privacy'>Save preferences</button>
+      </footer>
+    </div>
+  </div>
+
+  <script defer src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' crossorigin=''></script>
+  <script defer src='https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js' crossorigin=''></script>
+  <script>
+    const state = {
+      map: null,
+      drawnItems: null,
+      activeLayer: null,
+      cropAnswers: [],
+      currentQuestionNumber: 0,
+      currentQuestion: null,
+      currentCandidates: [],
+      currentProbableCrop: null,
+      analysisResult: null,
+      narrativeMode: 'farmer',
+    };
+
+    const els = {};
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function setCookie(name, value, maxAgeSeconds = 31536000) {
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Strict${secure}`;
+    }
+
+    function getUserToken() {
+      const existing = getCookie('deltaplant_public_id') || window.localStorage.getItem('deltaplant_public_id');
+      if (existing) {
+        setCookie('deltaplant_public_id', existing);
+        return existing;
+      }
+      const token = `dp_${(window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`).replace(/-/g, '')}`;
+      setCookie('deltaplant_public_id', token);
+      window.localStorage.setItem('deltaplant_public_id', token);
+      return token;
+    }
+
+    function getConsent() {
+      const value = getCookie('deltaplant_consent');
+      if (!value) {
+        return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+      }
+      try {
+        return JSON.parse(value);
+      } catch {
+        return { necessary: true, analytics: false, maps: false, voice: false, llm: false };
+      }
+    }
+
+    function getCsrfToken() {
+      return getCookie('deltaplant_csrf');
+    }
+
+    async function apiFetch(path, options = {}) {
+      const method = (options.method || 'GET').toUpperCase();
+      const headers = new Headers(options.headers || {});
+      if (method !== 'GET') {
+        const csrf = getCsrfToken();
+        if (csrf) {
+          headers.set('X-CSRF-Token', csrf);
+        }
+        if (!headers.has('Content-Type')) {
+          headers.set('Content-Type', 'application/json');
+        }
+      }
+      const response = await fetch(path, {
+        credentials: 'include',
+        ...options,
+        headers,
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+      }
+      return response;
+    }
+
+    function syncConsentUI() {
+      const consent = getConsent();
+      els.consentLlm.textContent = `LLM: ${consent.llm ? 'on' : 'off'}`;
+      els.consentVoice.textContent = `Voice: ${consent.voice ? 'on' : 'off'}`;
+      els.consentMaps.textContent = `Map tiles: ${consent.maps ? 'on' : 'off'}`;
+      document.querySelector('#privacy-modal input[name="analytics"]').checked = Boolean(consent.analytics);
+      document.querySelector('#privacy-modal input[name="maps"]').checked = Boolean(consent.maps);
+      document.querySelector('#privacy-modal input[name="voice"]').checked = Boolean(consent.voice);
+      document.querySelector('#privacy-modal input[name="llm"]').checked = Boolean(consent.llm);
+    }
+
+    function showPrivacyModal() {
+      document.getElementById('privacy-modal').hidden = false;
+    }
+
+    function hidePrivacyModal() {
+      document.getElementById('privacy-modal').hidden = true;
+    }
+
+    function mountCookieBanner() {
+      if (getCookie('deltaplant_consent')) {
+        return;
+      }
+      const banner = document.createElement('aside');
+      banner.className = 'dp-cookie-banner';
+      banner.innerHTML = `
+        <div class='dp-cookie-banner__copy'>
+          <strong>Optional privacy categories stay off by default.</strong>
+          <p>Necessary security cookies are always active. Voice, LLM, analytics, and external map tiles require explicit consent.</p>
+        </div>
+        <div class='dp-cookie-banner__actions'>
+          <button type='button' data-action='reject'>Reject non-essential</button>
+          <button type='button' data-action='manage'>Manage</button>
+          <button type='button' data-action='accept'>Accept all</button>
+        </div>
+      `;
+      banner.querySelector('[data-action="manage"]').addEventListener('click', showPrivacyModal);
+      banner.querySelector('[data-action="accept"]').addEventListener('click', async () => {
+        await saveConsent({ analytics: true, maps: true, voice: true, llm: true });
+        banner.remove();
+      });
+      banner.querySelector('[data-action="reject"]').addEventListener('click', async () => {
+        await saveConsent({ analytics: false, maps: false, voice: false, llm: false });
+        banner.remove();
+      });
+      document.body.appendChild(banner);
+    }
+
+    async function saveConsent(categories) {
+      const user_token = getUserToken();
+      const response = await apiFetch('/api/privacy/consent', {
+        method: 'POST',
+        body: JSON.stringify({ user_token, ...categories }),
+      });
+      const payload = await response.json();
+      setCookie('deltaplant_consent', JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      syncConsentUI();
+      maybeEnableMapTiles();
+      return payload;
+    }
+
+    function maybeEnableMapTiles() {
+      if (!state.map || state.tileLayer || !getConsent().maps || !window.L) {
+        return;
+      }
+      state.tileLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(state.map);
+    }
+
+    function initMap() {
+      if (!window.L) {
+        els.mapHint.textContent = 'Leaflet failed to load. Reload the page to initialize the map.';
+        return;
+      }
+      state.map = window.L.map('map', { zoomControl: true }).setView([43.5, 12.5], 6);
+      state.drawnItems = new window.L.FeatureGroup();
+      state.map.addLayer(state.drawnItems);
+      maybeEnableMapTiles();
+
+      const drawOptions = {
+        edit: { featureGroup: state.drawnItems, edit: false, remove: false },
+        draw: {
+          polyline: false,
+          rectangle: false,
+          marker: false,
+          circlemarker: false,
+          polygon: { allowIntersection: false, showArea: true },
+          circle: true,
+        },
+      };
+      state.drawControl = new window.L.Control.Draw(drawOptions);
+      state.map.addControl(state.drawControl);
+
+      state.map.on(window.L.Draw.Event.CREATED, (event) => {
+        resetGeometry();
+        state.activeLayer = event.layer;
+        state.drawnItems.addLayer(event.layer);
+        updateAreaLabel();
+      });
+    }
+
+    function startDraw(mode) {
+      if (!window.L || !state.map) {
+        return;
+      }
+      if (mode === 'polygon') {
+        new window.L.Draw.Polygon(state.map, state.drawControl.options.draw.polygon).enable();
+      }
+      if (mode === 'circle') {
+        new window.L.Draw.Circle(state.map, state.drawControl.options.draw.circle).enable();
+      }
+    }
+
+    function resetGeometry() {
+      if (state.drawnItems) {
+        state.drawnItems.clearLayers();
+      }
+      state.activeLayer = null;
+      els.mapArea.textContent = 'No geometry selected.';
+    }
+
+    function computeApproxAreaHectares(layer) {
+      if (!layer) {
+        return 0;
+      }
+      if (layer instanceof window.L.Circle) {
+        return (Math.PI * layer.getRadius() * layer.getRadius()) / 10000;
+      }
+      const coordinates = layer.toGeoJSON().geometry.coordinates[0] || [];
+      if (!coordinates.length) {
+        return 0;
+      }
+      const centroid = coordinates.reduce((acc, point) => [acc[0] + point[0], acc[1] + point[1]], [0, 0]);
+      const lon0 = centroid[0] / coordinates.length;
+      const lat0 = centroid[1] / coordinates.length;
+      let area = 0;
+      for (let index = 0; index < coordinates.length - 1; index += 1) {
+        const [lon1, lat1] = coordinates[index];
+        const [lon2, lat2] = coordinates[index + 1];
+        const x1 = (lon1 - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+        const y1 = (lat1 - lat0) * 110540;
+        const x2 = (lon2 - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+        const y2 = (lat2 - lat0) * 110540;
+        area += (x1 * y2) - (x2 * y1);
+      }
+      return Math.abs(area / 2) / 10000;
+    }
+
+    function updateAreaLabel() {
+      if (!state.activeLayer) {
+        els.mapArea.textContent = 'No geometry selected.';
+        return;
+      }
+      const area = computeApproxAreaHectares(state.activeLayer);
+      els.mapArea.textContent = `Approx. ${area.toFixed(2)} hectares selected.`;
+    }
+
+    function buildGeoPayload() {
+      if (!state.activeLayer) {
+        throw new Error('Draw a polygon or circle before running the analysis.');
+      }
+      if (state.activeLayer instanceof window.L.Circle) {
+        const center = state.activeLayer.getLatLng();
+        return {
+          type: 'circle',
+          center: { lat: center.lat, lng: center.lng },
+          radius: state.activeLayer.getRadius(),
+        };
+      }
+      return {
+        type: 'polygon',
+        geojson: state.activeLayer.toGeoJSON(),
+      };
+    }
+
+    async function initializeCropWizard() {
+      state.cropAnswers = [];
+      state.currentQuestionNumber = 0;
+      const response = await apiFetch('/api/nisar/crop-question', {
+        method: 'POST',
+        body: JSON.stringify({ question_number: 0, answer: null, sar_signature: {} }),
+      });
+      const payload = await response.json();
+      renderWizard(payload, false);
+    }
+
+    function renderWizard(payload, pushAnswer) {
+      if (pushAnswer && state.currentQuestion && pushAnswer !== false) {
+        state.cropAnswers.push(pushAnswer);
+      }
+      state.currentQuestion = payload.next_question || null;
+      state.currentCandidates = payload.candidate_crops || [];
+      state.currentProbableCrop = payload.probable_crop || null;
+
+      els.wizardOptions.innerHTML = '';
+      els.candidateList.innerHTML = '';
+      state.currentCandidates.slice(0, 6).forEach((item) => {
+        const node = document.createElement('span');
+        node.className = 'candidate';
+        node.textContent = item;
+        els.candidateList.appendChild(node);
+      });
+
+      if (payload.next_question) {
+        state.currentQuestionNumber = payload.next_question.number;
+        els.wizardPrompt.textContent = payload.next_question.prompt;
+        els.wizardStatus.textContent = `Question ${payload.next_question.number} of 5. Probable crop: ${payload.probable_crop || 'undetermined'}. Confidence ${Math.round((payload.confidence || 0) * 100)}%.`;
+        payload.next_question.options.forEach((option) => {
+          const button = document.createElement('button');
+          button.className = 'tool-button secondary';
+          button.type = 'button';
+          button.textContent = option.replace(/_/g, ' ');
+          button.addEventListener('click', () => answerCropQuestion(option));
+          els.wizardOptions.appendChild(button);
+        });
+      } else {
+        els.wizardPrompt.textContent = `Crop questioning complete. Most probable class: ${payload.probable_crop || 'undetermined'}.`;
+        els.wizardStatus.textContent = `Final confidence ${Math.round((payload.confidence || 0) * 100)}%. You can restart the wizard at any time.`;
+      }
+    }
+
+    async function answerCropQuestion(answer) {
+      const response = await apiFetch('/api/nisar/crop-question', {
+        method: 'POST',
+        body: JSON.stringify({
+          question_number: state.currentQuestionNumber,
+          answer,
+          sar_signature: state.analysisResult?.field_state?.sar_features || {},
+        }),
+      });
+      const payload = await response.json();
+      renderWizard(payload, answer);
+    }
+
+    function setDateDefaults() {
+      const end = new Date();
+      const start = new Date(end.getTime() - (29 * 24 * 60 * 60 * 1000));
+      els.dateStart.value = start.toISOString().slice(0, 10);
+      els.dateEnd.value = end.toISOString().slice(0, 10);
+    }
+
+    async function runAnalysis() {
+      try {
+        els.analysisStatus.textContent = 'Running analysis...';
+        const response = await apiFetch('/api/nisar/area-analysis', {
+          method: 'POST',
+          body: JSON.stringify({
+            geo_data: buildGeoPayload(),
+            date_range: {
+              start: els.dateStart.value,
+              end: els.dateEnd.value,
+            },
+            user_token: getUserToken(),
+            crop_answers: state.cropAnswers,
+          }),
+        });
+        const payload = await response.json();
+        state.analysisResult = payload;
+        renderResults(payload);
+        els.analysisStatus.textContent = 'Analysis completed.';
+      } catch (error) {
+        els.analysisStatus.textContent = error.message || 'Analysis failed.';
+      }
+    }
+
+    function renderResults(payload) {
+      const diagnosis = payload.diagnosis;
+      const features = payload.field_state.sar_features;
+      document.getElementById('results').hidden = false;
+      els.metricMoisture.textContent = `${Number(features.soil_moisture_percent || 0).toFixed(1)}%`;
+      els.metricBiomass.textContent = Number(features.biomass_index || 0).toFixed(1);
+      els.metricDisease.textContent = Number(features.disease_risk_composite || 0).toFixed(1);
+      els.metricYield.textContent = Number(features.yield_forecast_index || 0).toFixed(1);
+
+      els.tagCrop.textContent = `Crop: ${diagnosis.probable_crop || 'Unknown'}`;
+      els.tagWater.textContent = `Water stress: ${diagnosis.water_stress_level || '--'}`;
+      els.tagConfidence.textContent = `Confidence: ${Number(diagnosis.confidence_score || 0).toFixed(2)}`;
+      els.recommendationText.textContent = diagnosis.irrigation_recommendation || 'No recommendation.';
+      els.drainageText.textContent = diagnosis.drainage_recommendation || '';
+      document.getElementById('result-candidates').innerHTML = '';
+      (diagnosis.candidate_crops || []).slice(0, 8).forEach((item) => {
+        const node = document.createElement('span');
+        node.className = 'candidate';
+        node.textContent = item;
+        document.getElementById('result-candidates').appendChild(node);
+      });
+
+      const anomalyList = document.getElementById('anomaly-list');
+      anomalyList.innerHTML = '';
+      (diagnosis.anomalies || ['No anomalies detected.']).forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        anomalyList.appendChild(li);
+      });
+
+      const transparencyList = document.getElementById('transparency-list');
+      transparencyList.innerHTML = '';
+      [
+        `LLM used: ${diagnosis.llm_used ? 'yes' : 'no'}`,
+        `LLM remaining today: ${payload.llm_remaining_today}`,
+        `Interpolation: ${payload.field_state.raw_sar_summary.interpolation_method}`,
+        `Polarimetric mode: ${payload.field_state.raw_sar_summary.polarimetric_mode}`,
+      ].forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        transparencyList.appendChild(li);
+      });
+
+      document.getElementById('stack-summary').textContent = `${payload.field_state.raw_sar_summary.source} | ${payload.field_state.raw_sar_summary.available_channels.join(', ')} | coherence available: ${payload.field_state.raw_sar_summary.insar_available ? 'yes' : 'no'}`;
+      document.getElementById('voice-summary').textContent = getConsent().voice
+        ? 'Voice consent is active. Reports can be streamed in Italian or English.'
+        : 'Voice remains disabled until optional voice consent is enabled.';
+
+      updateNarrative();
+    }
+
+    function updateNarrative() {
+      if (!state.analysisResult) {
+        return;
+      }
+      const diagnosis = state.analysisResult.diagnosis;
+      const farmer = diagnosis.report_farmer || '';
+      const scientist = diagnosis.report_scientist || '';
+      const narrative = state.narrativeMode === 'scientist' ? scientist : farmer;
+      document.getElementById('narrative-title').textContent = state.narrativeMode === 'scientist' ? 'Scientist report' : 'Farmer report';
+      document.getElementById('narrative-text').textContent = narrative;
+    }
+
+    async function playVoice(text) {
+      try {
+        const response = await apiFetch('/api/nisar/voice', {
+          method: 'POST',
+          body: JSON.stringify({
+            report_text: text,
+            language: document.getElementById('voice-language').value,
+            format: 'ogg',
+            user_token: getUserToken(),
+          }),
+        });
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        els.voicePlayer.src = url;
+        els.voicePlayer.hidden = false;
+        await els.voicePlayer.play();
+      } catch (error) {
+        els.analysisStatus.textContent = error.message || 'Voice synthesis failed.';
+        if ((error.message || '').includes('403')) {
+          showPrivacyModal();
+        }
+      }
+    }
+
+    function downloadPdf(kind) {
+      if (!state.analysisResult) {
+        return;
+      }
+      const token = state.analysisResult.pdf_tokens?.[kind];
+      if (!token) {
+        return;
+      }
+      window.open(`/api/nisar/pdf/${token}`, '_blank', 'noopener');
+    }
+
+    function wireEvents() {
+      els.managePrivacy.addEventListener('click', showPrivacyModal);
+      document.getElementById('privacy-modal').addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.dataset.close === 'true') {
+          hidePrivacyModal();
+        }
+      });
+      document.querySelector('[data-action="save-privacy"]').addEventListener('click', async () => {
+        await saveConsent({
+          analytics: document.querySelector('#privacy-modal input[name="analytics"]').checked,
+          maps: document.querySelector('#privacy-modal input[name="maps"]').checked,
+          voice: document.querySelector('#privacy-modal input[name="voice"]').checked,
+          llm: document.querySelector('#privacy-modal input[name="llm"]').checked,
+        });
+        hidePrivacyModal();
+      });
+
+      els.drawPolygon.addEventListener('click', () => startDraw('polygon'));
+      els.drawCircle.addEventListener('click', () => startDraw('circle'));
+      els.clearMap.addEventListener('click', resetGeometry);
+      els.restartWizard.addEventListener('click', initializeCropWizard);
+      els.runAnalysis.addEventListener('click', runAnalysis);
+      els.heroVoiceDemo.addEventListener('click', () => playVoice('DELTA Plant can read back the current report when voice consent is enabled.'));
+      els.playVoice.addEventListener('click', () => {
+        if (!state.analysisResult) {
+          return;
+        }
+        const narrative = state.narrativeMode === 'scientist'
+          ? state.analysisResult.diagnosis.report_scientist
+          : state.analysisResult.diagnosis.report_farmer;
+        playVoice(narrative);
+      });
+      els.downloadFarmerPdf.addEventListener('click', () => downloadPdf('farmer'));
+      els.downloadScientistPdf.addEventListener('click', () => downloadPdf('scientist'));
+      document.querySelectorAll('[data-mode]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.narrativeMode = button.dataset.mode;
+          document.querySelectorAll('[data-mode]').forEach((node) => node.classList.remove('active'));
+          button.classList.add('active');
+          updateNarrative();
+        });
+      });
+    }
+
+    function cacheElements() {
+      els.managePrivacy = document.getElementById('manage-privacy');
+      els.drawPolygon = document.getElementById('draw-polygon');
+      els.drawCircle = document.getElementById('draw-circle');
+      els.clearMap = document.getElementById('clear-map');
+      els.mapHint = document.getElementById('map-hint');
+      els.mapArea = document.getElementById('map-area');
+      els.dateStart = document.getElementById('date-start');
+      els.dateEnd = document.getElementById('date-end');
+      els.wizardPrompt = document.getElementById('wizard-prompt');
+      els.wizardOptions = document.getElementById('wizard-options');
+      els.wizardStatus = document.getElementById('wizard-status');
+      els.candidateList = document.getElementById('candidate-list');
+      els.restartWizard = document.getElementById('restart-wizard');
+      els.runAnalysis = document.getElementById('run-analysis');
+      els.analysisStatus = document.getElementById('analysis-status');
+      els.consentLlm = document.getElementById('consent-llm');
+      els.consentVoice = document.getElementById('consent-voice');
+      els.consentMaps = document.getElementById('consent-maps');
+      els.metricMoisture = document.getElementById('metric-moisture');
+      els.metricBiomass = document.getElementById('metric-biomass');
+      els.metricDisease = document.getElementById('metric-disease');
+      els.metricYield = document.getElementById('metric-yield');
+      els.tagCrop = document.getElementById('tag-crop');
+      els.tagWater = document.getElementById('tag-water');
+      els.tagConfidence = document.getElementById('tag-confidence');
+      els.recommendationText = document.getElementById('recommendation-text');
+      els.drainageText = document.getElementById('drainage-text');
+      els.heroVoiceDemo = document.getElementById('hero-voice-demo');
+      els.playVoice = document.getElementById('play-voice');
+      els.downloadFarmerPdf = document.getElementById('download-farmer-pdf');
+      els.downloadScientistPdf = document.getElementById('download-scientist-pdf');
+      els.voicePlayer = document.getElementById('voice-player');
+    }
+
+    async function boot() {
+      cacheElements();
+      getUserToken();
+      await apiFetch('/api/health');
+      syncConsentUI();
+      setDateDefaults();
+      wireEvents();
+      mountCookieBanner();
+      initMap();
+      await initializeCropWizard();
+    }
+
+    window.addEventListener('load', () => {
+      boot().catch((error) => {
+        const status = document.getElementById('analysis-status');
+        if (status) {
+          status.textContent = error.message || 'Initialization failed.';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

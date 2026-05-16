@@ -59,6 +59,22 @@ ai-edge-litert==1.2.0
 
 # ── API opzionale ────────────────────────────────────────────
 flask>=3.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.4
+python-jose[cryptography]>=3.3.0
+cryptography>=42.0.0
+slowapi>=0.1.9
+bleach>=6.1.0
+python-dotenv>=1.0.1
+redis>=5.0.0
+reportlab>=4.2.0
+shapely>=2.0.4
+tifffile>=2024.5.22
+pykrige>=1.7.0
+scikit-image>=0.22.0
 
 # ── HuggingFace Inference API (LLM cloud per chat intelligente) ──────────────
 # Richiede token HF_API_TOKEN nel file .env

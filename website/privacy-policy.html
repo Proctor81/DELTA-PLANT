@@ -1,18 +1,258 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DELTA Plant | Privacy Policy Redirect</title>
-  <meta name="description" content="Redirecting to the current DELTA Plant privacy policy URL." />
-  <meta name="robots" content="noindex, follow" />
-  <link rel="canonical" href="https://deltaplant.ai/privacy.html" />
-  <meta http-equiv="refresh" content="0; url=./privacy.html" />
-  <script>
-    window.location.replace('./privacy.html');
-  </script>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>DELTA Plant | Privacy Policy</title>
+  <meta name='description' content='Privacy policy for the NASA DeltaPlant monitoring stack, including consent, retention, runtime PDF handling, and user rights.' />
+  <link rel='canonical' href='https://deltaplant.ai/privacy-policy.html' />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+    :root {
+      --bg: #08111d;
+      --panel: rgba(12, 28, 43, 0.82);
+      --line: rgba(149, 198, 214, 0.2);
+      --text: #eef5f4;
+      --muted: #a8bbc3;
+      --accent: #c5ff7d;
+      --accent-2: #7ee6ff;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(126, 230, 255, 0.12), transparent 35%),
+        linear-gradient(180deg, #08111d 0%, #0d1e2c 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+    main {
+      width: min(980px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 6rem;
+    }
+    header {
+      padding: 2rem 0 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    header a.brand {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      text-decoration: none;
+      color: var(--text);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    nav {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    nav a { text-decoration: none; color: var(--muted); }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+      backdrop-filter: blur(18px);
+    }
+    h1, h2 { font-family: 'Space Grotesk', sans-serif; }
+    h1 { font-size: clamp(2.4rem, 7vw, 4rem); margin: 0 0 0.5rem; }
+    h2 { margin-top: 0; }
+    p, li { color: var(--muted); line-height: 1.75; }
+    ul { padding-left: 1.2rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid rgba(197, 255, 125, 0.32);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.75rem;
+    }
+    .dp-cookie-banner,
+    .dp-privacy-modal {
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+    .dp-cookie-banner {
+      position: fixed;
+      left: 1rem;
+      right: 1rem;
+      bottom: 1rem;
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1.4fr 1fr;
+      padding: 1rem 1.2rem;
+      border-radius: 20px;
+      background: rgba(5, 10, 18, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      z-index: 40;
+    }
+    .dp-cookie-banner__actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .dp-cookie-banner button,
+    .dp-privacy-modal button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.8rem 1rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .dp-cookie-banner button:last-child,
+    .dp-privacy-modal [data-action='save'] {
+      background: var(--accent);
+      color: #031017;
+    }
+    .dp-privacy-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+    }
+    .dp-privacy-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 8, 14, 0.7);
+    }
+    .dp-privacy-modal__panel {
+      position: relative;
+      width: min(560px, calc(100vw - 2rem));
+      margin: 8vh auto 0;
+      background: #0d1824;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 1.25rem;
+    }
+    .dp-privacy-modal__panel header,
+    .dp-privacy-modal__panel footer,
+    .dp-privacy-modal__panel section {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: 0;
+    }
+    .dp-privacy-modal__panel section {
+      display: grid;
+      gap: 0.8rem;
+      margin: 1rem 0;
+    }
+    .dp-privacy-modal__panel label {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      color: var(--muted);
+    }
+    @media (max-width: 720px) {
+      .dp-cookie-banner {
+        grid-template-columns: 1fr;
+      }
+      .dp-cookie-banner__actions {
+        justify-content: stretch;
+      }
+      .dp-cookie-banner__actions button {
+        flex: 1 1 100%; 
+      }
+    }
+  </style>
 </head>
 <body>
-  <p>Redirecting to the current <a href="./privacy.html">Privacy Policy</a>.</p>
+  <main>
+    <header>
+      <a class='brand' href='/'>DELTA Plant</a>
+      <nav>
+        <a href='/'>NASA Monitor</a>
+        <a href='/cookie-policy.html'>Cookie Policy</a>
+        <a href='/terms-of-service.html'>Terms</a>
+      </nav>
+    </header>
+
+    <section>
+      <span class='badge'>Privacy and GDPR</span>
+      <h1>Privacy Policy</h1>
+      <p>This policy applies to the NASA DeltaPlant monitoring experience published on deltaplant.ai, including the FastAPI endpoints used for NASA POWER, Copernicus Sentinel-1 analysis, LLM summaries, runtime PDF delivery, and optional voice synthesis.</p>
+    </section>
+
+    <section>
+      <h2>Controller and Scope</h2>
+      <p>The DELTA Plant project acts as the controller for anonymous session data, consent records, and operational telemetry generated by the monitoring workflow. The service is designed to avoid direct personal identification whenever possible and uses hashed browser identifiers instead of named user accounts.</p>
+    </section>
+
+    <section>
+      <h2>Data Categories</h2>
+      <ul>
+        <li>Session and security cookies required to issue JWT sessions and CSRF protection.</li>
+        <li>Anonymous user token values stored as hashed identifiers in the consent registry.</li>
+        <li>Geo-area submissions, crop answers, optional local sensor payloads, and analysis timestamps.</li>
+        <li>Optional consent categories for analytics, maps, voice synthesis, and LLM narrative generation.</li>
+        <li>Runtime PDF artifacts held only in volatile memory and invalidated automatically after 60 minutes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Legal Bases</h2>
+      <ul>
+        <li>Necessary security processing is performed under legitimate interest to protect the service against abuse.</li>
+        <li>Optional analytics, external map tiles, voice synthesis, and LLM summaries are processed only after explicit consent.</li>
+        <li>Scientific area analysis is performed on the data you submit for the purpose of delivering the requested agronomic output.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Retention</h2>
+      <ul>
+        <li>Consent records are encrypted with Fernet and retained for up to 36 months.</li>
+        <li>GDPR audit logs rotate daily and are retained for 30 days.</li>
+        <li>Runtime PDFs are never persisted as files and expire after 60 minutes.</li>
+        <li>Expired artifacts are purged automatically by the retention policy.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Security Controls</h2>
+      <ul>
+        <li>JWT cookies are issued with SameSite strict and secure attributes when served over HTTPS.</li>
+        <li>State-changing privacy and cookie routes require CSRF validation.</li>
+        <li>Consent data is encrypted at rest and audit logs avoid plain-text personal identifiers.</li>
+        <li>HTML and text inputs are sanitized before entering the LLM or analysis workflow.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Your Rights</h2>
+      <p>You can review consent status, export your encrypted consent record, revoke consent, or request deletion through the privacy endpoints exposed by the application. These flows are available from the website privacy controls and require CSRF-protected requests.</p>
+    </section>
+
+    <section>
+      <h2>Third-Party Services</h2>
+      <p>The platform may contact NASA POWER, Copernicus Data Space, optional voice providers already configured inside the DELTA runtime, and an LLM backend only when the corresponding processing path is requested and, where required, consented to. Interactive maps may load third-party tile resources only after map consent is enabled.</p>
+    </section>
+  </main>
+
+  <script type='module'>
+    import { CookieManager } from '/components/cookie-manager.js';
+    import { CookieBanner } from '/components/cookie-banner.js';
+    import { PrivacyModal } from '/components/privacy-modal.js';
+
+    const manager = new CookieManager();
+    const modal = new PrivacyModal({ manager });
+    modal.mount(document.body);
+    new CookieBanner({ manager, onManage: () => modal.show() }).mount(document.body);
+  </script>
 </body>
 </html>
