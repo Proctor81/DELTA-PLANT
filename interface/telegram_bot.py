@@ -1078,8 +1078,17 @@ def _welcome_display_name(update: Update) -> str:
     return "amico"
 
 
-def _build_welcome_voice_text(update: Update) -> str:
+def _build_welcome_voice_text(
+    update: Update,
+    context: Optional[ContextTypes.DEFAULT_TYPE] = None,
+) -> str:
     display_name = _welcome_display_name(update)
+    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+        return (
+            f"Hello {display_name}, welcome to DELTAPLANO. "
+            "I am ready to help you with plant diagnosis, sensors, reports, and agronomic guidance. "
+            "Open the menu and tell me how I can help you."
+        )
     return (
         f"Ciao {display_name}, benvenuto in DELTAPLANO. "
         "Sono pronto ad aiutarti con diagnosi delle piante, sensori, report e consigli agronomici. "
@@ -1087,9 +1096,19 @@ def _build_welcome_voice_text(update: Update) -> str:
     )
 
 
+def _build_welcome_voice_caption(
+    update: Update,
+    context: Optional[ContextTypes.DEFAULT_TYPE] = None,
+) -> str:
+    display_name = _welcome_display_name(update)
+    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+        return f"Welcome, {display_name}."
+    return f"Benvenuto, {display_name}."
+
+
 async def _send_personalized_welcome_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    welcome_text = _build_welcome_voice_text(update)
-    caption = f"Benvenuto, {_welcome_display_name(update)}."
+    welcome_text = _build_welcome_voice_text(update, context)
+    caption = _build_welcome_voice_caption(update, context)
     try:
         try:
             await update.effective_chat.send_action("record_voice")
