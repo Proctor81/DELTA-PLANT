@@ -674,6 +674,64 @@
       padding: 0.9rem;
     }
 
+    .hero-home-layout {
+      position: relative;
+      z-index: 10;
+      margin-inline: auto;
+      display: grid;
+      width: 100%;
+      max-width: 96rem;
+      gap: 3rem;
+      padding: 2.5rem 1.5rem 18rem;
+    }
+
+    .hero-home-copy {
+      max-width: none;
+      min-width: 0;
+    }
+
+    .hero-home-demo {
+      min-width: 0;
+    }
+
+    .hero-demo-shell {
+      display: grid;
+      gap: 1.35rem;
+    }
+
+    .hero-demo-header-grid,
+    .hero-demo-controls-grid {
+      display: grid;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .hero-demo-quickfacts {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hero-demo-quickfact {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(6, 17, 29, 0.34));
+      border-radius: 1.15rem;
+      padding: 1rem;
+    }
+
+    .hero-demo-controls-panel {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: rgba(3, 11, 18, 0.58);
+      border-radius: 1.4rem;
+      padding: 1rem;
+    }
+
+    .hero-demo-input-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
     .hero-dashboard-grid {
       display: grid;
       gap: 1rem;
@@ -983,6 +1041,24 @@
         grid-template-columns: 1fr;
       }
 
+      .hero-demo-header-grid,
+      .hero-demo-controls-grid,
+      .hero-dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-demo-quickfacts {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-home-layout {
+        padding-bottom: 18rem;
+      }
+
+      .hero-demo-controls-panel {
+        padding: 0.95rem;
+      }
+
       .hero-map-chip {
         left: 0.75rem;
       }
@@ -1005,6 +1081,25 @@
     }
 
     @media (min-width: 1024px) {
+      .hero-home-layout {
+        grid-template-columns: minmax(21rem, 0.78fr) minmax(0, 1.22fr);
+        gap: 3.25rem;
+        padding-inline: 2.5rem;
+        padding-bottom: 7rem;
+      }
+
+      .hero-home-demo {
+        grid-column: 1 / -1;
+      }
+
+      .hero-demo-header-grid {
+        grid-template-columns: minmax(0, 1.24fr) minmax(23rem, 0.96fr);
+      }
+
+      .hero-demo-controls-grid {
+        grid-template-columns: minmax(0, 1.12fr) minmax(20rem, 0.88fr);
+      }
+
       .hero-dashboard-grid {
         grid-template-columns: minmax(0, 1.16fr) minmax(0, 0.94fr);
       }
@@ -1165,8 +1260,8 @@
       <div class="orb orb-b"></div>
       <div class="orb orb-c"></div>
 
-      <div class="relative z-10 mx-auto grid w-full max-w-7xl gap-14 px-6 pb-72 pt-10 lg:grid-cols-[0.95fr_1.18fr] lg:px-10 lg:pb-28 xl:grid-cols-[0.88fr_1.24fr]">
-        <div class="max-w-3xl xl:max-w-[34rem]">
+      <div class="hero-home-layout">
+        <div class="hero-home-copy">
           <div class="reveal flex flex-wrap gap-3">
             <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
               <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
@@ -1229,29 +1324,51 @@
           </div>
         </div>
 
-        <div class="reveal relative lg:pt-10">
+        <div class="hero-home-demo reveal relative">
           <div class="glass rounded-[32px] p-6 sm:p-8">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <div class="section-kicker">Hero demo</div>
-                <h2 class="mt-2 font-display text-2xl text-white">Paste Google coordinates. Watch a 7-day NISAR-style scene appear.</h2>
+            <div class="hero-demo-shell">
+              <div class="hero-demo-header-grid">
+                <div>
+                  <div class="section-kicker">Hero demo</div>
+                  <h2 class="mt-2 font-display text-2xl text-white sm:text-3xl">Paste Google coordinates. Watch a 7-day NISAR-style scene appear.</h2>
+                  <p class="mt-4 max-w-3xl text-base leading-7 text-slate-300/72">This high-impact demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant reads the last 7 days of SAR and weather evidence around that micro-area.</p>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/68">SAR means <span class="font-semibold text-white">Synthetic Aperture Radar</span>, an advanced sensing technology that sends electromagnetic signals to Earth and reads the return signal to produce high-resolution surface information even through clouds or darkness.</p>
+                </div>
+                <div class="hero-demo-quickfacts">
+                  <div class="hero-demo-quickfact">
+                    <div class="text-xs uppercase tracking-[0.2em] text-cyan-200/62">Acquisition radius</div>
+                    <div class="mt-3 text-2xl font-semibold text-white">50 m</div>
+                    <div class="mt-2 text-sm text-slate-300/68">Same circular micro-footprint used in DELTAPLANO.</div>
+                  </div>
+                  <div class="hero-demo-quickfact">
+                    <div class="text-xs uppercase tracking-[0.2em] text-cyan-200/62">Observation window</div>
+                    <div class="mt-3 text-2xl font-semibold text-white">7 days</div>
+                    <div class="mt-2 text-sm text-slate-300/68">Latest SAR-style moisture and weather persistence.</div>
+                  </div>
+                  <div class="hero-demo-quickfact">
+                    <div class="text-xs uppercase tracking-[0.2em] text-cyan-200/62">L-band depth</div>
+                    <div class="mt-3 text-2xl font-semibold text-white">~30 cm</div>
+                    <div class="mt-2 text-sm text-slate-300/68">Useful for soil moisture context, clouds, and vegetation response.</div>
+                  </div>
+                </div>
               </div>
-              <div class="rounded-full border border-neonleaf/20 bg-neonleaf/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-neonleaf">50 m radius</div>
-            </div>
 
-            <p class="mt-4 text-base leading-7 text-slate-300/72">This high-impact demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant reads the last 7 days of SAR and weather evidence around that micro-area.</p>
-            <p class="mt-3 text-sm leading-7 text-slate-300/68">SAR means <span class="font-semibold text-white">Synthetic Aperture Radar</span>, an advanced sensing technology that sends electromagnetic signals to Earth and reads the return signal to produce high-resolution surface information even through clouds or darkness.</p>
-
-            <div class="mt-6 grid gap-3">
-              <label for="hero-google-coordinates" class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Google coordinates or Maps URL</label>
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
-                <button id="hero-demo-run" class="hero-demo-button" type="button">Run NISAR demo</button>
+              <div class="hero-demo-controls-grid">
+                <div class="hero-demo-controls-panel">
+                  <label for="hero-google-coordinates" class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Google coordinates or Maps URL</label>
+                  <div class="hero-demo-input-row mt-3 sm:flex-row">
+                    <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
+                    <button id="hero-demo-run" class="hero-demo-button" type="button">Run NISAR demo</button>
+                  </div>
+                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point and render the last 7 days.</div>
+                </div>
+                <div class="hero-demo-controls-panel text-sm leading-7 text-slate-300/72">
+                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">What this horizontal view shows</div>
+                  <p class="mt-3">On desktop, the NISAR demo uses the full hero width: satellite focus map on the left, summary intelligence on the right, and the complete 7-day sequence below for left-to-right scanning.</p>
+                  <p class="mt-3">On mobile, the same content collapses into a clean vertical flow so the map, controls, and latest readings remain readable without pinching.</p>
+                </div>
               </div>
-              <div id="hero-demo-status" class="text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point and render the last 7 days.</div>
-            </div>
 
-            <div class="mt-6 grid gap-4">
               <div class="rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5">
                 <div class="flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-cyan-200/60">
                   <span>NISAR 7-day demonstrator</span>
@@ -1313,6 +1430,7 @@
               <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">NISAR-style SAR signal over the last 7 days.</div>
               <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">Weather context fused with radar moisture persistence.</div>
               <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">Simple fungal-risk outlook for the pasted GPS micro-area.</div>
+            </div>
             </div>
           </div>
         </div>
