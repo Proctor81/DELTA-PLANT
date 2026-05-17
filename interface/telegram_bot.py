@@ -1741,7 +1741,7 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
     summary = dashboard.get("summary", {}) or {}
-    soil_days = dashboard.get("soil_moisture_last_7_days", []) or []
+    soil_days = list(dashboard.get("soil_moisture_last_7_days", []) or [])
     centroid = geo_summary.get("centroid", {}) or {}
     radius_m = geo_summary.get("radius_m", 50)
 
@@ -1757,7 +1757,7 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
         "",
         "<b>Ultimi 7 giorni</b>",
     ]
-    for item in soil_days:
+    for item in reversed(soil_days):
         value = float(item.get("soil_moisture_percent", 0.0))
         day = str(item.get("day", ""))[5:]
         lines.append(

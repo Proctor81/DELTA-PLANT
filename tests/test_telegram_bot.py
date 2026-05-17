@@ -427,6 +427,32 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
     assert "non e' una diagnosi di malattia" in text.lower()
 
 
+def test_format_nasa_sar_dashboard_shows_most_recent_day_first():
+    text = tg._format_nasa_sar_dashboard(
+        {
+            "geo_summary": {
+                "centroid": {"lat": 41.9028, "lon": 12.4964},
+                "radius_m": 50,
+            },
+            "dashboard": {
+                "summary": {
+                    "latest_soil_moisture_percent": 19.4,
+                    "average_soil_moisture_percent": 24.5,
+                    "min_soil_moisture_percent": 19.4,
+                    "max_soil_moisture_percent": 28.1,
+                    "trend_delta_percent": -8.7,
+                },
+                "soil_moisture_last_7_days": [
+                    {"day": "2026-05-11", "soil_moisture_percent": 28.1},
+                    {"day": "2026-05-17", "soil_moisture_percent": 19.4},
+                ],
+            },
+        }
+    )
+
+    assert text.index("05-17") < text.index("05-11")
+
+
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
     calls = []
 

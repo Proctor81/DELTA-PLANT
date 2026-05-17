@@ -1801,7 +1801,7 @@
       heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
       heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal);
 
-      heroDemoDays.innerHTML = series.map((item) => `
+      heroDemoDays.innerHTML = [...series].reverse().map((item) => `
         <article class="hero-demo-day">
           <div class="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-cyan-200/60">
             <span>${item.dayLabel}</span>
