@@ -1641,6 +1641,10 @@
                   <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
                   Edge AI for Plant Health
                 </span>
+                <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
+                  <span aria-hidden="true">🛰️</span>
+                  CONNECTED TO NASA-ISRO/SAR
+                </span>
                 <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Raspberry Pi 5 Ready</span>
               </div>
 
@@ -2587,14 +2591,14 @@
       return 'LOW';
     };
 
-    const buildHeroRiskCopy = (level, averageRisk, humidityMean, rainTotal, soilMoistureMean, sourceLabel) => {
+    const buildHeroRiskCopy = (level, averageRisk, humidityMean, rainTotal, rainDailyMean, soilMoistureMean, sourceLabel) => {
       if (level === 'HIGH') {
-        return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area shows high fungal favorability because the SAR moisture proxy stays near ${soilMoistureMean.toFixed(1)}%, humidity averages ${humidityMean.toFixed(0)}%, and rainfall reaches ${rainTotal.toFixed(1)} mm from ${sourceLabel}.`;
+        return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area shows high fungal favorability because the SAR moisture proxy stays near ${soilMoistureMean.toFixed(1)}%, humidity averages ${humidityMean.toFixed(0)}%, and rainfall reaches ${rainTotal.toFixed(1)} mm total (${rainDailyMean.toFixed(1)} mm/day) from ${sourceLabel}.`;
       }
       if (level === 'MEDIUM') {
-        return `Weekly mean risk ${averageRisk.toFixed(2)}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.`;
+        return `Weekly mean risk ${averageRisk.toFixed(2)}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius, with ${rainTotal.toFixed(1)} mm total rainfall (${rainDailyMean.toFixed(1)} mm/day).`;
       }
-      return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.`;
+      return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window (${rainTotal.toFixed(1)} mm total, ${rainDailyMean.toFixed(1)} mm/day).`;
     };
 
     const fetchHeroWeatherReference = async (latitude, longitude) => {
@@ -2856,6 +2860,7 @@
       const peakRisk = riskWindow.peakValue;
       const humidityMean = combinedSeries.reduce((sum, item) => sum + item.humidity, 0) / combinedSeries.length;
       const rainTotal = combinedSeries.reduce((sum, item) => sum + item.rainfall, 0);
+      const rainDailyMean = rainTotal / combinedSeries.length;
       const temperatureMean = combinedSeries.reduce((sum, item) => sum + item.temperature, 0) / combinedSeries.length;
       const soilMoistureMean = combinedSeries.reduce((sum, item) => sum + item.soilMoisture, 0) / combinedSeries.length;
       const riskLevel = classifyHeroRisk(averageRisk, peakRisk, riskWindow.highRiskDays);
@@ -2868,7 +2873,7 @@
         : `GPS locked. Official MeteoAM weather is temporarily unavailable, so the landing page is showing the same weekly risk logic with a fallback weather source (${weatherReference.warning || 'unavailable source'}).`;
       heroRiskBadge.textContent = riskLevel;
       heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
-      heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal, soilMoistureMean, weatherReference.source);
+      heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal, rainDailyMean, soilMoistureMean, weatherReference.source);
       if (heroDemoMapImage) {
         heroDemoMapImage.src = buildHeroSatelliteMapUrl(latitude, longitude);
         heroDemoMapImage.alt = `Satellite view centered on ${formatCoordinate(latitude)}, ${formatCoordinate(longitude)} with the 50 meter focus ring used by the DELTA Plant demo`;
