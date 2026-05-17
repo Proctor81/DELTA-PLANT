@@ -372,6 +372,18 @@ def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
 
 
 def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch):
+    monkeypatch.setattr(
+        tg,
+        "_fetch_external_weather_reference",
+        lambda result: {
+            "source": "Open-Meteo Archive",
+            "daily": [
+                {"day": "2026-05-11", "T2M": 20.4, "RH2M": 80.0, "PRECTOTCORR": 2.0},
+                {"day": "2026-05-17", "T2M": 19.6, "RH2M": 84.0, "PRECTOTCORR": 4.0},
+            ],
+        },
+    )
+
     result = {
         "dashboard": {
             "soil_moisture_last_7_days": [
@@ -408,8 +420,11 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
 
     assert "rischio fungino" in text.lower()
     assert "alto" in text.lower()
-    assert "non conferma la presenza di una patologia" in text.lower()
+    assert "50% umidita' relativa" in text.lower()
+    assert "open-meteo archive" in text.lower()
+    assert "quadro coerente" in text.lower()
     assert "stress idrico" in text.lower()
+    assert "non e' una diagnosi di malattia" in text.lower()
 
 
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):

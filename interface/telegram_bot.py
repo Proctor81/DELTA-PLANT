@@ -1551,7 +1551,118 @@ def _classify_water_stress(mean_value: float, peak_value: float) -> str:
     return "basso"
 
 
-def _build_nasa_sar_scientific_interpretation(result: Dict[str, Any]) -> str:
+def _safe_average(values: List[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def _fetch_external_weather_reference(result: Dict[str, Any]) -> Dict[str, Any]:
+    geo_summary = result.get("geo_summary", {}) or {}
+    centroid = geo_summary.get("centroid", {}) or {}
+    daily = (result.get("nasa_power", {}) or {}).get("daily", []) or []
+    daily = daily[-7:]
+    latitude = centroid.get("lat")
+    longitude = centroid.get("lon")
+    start_date = daily[0].get("day") if daily else None
+    end_date = daily[-1].get("day") if daily else None
+
+    if latitude is None or longitude is None or not start_date or not end_date:
+        return {}
+
+    try:
+        response = requests.get(
+            "https://archive-api.open-meteo.com/v1/archive",
+            params={
+                "latitude": float(latitude),
+                "longitude": float(longitude),
+                "start_date": start_date,
+                "end_date": end_date,
+                "daily": "temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum",
+                "timezone": "UTC",
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        payload = response.json() or {}
+        raw_daily = payload.get("daily", {}) or {}
+        times = raw_daily.get("time", []) or []
+        temps = raw_daily.get("temperature_2m_mean", []) or []
+        humidities = raw_daily.get("relative_humidity_2m_mean", []) or []
+        precipitations = raw_daily.get("precipitation_sum", []) or []
+
+        series: List[Dict[str, Any]] = []
+        for index, day in enumerate(times):
+            series.append(
+                {
+                    "day": day,
+                    "T2M": float(temps[index]) if index < len(temps) and temps[index] is not None else 0.0,
+                    "RH2M": float(humidities[index]) if index < len(humidities) and humidities[index] is not None else 0.0,
+                    "PRECTOTCORR": float(precipitations[index]) if index < len(precipitations) and precipitations[index] is not None else 0.0,
+                }
+            )
+        if not series:
+            return {}
+        return {
+            "source": "Open-Meteo Archive",
+            "daily": series,
+        }
+    except Exception as exc:
+        logger.info("Confronto meteo web non disponibile: %s", exc)
+        return {}
+
+
+def _build_weather_comparison_lines(
+    nasa_daily: List[Dict[str, Any]],
+    weather_reference: Dict[str, Any],
+) -> List[str]:
+    if not nasa_daily:
+        return []
+
+    weather_daily = weather_reference.get("daily", []) or []
+    weather_by_day = {str(item.get("day")): item for item in weather_daily if item.get("day")}
+    overlap = [
+        (day, weather_by_day.get(str(day.get("day"))))
+        for day in nasa_daily
+        if weather_by_day.get(str(day.get("day"))) is not None
+    ]
+    if not overlap:
+        return [
+            "Confronto meteo web: non disponibile in questo momento; la sintesi sotto usa solo i dati NASA POWER.",
+        ]
+
+    nasa_temp = _safe_average([float(nasa.get("T2M", 0.0) or 0.0) for nasa, _ in overlap])
+    nasa_humidity = _safe_average([float(nasa.get("RH2M", 0.0) or 0.0) for nasa, _ in overlap])
+    nasa_precip = sum(float(nasa.get("PRECTOTCORR", 0.0) or 0.0) for nasa, _ in overlap)
+
+    web_temp = _safe_average([float(web.get("T2M", 0.0) or 0.0) for _, web in overlap])
+    web_humidity = _safe_average([float(web.get("RH2M", 0.0) or 0.0) for _, web in overlap])
+    web_precip = sum(float(web.get("PRECTOTCORR", 0.0) or 0.0) for _, web in overlap)
+
+    temp_delta = abs(nasa_temp - web_temp)
+    humidity_delta = abs(nasa_humidity - web_humidity)
+    precip_delta = abs(nasa_precip - web_precip)
+
+    if temp_delta <= 2.0 and humidity_delta <= 10.0 and precip_delta <= 8.0:
+        alignment = "coerente"
+    elif temp_delta <= 4.0 and humidity_delta <= 18.0 and precip_delta <= 15.0:
+        alignment = "parzialmente coerente"
+    else:
+        alignment = "disallineato"
+
+    source = str(weather_reference.get("source", "fonte web"))
+    return [
+        (
+            f"Confronto con meteo web ({source}) sullo stesso periodo: NASA {nasa_temp:.1f} C / {nasa_humidity:.1f}% UR / {nasa_precip:.1f} mm, "
+            f"web {web_temp:.1f} C / {web_humidity:.1f}% UR / {web_precip:.1f} mm. Quadro {alignment}."
+        )
+    ]
+
+
+def _build_nasa_sar_scientific_interpretation(
+    result: Dict[str, Any],
+    weather_reference: Optional[Dict[str, Any]] = None,
+) -> str:
     dashboard = result.get("dashboard", {}) or {}
     soil_summary = dashboard.get("summary", {}) or {}
     nasa_power = result.get("nasa_power", {}) or {}
@@ -1596,14 +1707,20 @@ def _build_nasa_sar_scientific_interpretation(result: Dict[str, Any]) -> str:
     else:
         stress_message = "lo stress idrico atmosferico resta contenuto"
 
+    weather_lines = _build_weather_comparison_lines(daily, weather_reference or {})
+
     return "\n".join(
         [
+            "Il rischio fungino non e' calcolato dall'LLM: usa solo i dati NASA POWER giornalieri.",
+            "Formula NASA del rischio fungino: 50% umidita' relativa, 35% temperatura vicina a 20 C, 15% pioggia giornaliera, piu' una persistenza del 45% dal giorno precedente; il risultato e' limitato tra 0 e 1.",
+            "Classificazione usata qui: alto se picco >= 0.80, oppure almeno 3 giorni >= 0.70, oppure media >= 0.65; medio con soglie intermedie; basso negli altri casi.",
             f"Il proxy di umidita' del suolo e' {soil_level} ({latest_soil:.1f}% oggi; media 7 giorni {average_soil:.1f}%) ed e' {trend_label}.",
             f"Il rischio fungino climatico e' {fungal_level}. {fungal_message}: indice medio {fungal_mean:.2f}, picco {fungal_peak:.2f}, {high_fungal_days} giorni ad alta criticita'.",
             f"Nei 7 giorni osservati: umidita' relativa media {mean_humidity:.1f}%, precipitazione cumulata {total_precip:.1f} mm, temperatura media {mean_temp:.1f} C.",
+            *weather_lines,
             f"Sul bilancio idrico, {stress_message} (media {water_stress_mean:.2f}, picco {water_stress_peak:.2f}).",
-            "Interpretazione scientifica: questo output descrive condizioni agroclimatiche favorevoli o sfavorevoli ai funghi, non conferma la presenza di una patologia.",
-            "Indicazione operativa: intensifica monitoraggio visivo e controlli in campo quando rischio fungino e umidita' restano elevati per piu' giorni consecutivi.",
+            "Interpretazione semplice per la zona GPS: rischio maggiore quando umidita' alta, temperatura vicina a 20 C e piogge recenti restano allineate tra NASA e meteo web.",
+            "Questa non e' una diagnosi di malattia: descrive solo la favorevolezza climatica allo sviluppo fungino nella zona rilevata dal GPS.",
         ]
     )
 
@@ -1657,7 +1774,8 @@ async def _interpret_nasa_sar_dashboard(
     series = dashboard.get("soil_moisture_last_7_days", []) or []
     if not series:
         return "Non ho trovato abbastanza dati NASA POWER per produrre un'interpretazione agronomica." 
-    return _build_nasa_sar_scientific_interpretation(result)
+    weather_reference = await asyncio.to_thread(_fetch_external_weather_reference, result)
+    return _build_nasa_sar_scientific_interpretation(result, weather_reference)
 
 
 def _get_nasa_orchestrator(context: ContextTypes.DEFAULT_TYPE):
@@ -1711,7 +1829,7 @@ async def _run_nasa_sar_analysis(
     )
     await _send(
         update,
-        "<b>🧠 Interpretazione scientifica assistita</b>\n" + interpretation,
+        "<b>🧠 Sintesi semplice NASA + meteo web</b>\n" + interpretation,
         reply_markup=_menu_keyboard(),
         parse_mode="HTML",
     )
@@ -1724,7 +1842,7 @@ async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
         "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
         "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
-        "Analizzerò un'area circolare di 50 metri e ti mostrerò la dashboard degli ultimi 7 giorni con interpretazione LLM.",
+        "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard degli ultimi 7 giorni con sintesi semplice basata su NASA POWER e confronto meteo web.",
         reply_markup=_nasa_sar_reply_keyboard(),
         parse_mode="HTML",
     )
