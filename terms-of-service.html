@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>DELTA Plant | Terms of Service</title>
+  <meta name='description' content='Terms of service for DELTA Plant NASA Monitor, including allowed use, disclaimers, data responsibility, and runtime artifact handling.' />
+  <link rel='canonical' href='https://deltaplant.ai/terms-of-service.html' />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+    :root {
+      --bg: #08111d;
+      --panel: rgba(12, 28, 43, 0.82);
+      --line: rgba(149, 198, 214, 0.2);
+      --text: #eef5f4;
+      --muted: #a8bbc3;
+      --accent: #c5ff7d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: linear-gradient(180deg, #08111d 0%, #0d1e2c 100%);
+      color: var(--text);
+    }
+    main {
+      width: min(920px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 6rem;
+    }
+    header, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    h1, h2 { font-family: 'Space Grotesk', sans-serif; }
+    h1 { margin: 0; font-size: clamp(2.4rem, 7vw, 3.9rem); }
+    p, li { color: var(--muted); line-height: 1.75; }
+    ul { padding-left: 1.2rem; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Terms of Service</h1>
+        <p>Operational terms for the DELTA Plant NASA monitoring experience.</p>
+      </div>
+      <div><a href='/'>Back to monitor</a></div>
+    </header>
+
+    <section>
+      <h2>Permitted Use</h2>
+      <ul>
+        <li>You may use the service to analyze agricultural areas, review procedural and LLM-based agronomic summaries, and download runtime-generated PDFs.</li>
+        <li>You must not submit unlawful content, attempt prompt injection, abuse rate limits, or use the platform to attack external services.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scientific Nature of the Output</h2>
+      <ul>
+        <li>The service provides agronomic decision support, not legally binding certification, medical advice, or emergency services.</li>
+        <li>Satellite and climate indicators may contain uncertainty due to acquisition timing, sensor geometry, and external data quality.</li>
+        <li>Users remain responsible for operational decisions, field interventions, and local compliance obligations.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Artifacts and Availability</h2>
+      <ul>
+        <li>PDF artifacts are stored only in runtime memory and expire automatically after 60 minutes.</li>
+        <li>Voice responses depend on the configured DELTA runtime providers and may be unavailable without prior consent.</li>
+        <li>Service features may change as the NASA DeltaPlant module evolves.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Liability and External Services</h2>
+      <p>DELTA Plant depends on external sources such as NASA POWER and Copernicus Data Space. Availability and correctness of those sources are outside the direct control of the website operator. To the maximum extent permitted by law, the service is provided on an as-available basis.</p>
+    </section>
+  </main>
+</body>
+</html>
