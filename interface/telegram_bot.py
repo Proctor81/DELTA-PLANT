@@ -2040,23 +2040,8 @@ async def _interpret_nasa_sar_dashboard(
     if not dashboard.get("summary"):
         return "Non ho trovato abbastanza dati SAR e meteo per produrre una sintesi agronomica." 
     weather_reference = await asyncio.to_thread(_fetch_external_weather_reference, result)
-    technical_text = _build_nasa_sar_scientific_interpretation(result, weather_reference)
-    try:
-        engine = _get_chat_engine(context)
-        prompt = (
-            "Riscrivi il testo seguente in italiano molto semplice e sintetico (max 6 righe). "
-            "Mantieni i numeri principali (rischio medio, umidita' suolo, temperatura media, umidita' media, pioggia). "
-            "Non aggiungere link, non aggiungere avvertenze extra, non usare markdown.\n\n"
-            f"Testo tecnico:\n{technical_text}"
-        )
-        llm_text = await asyncio.to_thread(engine.chat_internal, prompt)
-        concise_text = re.sub(r"https?://\S+", "", str(llm_text or "")).strip()
-        if concise_text:
-            return f"Sintesi breve LLM:\n{concise_text}\n\nDettaglio tecnico:\n{technical_text}"
-        return technical_text
-    except Exception as exc:
-        logger.info("Sintesi LLM NASA non disponibile, uso testo tecnico: %s", exc)
-        return technical_text
+    # Keep numeric weather values deterministic: avoid LLM rewriting for this critical section.
+    return _build_nasa_sar_scientific_interpretation(result, weather_reference)
 
 
 def _build_nasa_sar_followup_context(result: Dict[str, Any], interpretation: str) -> str:
