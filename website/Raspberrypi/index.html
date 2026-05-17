@@ -2695,12 +2695,24 @@
           }
         });
 
-        return [...dailyBuckets.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(0, 7).map(([day, bucket]) => ({
-          day,
-          T2M: bucket.temperatures.length ? bucket.temperatures.reduce((sum, value) => sum + value, 0) / bucket.temperatures.length : 0,
-          RH2M: bucket.humidities.length ? bucket.humidities.reduce((sum, value) => sum + value, 0) / bucket.humidities.length : 0,
-          PRECTOTCORR: bucket.rainTotal,
-        })).filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
+        return [...dailyBuckets.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .slice(0, 7)
+          .map(([day, bucket]) => {
+            const tempMean = bucket.temperatures.length
+              ? bucket.temperatures.reduce((sum, value) => sum + value, 0) / bucket.temperatures.length
+              : null;
+            const humidityMean = bucket.humidities.length
+              ? bucket.humidities.reduce((sum, value) => sum + value, 0) / bucket.humidities.length
+              : null;
+            return {
+              day,
+              T2M: tempMean,
+              RH2M: humidityMean,
+              PRECTOTCORR: bucket.rainTotal,
+            };
+          })
+          .filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
       };
 
       const meteoAmEndpoint = new URL('https://api.meteoam.it/deda-meteograms/meteograms');
