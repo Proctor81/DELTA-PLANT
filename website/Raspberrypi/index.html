@@ -1711,7 +1711,7 @@
                 <div>
                   <div class="section-kicker">Hero demo</div>
                   <h2 class="mt-2 font-display text-2xl text-white sm:text-3xl">Paste Google coordinates. Get a weekly fungal-risk reading.</h2>
-                  <p class="mt-4 max-w-3xl text-base leading-7 text-slate-300/72">This public demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant fuses a 7-day SAR moisture proxy with official Aeronautica Militare weather to produce a single weekly fungal-risk reading.</p>
+                  <p class="mt-4 max-w-3xl text-base leading-7 text-slate-300/72">This public demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant fuses a 7-day SAR moisture proxy with Open-Meteo Archive weather data for the previous 7 days to produce a single weekly fungal-risk reading.</p>
                   <p class="mt-3 text-sm leading-7 text-slate-300/68">SAR means <span class="font-semibold text-white">Synthetic Aperture Radar</span>, an advanced sensing technology that sends electromagnetic signals to Earth and reads the return signal to produce high-resolution surface information even through clouds or darkness.</p>
                 </div>
                 <div class="hero-demo-quickfacts">
@@ -1740,7 +1740,7 @@
                     <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
                     <button id="hero-demo-run" class="hero-demo-button" type="button">Run NISAR demo</button>
                   </div>
-                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point, fetch official Open-Meteo Archive weather, and return one weekly risk reading.</div>
+                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point, fetch 7-day Open-Meteo Archive weather, and return one weekly risk reading.</div>
                 </div>
                 <div class="hero-demo-controls-panel text-sm leading-7 text-slate-300/72">
                   <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Scientific reading</div>
@@ -1751,7 +1751,7 @@
                     </div>
                     <div class="hero-demo-science-card">
                       <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">Weather support</div>
-                      <p class="mt-2 text-sm leading-6 text-slate-300/72">Humidity and rainfall are read from the official Aeronautica Militare weather service, then fused with radar persistence because fungal development needs sustained wet conditions rather than an isolated rain event.</p>
+                      <p class="mt-2 text-sm leading-6 text-slate-300/72">Humidity and rainfall are read from the Open-Meteo Archive for the previous 7 days, then fused with radar persistence because fungal development needs sustained wet conditions rather than an isolated rain event.</p>
                     </div>
                     <div class="hero-demo-science-card">
                       <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">L-band interpretation</div>
@@ -1788,15 +1788,15 @@
                       <div class="hero-summary-card">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Weekly mean</div>
                         <div id="hero-demo-focus-label" class="mt-3 text-lg font-semibold text-white">Risk 0.52</div>
-                        <div id="hero-demo-focus-copy" class="mt-2 text-sm text-slate-300/68">The public demo combines a 7-day SAR moisture proxy with official Open-Meteo Archive weather for this 50 m micro-zone.</div>
+                        <div id="hero-demo-focus-copy" class="mt-2 text-sm text-slate-300/68">The public demo combines a 7-day SAR moisture proxy with Open-Meteo Archive weather for this 50 m micro-zone.</div>
                       </div>
                       <div class="hero-summary-card">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Data sources</div>
-                        <div id="hero-demo-map-source" class="mt-3 text-lg font-semibold text-white">Esri World Imagery + Open-Meteo Archive</div>
-                        <div class="mt-2 text-sm text-slate-300/68">The public landing uses live official Open-Meteo Archive weather and a client-side SAR moisture proxy to mirror the bot logic.</div>
+                        <div id="hero-demo-map-source" class="mt-3 text-lg font-semibold text-white">Esri World Imagery + Open-Meteo</div>
+                        <div class="mt-2 text-sm text-slate-300/68">The public landing uses Open-Meteo Archive weather and a client-side SAR moisture proxy to mirror the bot logic.</div>
                       </div>
                     </div>
-                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Scientific note: the fungal outlook is not a disease diagnosis. It is a micro-area favorability estimate derived from a SAR moisture proxy, official Aeronautica Militare weather, and the same weekly risk formula used in the DELTAPLANO bot.</div>
+                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Scientific note: the fungal outlook is not a disease diagnosis. It is a micro-area favorability estimate derived from a SAR moisture proxy, Open-Meteo Archive weather data, and the same weekly risk formula used in the DELTAPLANO bot.</div>
                   </div>
                 </div>
                 <div id="hero-demo-days" class="hero-days-row mt-4"></div>
@@ -1809,7 +1809,7 @@
                 </div>
                 <div class="hero-demo-note dashboard-panel">
                   <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">Weather source</div>
-                  <p class="mt-3 text-sm leading-7 text-slate-300/72">Temperature, humidity, and rainfall are pulled from the <span class="font-semibold text-white">Servizio Meteorologico dell'Aeronautica Militare</span> through the public Open-Meteo Archive endpoint exposed to the browser.</p>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/72">Temperature, humidity, and rainfall are pulled from the <span class="font-semibold text-white">Open-Meteo Archive API</span> for the past 7 days, providing real historical weather data for the selected GPS micro-zone.</p>
                 </div>
                 <div class="hero-demo-note dashboard-panel">
                   <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">Public data note</div>
@@ -2553,111 +2553,6 @@
       return null;
     };
 
-    const parseMeteoAmParamKey = (rawParam) => {
-      if (rawParam && typeof rawParam === 'object') {
-        for (const key of ['id', 'name', 'code', 'param']) {
-          if (rawParam[key]) {
-            return String(rawParam[key]).trim().toLowerCase();
-          }
-        }
-      }
-      return String(rawParam || '').trim().toLowerCase();
-    };
-
-    const findMeteoAmParamIndex = (paramlist, targetKey) => paramlist.findIndex((param) => parseMeteoAmParamKey(param) === targetKey.toLowerCase());
-
-    const extractMeteoAmPointDataset = (datasets) => {
-      if (Array.isArray(datasets) && datasets.length) {
-        return datasets[0];
-      }
-      if (datasets && typeof datasets === 'object') {
-        if (Object.prototype.hasOwnProperty.call(datasets, '0')) {
-          return datasets['0'];
-        }
-        const firstKey = Object.keys(datasets)[0];
-        return firstKey ? datasets[firstKey] : null;
-      }
-      return null;
-    };
-
-    const unwrapMeteoAmSeries = (rawSeries) => {
-      if (Array.isArray(rawSeries)) {
-        return rawSeries;
-      }
-      if (rawSeries && typeof rawSeries === 'object') {
-        for (const key of ['data', 'values', 'series']) {
-          if (Array.isArray(rawSeries[key])) {
-            return rawSeries[key];
-          }
-        }
-      }
-      return [];
-    };
-
-    const extractMeteoAmValues = (datasets, paramIndex) => {
-      const pointDataset = extractMeteoAmPointDataset(datasets);
-      if (!pointDataset) {
-        return [];
-      }
-      const rawSeries = Array.isArray(pointDataset) ? pointDataset[paramIndex] : pointDataset[String(paramIndex)] ?? pointDataset[paramIndex];
-      return unwrapMeteoAmSeries(rawSeries);
-    };
-
-    const parseIsoMoment = (rawValue) => {
-      const value = rawValue && typeof rawValue === 'object' ? rawValue.time || rawValue.timestamp || rawValue.value : rawValue;
-      const parsed = new Date(String(value || '').trim());
-      return Number.isFinite(parsed.getTime()) ? parsed : null;
-    };
-
-    const aggregateMeteoAmDaily = (payload) => {
-      const timeseries = Array.isArray(payload?.timeseries) ? payload.timeseries : [];
-      const paramlist = Array.isArray(payload?.paramlist) ? payload.paramlist : [];
-      const datasets = payload?.datasets || {};
-
-      const temperatureIndex = findMeteoAmParamIndex(paramlist, '2t');
-      const humidityIndex = findMeteoAmParamIndex(paramlist, 'r');
-      const rainIndex = findMeteoAmParamIndex(paramlist, 'tpp');
-      if (temperatureIndex < 0 || humidityIndex < 0 || rainIndex < 0) {
-        return [];
-      }
-
-      const temperatures = extractMeteoAmValues(datasets, temperatureIndex);
-      const humidities = extractMeteoAmValues(datasets, humidityIndex);
-      const rains = extractMeteoAmValues(datasets, rainIndex);
-      const dailyBuckets = new Map();
-
-      timeseries.forEach((rawTime, index) => {
-        const moment = parseIsoMoment(rawTime);
-        if (!moment) {
-          return;
-        }
-        const day = moment.toISOString().slice(0, 10);
-        if (!dailyBuckets.has(day)) {
-          dailyBuckets.set(day, { temperatures: [], humidities: [], rainTotal: 0 });
-        }
-        const bucket = dailyBuckets.get(day);
-        const temperature = Number(temperatures[index]);
-        if (Number.isFinite(temperature)) {
-          bucket.temperatures.push(temperature);
-        }
-        const humidity = Number(humidities[index]);
-        if (Number.isFinite(humidity)) {
-          bucket.humidities.push(humidity);
-        }
-        const rain = Number(rains[index]);
-        if (Number.isFinite(rain)) {
-          bucket.rainTotal += rain;
-        }
-      });
-
-      return [...dailyBuckets.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(0, 7).map(([day, bucket]) => ({
-        day,
-        T2M: bucket.temperatures.length ? bucket.temperatures.reduce((sum, value) => sum + value, 0) / bucket.temperatures.length : 0,
-        RH2M: bucket.humidities.length ? bucket.humidities.reduce((sum, value) => sum + value, 0) / bucket.humidities.length : 0,
-        PRECTOTCORR: bucket.rainTotal,
-      })).filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
-    };
-
     const computeFungalRiskValue = (temperature, humidity, precipitation, previousRisk) => {
       const humidityFactor = humidity >= 80 ? 1 : humidity / 80;
       const tempCentered = Math.max(0, 1 - Math.abs(temperature - 20) / 10);
@@ -2699,33 +2594,47 @@
       if (level === 'MEDIO') {
         return `Weekly mean risk ${averageRisk.toFixed(2)}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.`;
       }
-      return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current Open-Meteo Archive window.`;
+      return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.`;
     };
 
     const fetchHeroWeatherReference = async (latitude, longitude) => {
-      const endpoint = new URL('https://api.meteoam.it/deda-meteograms/meteograms');
-      endpoint.searchParams.set('request', 'GetMeteogram');
-      endpoint.searchParams.set('layers', 'preset1');
-      endpoint.searchParams.set('latlon', `${latitude.toFixed(6)},${longitude.toFixed(6)}`);
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 6);
+      const formatDate = (d) => d.toISOString().slice(0, 10);
+      const endpoint = new URL('https://archive-api.open-meteo.com/v1/archive');
+      endpoint.searchParams.set('latitude', latitude.toFixed(6));
+      endpoint.searchParams.set('longitude', longitude.toFixed(6));
+      endpoint.searchParams.set('start_date', formatDate(startDate));
+      endpoint.searchParams.set('end_date', formatDate(today));
+      endpoint.searchParams.set('daily', 'temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum');
+      endpoint.searchParams.set('timezone', 'UTC');
       try {
-        const response = await fetch(endpoint.toString(), {
-          headers: { Accept: 'application/json' },
-        });
+        const response = await fetch(endpoint.toString());
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = await response.json();
-        const daily = aggregateMeteoAmDaily(payload);
+        const times = Array.isArray(payload.daily?.time) ? payload.daily.time : [];
+        const temps = Array.isArray(payload.daily?.temperature_2m_mean) ? payload.daily.temperature_2m_mean : [];
+        const humidities = Array.isArray(payload.daily?.relative_humidity_2m_mean) ? payload.daily.relative_humidity_2m_mean : [];
+        const precipitations = Array.isArray(payload.daily?.precipitation_sum) ? payload.daily.precipitation_sum : [];
+        const daily = times.map((day, i) => ({
+          day,
+          T2M: temps[i] != null ? Number(temps[i]) : 0,
+          RH2M: humidities[i] != null ? Number(humidities[i]) : 0,
+          PRECTOTCORR: precipitations[i] != null ? Number(precipitations[i]) : 0,
+        })).filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
         if (!daily.length) {
-          throw new Error('No Open-Meteo Archive daily payload available');
+          throw new Error('No daily data from Open-Meteo Archive');
         }
         return {
-          source: 'Servizio Meteorologico dell\'Aeronautica Militare',
+          source: 'Open-Meteo Archive',
           daily,
           live: true,
         };
       } catch (error) {
-        console.warn('Hero Open-Meteo Archive fetch unavailable:', error);
+        console.warn('Hero weather fetch unavailable:', error);
         return {
           source: 'Built-in demo fallback',
           daily: [],
@@ -2773,21 +2682,20 @@
 
       const { latitude, longitude } = coordinates;
       const series = generateHeroDemoSeries(latitude, longitude);
-      heroDemoStatus.textContent = 'GPS locked. Fetching official Open-Meteo Archive weather and merging it with the 7-day SAR moisture proxy around this 50 m radius.';
+      heroDemoStatus.textContent = 'GPS locked. Fetching Open-Meteo Archive weather and merging it with the 7-day SAR moisture proxy around this 50 m radius.';
 
       const weatherReference = await fetchHeroWeatherReference(latitude, longitude);
-      const combinedWeatherSeries = series.map((item, index) => {
-        const weatherItem = weatherReference.daily[index] || {
-          day: item.isoDay,
-          T2M: item.temperature,
-          RH2M: item.humidity,
-          PRECTOTCORR: item.rainfall,
-        };
+      const weatherByDay = {};
+      for (const w of weatherReference.daily) {
+        if (w.day) weatherByDay[w.day] = w;
+      }
+      const combinedWeatherSeries = series.map((item) => {
+        const w = weatherByDay[item.isoDay];
         return {
-          day: weatherItem.day || item.isoDay,
-          T2M: Number.isFinite(Number(weatherItem.T2M)) ? Number(weatherItem.T2M) : item.temperature,
-          RH2M: Number.isFinite(Number(weatherItem.RH2M)) ? Number(weatherItem.RH2M) : item.humidity,
-          PRECTOTCORR: Number.isFinite(Number(weatherItem.PRECTOTCORR)) ? Number(weatherItem.PRECTOTCORR) : item.rainfall,
+          day: item.isoDay,
+          T2M: w && Number.isFinite(Number(w.T2M)) ? Number(w.T2M) : item.temperature,
+          RH2M: w && Number.isFinite(Number(w.RH2M)) ? Number(w.RH2M) : item.humidity,
+          PRECTOTCORR: w && Number.isFinite(Number(w.PRECTOTCORR)) ? Number(w.PRECTOTCORR) : item.rainfall,
         };
       });
       const riskWindow = buildWeeklyFungalRiskWindow(combinedWeatherSeries);
@@ -2810,8 +2718,8 @@
       heroDemoCenter.textContent = `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`;
       heroDemoFootprint.textContent = `Footprint ${Math.round(HERO_FOOTPRINT_M2).toLocaleString('en-US')} m²`;
       heroDemoStatus.textContent = weatherReference.live
-        ? 'GPS locked. DELTA Plant merged a 7-day SAR moisture proxy with official Open-Meteo Archive weather for this 50 m radius and reduced the output to one weekly mean risk.'
-        : `GPS locked. Official Open-Meteo Archive weather is temporarily unavailable, so the landing page is showing the same weekly risk logic with the built-in demo fallback (${weatherReference.warning || 'unavailable source'}).`;
+        ? 'GPS locked. DELTA Plant merged a 7-day SAR moisture proxy with Open-Meteo Archive weather for this 50 m radius and reduced the output to one weekly mean risk.'
+        : `GPS locked. Open-Meteo Archive weather is temporarily unavailable, so the landing page is showing the same weekly risk logic with the built-in demo fallback (${weatherReference.warning || 'unavailable source'}).`;
       heroRiskBadge.textContent = riskLevel;
       heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
       heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal, soilMoistureMean, weatherReference.source);
@@ -2823,7 +2731,7 @@
         heroDemoMapCaption.textContent = `The highlighted ring marks the 50 m inspection radius around ${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}.`;
       }
       if (heroDemoMapSource) {
-        heroDemoMapSource.textContent = weatherReference.live ? 'Esri World Imagery + Open-Meteo Archive live' : 'Esri World Imagery + demo fallback';
+        heroDemoMapSource.textContent = weatherReference.live ? 'Esri World Imagery + Open-Meteo Archive' : 'Esri World Imagery + demo fallback';
       }
       if (heroDemoFocusLabel) {
         heroDemoFocusLabel.textContent = `Risk ${averageRisk.toFixed(2)}`;
