@@ -2635,6 +2635,12 @@
               return rawSeries[key];
             }
           }
+          const numericKeys = Object.keys(rawSeries).filter((key) => /^\d+$/.test(key));
+          if (numericKeys.length) {
+            return numericKeys
+              .sort((left, right) => Number(left) - Number(right))
+              .map((key) => rawSeries[key]);
+          }
         }
         return [];
       };

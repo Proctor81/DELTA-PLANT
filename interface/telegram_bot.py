@@ -1729,6 +1729,10 @@ def _unwrap_meteoam_series(raw_series: Any) -> List[Any]:
             value = raw_series.get(key)
             if isinstance(value, list):
                 return value
+        numeric_keys = [key for key in raw_series.keys() if str(key).isdigit()]
+        if numeric_keys:
+            sorted_keys = sorted(numeric_keys, key=lambda value: int(str(value)))
+            return [raw_series.get(key) for key in sorted_keys]
     if isinstance(raw_series, list):
         return raw_series
     return []
