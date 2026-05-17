@@ -60,6 +60,8 @@ DIAGNOSIS_FOLLOWUP_REFERENTS = (
 )
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ITALIAN_RESPONSE_RULE = "Rispondi SEMPRE in italiano, anche se la domanda è in un'altra lingua."
+_ENGLISH_RESPONSE_RULE = "Respond ALWAYS in English, even if the question is in another language."
 
 
 def _load_project_env_if_needed() -> None:
@@ -78,6 +80,15 @@ def _load_project_env_if_needed() -> None:
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
     except OSError as exc:
         logger.warning("Impossibile leggere %s: %s", _ENV_FILE, exc)
+
+
+def _system_prompt_for_language(base_prompt: str, response_language: str = "auto") -> str:
+    normalized = (response_language or "auto").strip().lower()
+    if normalized == "en":
+        if _ITALIAN_RESPONSE_RULE in base_prompt:
+            return base_prompt.replace(_ITALIAN_RESPONSE_RULE, _ENGLISH_RESPONSE_RULE)
+        return base_prompt + "\n\n" + _ENGLISH_RESPONSE_RULE
+    return base_prompt
 
 
 class ChatEngine:
@@ -187,14 +198,20 @@ class ChatEngine:
 
         return False
 
-    def _prepare_turn_prompt(self, user_input: str, raw_history: list) -> tuple[str, str]:
+    def _prepare_turn_prompt(
+        self,
+        user_input: str,
+        raw_history: list,
+        response_language: str = "auto",
+    ) -> tuple[str, str]:
         """Prepara il prompt del turno, ancorando esplicitamente gli approfondimenti alla diagnosi."""
+        base_system_prompt = _system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language)
         diagnosis_context = self._extract_latest_diagnosis_context(raw_history)
         if not diagnosis_context or not self._looks_like_diagnosis_followup(user_input, raw_history):
-            return user_input, DELTA_SYSTEM_PROMPT
+            return user_input, base_system_prompt
 
         anchored_system_prompt = (
-            DELTA_SYSTEM_PROMPT
+            base_system_prompt
             + "\n\nGestione del contesto diagnostico:\n"
             "- Se nella cronologia è presente una diagnosi DELTA recente e l'utente fa una richiesta di follow-up, "
             "devi usare quella diagnosi come contesto tecnico principale.\n"
@@ -231,7 +248,7 @@ class ChatEngine:
             logger.warning("chat_internal error: %s", exc)
             return ""
 
-    def chat(self, user_id: str, user_input: str) -> str:
+    def chat(self, user_id: str, user_input: str, response_language: str = "auto") -> str:
         """
         Elabora un messaggio utente e restituisce la risposta DELTA.
 
@@ -241,7 +258,11 @@ class ChatEngine:
         3. Salva turno in memoria
         """
         history = self.memory.get_history(user_id)
-        llm_user_input, system_prompt = self._prepare_turn_prompt(user_input, history)
+        llm_user_input, system_prompt = self._prepare_turn_prompt(
+            user_input,
+            history,
+            response_language=response_language,
+        )
 
         # ── Backend unico: HuggingFace cloud ─────────────────────────────────
         if self._hf_available:

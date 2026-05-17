@@ -669,9 +669,10 @@ async def _generate_free_chat_response(
         pass
 
     engine = _get_chat_engine(context)
+    response_language = _voice_language_mode(context)
 
     def _ask() -> str:
-        return engine.chat(user_id, user_text)
+        return engine.chat(user_id, user_text, response_language=response_language)
 
     try:
         response = await asyncio.to_thread(_ask)
@@ -771,7 +772,7 @@ async def _set_voice_language(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     context.user_data["voice_language_override"] = requested
     label = "italiano" if requested == VOICE_LANGUAGE_IT else "inglese"
-    await _send(update, f"🗣️ Lingua voce forzata su {label}. Da ora userò sempre il pack Piper corrispondente finché non imposti /voice_lang auto.")
+    await _send(update, f"🗣️ Lingua voce forzata su {label}. In chat libera adeguerò anche le risposte testuali a questa lingua, oltre a usare sempre il pack Piper corrispondente, finché non imposti /voice_lang auto.")
 
 
 async def voice_language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
