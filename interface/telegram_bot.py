@@ -143,6 +143,7 @@ _VOICE_MODE_ALLOWED = {VOICE_MODE_AUTO, VOICE_MODE_ON, VOICE_MODE_OFF}
 VOICE_LANGUAGE_AUTO = "auto"
 VOICE_LANGUAGE_IT = "it"
 VOICE_LANGUAGE_EN = "en"
+VOICE_LANGUAGE_DEFAULT = VOICE_LANGUAGE_IT
 _VOICE_LANGUAGE_ALLOWED = {VOICE_LANGUAGE_AUTO, VOICE_LANGUAGE_IT, VOICE_LANGUAGE_EN}
 
 _VOICE_GUIDED_DIAGNOSIS_REJECT = (
@@ -280,7 +281,7 @@ async def _maybe_send_voice_welcome(update: Update, context: "ContextTypes.DEFAU
     context.user_data["voice_welcome_sent"] = True
     await _send(
         update,
-        "🎙️ Modalità voce disponibile in chat libera. In automatico vale il mirroring testo→testo e vocale→vocale. Usa /voice on, /voice off o /voice auto per cambiare comportamento. Per forzare la lingua della voce usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+        "🎙️ Modalità voce disponibile in chat libera. Di default la voce usa italiano (Cris). In automatico vale il mirroring testo→testo e vocale→vocale. Usa /voice on, /voice off o /voice auto per cambiare comportamento. Per forzare la lingua della voce usa /voice_lang it, /voice_lang en o /voice_lang auto.",
     )
 
 
@@ -383,9 +384,9 @@ def _piper_model_paths(profile_id: str) -> Tuple[Path, Path]:
 
 def _voice_language_mode(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> str:
     if context is None:
-        return VOICE_LANGUAGE_AUTO
-    raw = str(context.user_data.get("voice_language_override", VOICE_LANGUAGE_AUTO)).strip().lower()
-    return raw if raw in _VOICE_LANGUAGE_ALLOWED else VOICE_LANGUAGE_AUTO
+        return VOICE_LANGUAGE_DEFAULT
+    raw = str(context.user_data.get("voice_language_override", VOICE_LANGUAGE_DEFAULT)).strip().lower()
+    return raw if raw in _VOICE_LANGUAGE_ALLOWED else VOICE_LANGUAGE_DEFAULT
 
 
 def _select_piper_voice_profile(
