@@ -201,6 +201,30 @@ class NASADeltaPlantOrchestrator:
             "llm_remaining_today": self.llm_usage_tracker.remaining_calls(user_token),
         }
 
+    async def analyze_nasa_only(
+        self,
+        geo_data: dict[str, Any],
+        date_range: dict[str, str],
+    ) -> dict[str, Any]:
+        geo_summary = self.area_diagnosis.validate_geo_area(geo_data)
+        start = date.fromisoformat(date_range["start"])
+        end = date.fromisoformat(date_range["end"])
+        centroid = geo_summary["centroid"]
+
+        power_data = await self.power_client.fetch(
+            latitude=float(centroid["lat"]),
+            longitude=float(centroid["lon"]),
+            start=start,
+            end=end,
+        )
+
+        return {
+            "mode": "nasa-only",
+            "geo_summary": geo_summary,
+            "nasa_power": power_data,
+            "warnings": [],
+        }
+
     def _build_climate_proxy_field_state(
         self,
         geo_area: dict[str, Any],

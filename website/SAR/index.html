@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>DELTA Plant SAR | NASA Direct Dashboard</title>
+  <meta name='description' content='Simplified DELTA Plant SAR dashboard with direct NASA POWER output only: map, date window, and raw agroclimatic data.' />
+  <meta name='deltaplant-api-base' content='https://api.deltaplant.ai' />
+  <link rel='canonical' href='https://deltaplant.ai/SAR/' />
+  <link rel='preconnect' href='https://fonts.googleapis.com' />
+  <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin />
+  <link href='https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;700&display=swap' rel='stylesheet' />
+  <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' crossorigin='' />
+  <link rel='stylesheet' href='https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css' crossorigin='' />
+  <style>
+    :root {
+      --bg: #08121b;
+      --panel: #102230;
+      --panel-2: #132b3c;
+      --line: rgba(121, 231, 255, 0.16);
+      --text: #f3fbff;
+      --muted: #9bb8c8;
+      --accent: #79e7ff;
+      --accent-2: #19f5c1;
+      --warn: #ffd089;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Manrope', sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(121, 231, 255, 0.14), transparent 32%),
+        linear-gradient(180deg, #08121b 0%, #0d1b27 100%);
+      color: var(--text);
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1240px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding: 1rem 0 2rem;
+    }
+
+    .header,
+    .hero,
+    .panel,
+    .summary-card,
+    .table-card {
+      background: rgba(16, 34, 48, 0.88);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      backdrop-filter: blur(18px);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.95rem 1.1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 3.8rem;
+      height: 3.8rem;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(121, 231, 255, 0.18);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .brand-copy strong,
+    h1,
+    h2,
+    h3,
+    th {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .brand-copy span,
+    .subtle,
+    .status,
+    .map-caption,
+    .table-wrap td {
+      color: var(--muted);
+    }
+
+    .header-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .header-nav a {
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      text-decoration: none;
+    }
+
+    .hero {
+      margin-top: 1rem;
+      padding: 1.3rem;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+    }
+
+    .hero p {
+      margin: 0.8rem 0 0;
+      max-width: 56rem;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .hero-tags,
+    .summary-grid,
+    .toolbar,
+    .control-grid,
+    .map-caption {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+    }
+
+    .hero-tags { margin-top: 1rem; }
+
+    .tag {
+      padding: 0.55rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .layout {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+      gap: 1rem;
+    }
+
+    .panel {
+      padding: 1.15rem;
+    }
+
+    .toolbar {
+      align-items: center;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .tool-button,
+    .primary-action {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 0.92rem 1rem;
+      cursor: pointer;
+    }
+
+    .tool-button {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .primary-action {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      color: #061118;
+      font-weight: 800;
+      margin-top: 1rem;
+      border: 0;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .map-input-grid {
+      grid-template-columns: minmax(0, 1.7fr) minmax(9rem, 0.7fr);
+    }
+
+    .field {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 1rem;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 0.55rem;
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .field input {
+      width: 100%;
+      padding: 0.95rem 1rem;
+      background: rgba(4, 10, 15, 0.72);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 18px;
+    }
+
+    #map {
+      height: 34rem;
+      margin-top: 1rem;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #0f2231 0%, #0b1620 100%);
+    }
+
+    .map-caption,
+    .status {
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.85rem;
+      font-size: 0.94rem;
+    }
+
+    .summary-grid {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .summary-card,
+    .table-card {
+      padding: 1rem;
+    }
+
+    .summary-card span {
+      display: block;
+      font-size: 0.84rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 0.55rem;
+      font-size: 1.8rem;
+    }
+
+    .table-grid {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 1rem;
+    }
+
+    .table-wrap {
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 34rem;
+    }
+
+    th,
+    td {
+      padding: 0.8rem 0.7rem;
+      border-bottom: 1px solid rgba(121, 231, 255, 0.1);
+      text-align: left;
+      font-size: 0.92rem;
+    }
+
+    th {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+      position: sticky;
+      top: 0;
+    }
+
+    .warning {
+      color: var(--warn);
+    }
+
+    @media (max-width: 1080px) {
+      .layout,
+      .table-grid,
+      .summary-grid,
+      .control-grid,
+      .map-input-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .layout,
+      .table-grid {
+        display: grid;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .shell { width: min(100vw - 0.6rem, 100%); }
+      .header,
+      .toolbar,
+      .map-caption,
+      .status,
+      .header-nav {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .layout,
+      .summary-grid,
+      .table-grid,
+      .control-grid,
+      .map-input-grid {
+        grid-template-columns: 1fr;
+      }
+      #map { height: 22rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class='shell'>
+    <header class='header'>
+      <a class='brand' href='/'>
+        <span class='brand-mark'><img src='/assets/social-preview.png' alt='DELTA Plant' /></span>
+        <span class='brand-copy'>
+          <strong>DELTA Plant SAR</strong>
+          <span>NASA direct dashboard only</span>
+        </span>
+      </a>
+      <nav class='header-nav'>
+        <a href='/'>Home</a>
+        <a href='/NISAR/'>NISAR</a>
+        <a href='#run'>Run NASA diagnosis</a>
+      </nav>
+    </header>
+
+    <section class='hero'>
+      <h1>Direct NASA POWER output, without LLM, reports, or PDFs</h1>
+      <p>Use the full map dashboard to select a field, choose a time window, and launch a simplified SAR workflow that returns only direct NASA agroclimatic data. No crop wizard, no narrative report, no voice synthesis, and no document generation.</p>
+      <div class='hero-tags'>
+        <span class='tag'>NASA POWER only</span>
+        <span class='tag'>No LLM</span>
+        <span class='tag'>No PDF</span>
+        <span class='tag'>Direct daily metrics</span>
+      </div>
+    </section>
+
+    <div class='layout'>
+      <section class='panel'>
+        <div class='toolbar'>
+          <button class='tool-button' type='button' id='draw-polygon'>Draw polygon</button>
+          <button class='tool-button' type='button' id='draw-circle'>Draw circle</button>
+          <button class='tool-button' type='button' id='clear-map'>Reset geometry</button>
+        </div>
+        <div class='control-grid map-input-grid'>
+          <div class='field'>
+            <label for='google-coordinates'>Google coordinates or Maps URL</label>
+            <input id='google-coordinates' type='text' placeholder='45.4642, 9.1900 or https://maps.google.com/...' />
+          </div>
+          <div class='field'>
+            <label for='google-radius'>Circle radius (m)</label>
+            <input id='google-radius' type='number' min='50' max='5000' step='10' value='250' />
+          </div>
+        </div>
+        <div class='status'>
+          <span id='google-coordinates-status'>Paste coordinates to create a circular field selection instantly.</span>
+          <button class='tool-button' type='button' id='apply-google-coordinates'>Use coordinates</button>
+        </div>
+        <div id='map' aria-label='Interactive field map'></div>
+        <div class='map-caption'>
+          <span id='map-hint'>Draw one polygon, draw one circle, or paste Google coordinates.</span>
+          <span id='map-area'>No geometry selected.</span>
+        </div>
+      </section>
+
+      <section class='panel' id='run'>
+        <h2>Run NASA diagnosis</h2>
+        <p class='subtle'>This simplified dashboard queries only NASA POWER climate data and shows the raw daily output plus a compact numeric summary.</p>
+        <div class='control-grid'>
+          <div class='field'>
+            <label for='date-start'>Start date</label>
+            <input id='date-start' type='date' />
+          </div>
+          <div class='field'>
+            <label for='date-end'>End date</label>
+            <input id='date-end' type='date' />
+          </div>
+        </div>
+        <button class='primary-action' type='button' id='run-analysis'>Run NASA diagnosis</button>
+        <div class='status'>
+          <span id='api-status'>Checking API connectivity...</span>
+          <span id='analysis-status'>Waiting for the first NASA request.</span>
+        </div>
+        <div class='status'>
+          <span id='centroid-status'>Centroid: --</span>
+          <span id='window-status'>Window: --</span>
+        </div>
+      </section>
+    </div>
+
+    <section id='results' hidden>
+      <div class='summary-grid'>
+        <article class='summary-card'><span>Data source</span><strong id='metric-source'>--</strong></article>
+        <article class='summary-card'><span>Daily records</span><strong id='metric-days'>--</strong></article>
+        <article class='summary-card'><span>Total precipitation</span><strong id='metric-rain'>--</strong></article>
+        <article class='summary-card'><span>Total ET0</span><strong id='metric-et0'>--</strong></article>
+        <article class='summary-card'><span>GDD total</span><strong id='metric-gdd'>--</strong></article>
+        <article class='summary-card'><span>Mean temperature</span><strong id='metric-temp'>--</strong></article>
+        <article class='summary-card'><span>Mean humidity</span><strong id='metric-humidity'>--</strong></article>
+        <article class='summary-card'><span>Peak fungal risk</span><strong id='metric-fungal'>--</strong></article>
+      </div>
+
+      <div class='table-grid'>
+        <article class='table-card'>
+          <h3>NASA summary</h3>
+          <div class='table-wrap'>
+            <table>
+              <tbody id='summary-table'></tbody>
+            </table>
+          </div>
+        </article>
+        <article class='table-card'>
+          <h3>NASA daily feed</h3>
+          <div class='table-wrap'>
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>T2M</th>
+                  <th>Rain</th>
+                  <th>RH2M</th>
+                  <th>ET0</th>
+                  <th>GDD</th>
+                </tr>
+              </thead>
+              <tbody id='daily-table'></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <script defer src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' crossorigin=''></script>
+  <script defer src='https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js' crossorigin=''></script>
+  <script>
+    const state = {
+      apiBase: '',
+      apiAvailable: false,
+      map: null,
+      drawnItems: null,
+      drawControl: null,
+      activeLayer: null,
+      analysisResult: null,
+    };
+
+    const els = {};
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeApiBase(value) {
+      return value ? value.trim().replace(/\/+$/, '') : '';
+    }
+
+    function getConfiguredApiBase() {
+      const params = new URLSearchParams(window.location.search);
+      const queryValue = params.get('apiBase');
+      if (queryValue) {
+        window.localStorage.setItem('deltaplant_api_base', queryValue);
+      }
+      const storedValue = window.localStorage.getItem('deltaplant_api_base');
+      const metaValue = document.querySelector('meta[name="deltaplant-api-base"]')?.getAttribute('content') || '';
+      const hostname = window.location.hostname.toLowerCase();
+      const defaultValue = hostname === 'deltaplant.ai' || hostname.endsWith('.deltaplant.ai')
+        ? 'https://api.deltaplant.ai'
+        : '';
+      return normalizeApiBase(queryValue || storedValue || metaValue || defaultValue);
+    }
+
+    function resolveApiUrl(path) {
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return state.apiBase ? `${state.apiBase}${normalizedPath}` : normalizedPath;
+    }
+
+    function getUserToken() {
+      const existing = window.localStorage.getItem('deltaplant_public_id');
+      if (existing) {
+        return existing;
+      }
+      const token = `dp_${(window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`).replace(/-/g, '')}`;
+      window.localStorage.setItem('deltaplant_public_id', token);
+      return token;
+    }
+
+    async function probeApiHealth() {
+      state.apiBase = getConfiguredApiBase();
+      try {
+        const response = await fetch(resolveApiUrl('/api/health'), { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        state.apiAvailable = true;
+        els.apiStatus.textContent = 'Live NASA API connected.';
+        els.analysisStatus.textContent = 'Ready to request direct NASA POWER data.';
+      } catch (error) {
+        state.apiAvailable = false;
+        els.apiStatus.textContent = `API unavailable: ${error.message || 'unreachable'}`;
+        els.analysisStatus.textContent = 'This page does not run demo data. Connect the live API to continue.';
+      }
+    }
+
+    function parseGoogleCoordinates(value) {
+      const text = decodeURIComponent(String(value || '').trim());
+      if (!text) {
+        throw new Error('Insert Google coordinates or a Google Maps URL.');
+      }
+      const patterns = [
+        /@\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+        /[?&]q=(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+        /[?&]query=(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+        /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+      ];
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (!match) {
+          continue;
+        }
+        const lat = Number(match[1]);
+        const lng = Number(match[2]);
+        if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          return { lat, lng };
+        }
+      }
+      throw new Error('Coordinates not recognized. Use lat, lng or paste a Google Maps link.');
+    }
+
+    function resetGeometry() {
+      if (state.drawnItems) {
+        state.drawnItems.clearLayers();
+      }
+      state.activeLayer = null;
+      els.mapArea.textContent = 'No geometry selected.';
+      els.centroidStatus.textContent = 'Centroid: --';
+    }
+
+    function computeApproxAreaHectares(layer) {
+      if (!layer) {
+        return 0;
+      }
+      if (layer instanceof window.L.Circle) {
+        return (Math.PI * layer.getRadius() * layer.getRadius()) / 10000;
+      }
+      const coordinates = layer.toGeoJSON().geometry.coordinates[0] || [];
+      if (!coordinates.length) {
+        return 0;
+      }
+      const centroid = coordinates.reduce((acc, point) => [acc[0] + point[0], acc[1] + point[1]], [0, 0]);
+      const lon0 = centroid[0] / coordinates.length;
+      const lat0 = centroid[1] / coordinates.length;
+      let area = 0;
+      for (let index = 0; index < coordinates.length - 1; index += 1) {
+        const [lon1, lat1] = coordinates[index];
+        const [lon2, lat2] = coordinates[index + 1];
+        const x1 = (lon1 - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+        const y1 = (lat1 - lat0) * 110540;
+        const x2 = (lon2 - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+        const y2 = (lat2 - lat0) * 110540;
+        area += (x1 * y2) - (x2 * y1);
+      }
+      return Math.abs(area / 2) / 10000;
+    }
+
+    function updateAreaLabel() {
+      if (!state.activeLayer) {
+        els.mapArea.textContent = 'No geometry selected.';
+        els.centroidStatus.textContent = 'Centroid: --';
+        return;
+      }
+      const area = computeApproxAreaHectares(state.activeLayer);
+      els.mapArea.textContent = `Approx. ${area.toFixed(2)} hectares selected.`;
+      const payload = buildGeoPayload();
+      if (payload.type === 'circle') {
+        els.centroidStatus.textContent = `Centroid: ${payload.center.lat.toFixed(5)}, ${payload.center.lng.toFixed(5)}`;
+      } else {
+        const coords = payload.geojson.geometry.coordinates[0] || [];
+        const avg = coords.reduce((acc, point) => [acc[0] + point[1], acc[1] + point[0]], [0, 0]);
+        const count = Math.max(coords.length, 1);
+        els.centroidStatus.textContent = `Centroid: ${(avg[0] / count).toFixed(5)}, ${(avg[1] / count).toFixed(5)}`;
+      }
+    }
+
+    function buildGeoPayload() {
+      if (!state.activeLayer) {
+        throw new Error('Draw a polygon or circle, or insert Google coordinates, before running the analysis.');
+      }
+      if (state.activeLayer instanceof window.L.Circle) {
+        const center = state.activeLayer.getLatLng();
+        return {
+          type: 'circle',
+          center: { lat: center.lat, lng: center.lng },
+          radius: state.activeLayer.getRadius(),
+        };
+      }
+      return {
+        type: 'polygon',
+        geojson: state.activeLayer.toGeoJSON(),
+      };
+    }
+
+    function applyGoogleCoordinates() {
+      if (!window.L || !state.map) {
+        els.googleCoordinatesStatus.textContent = 'The map is not ready yet. Reload the page and try again.';
+        return;
+      }
+      try {
+        const { lat, lng } = parseGoogleCoordinates(els.googleCoordinates.value);
+        const radius = clamp(Number(els.googleRadius.value) || 250, 50, 5000);
+        els.googleRadius.value = String(radius);
+        resetGeometry();
+        const circle = window.L.circle([lat, lng], {
+          radius,
+          color: '#79e7ff',
+          weight: 2,
+          fillColor: '#19f5c1',
+          fillOpacity: 0.14,
+        });
+        state.activeLayer = circle;
+        state.drawnItems.addLayer(circle);
+        state.map.fitBounds(circle.getBounds(), { padding: [24, 24] });
+        updateAreaLabel();
+        els.googleCoordinatesStatus.textContent = `Loaded ${lat.toFixed(5)}, ${lng.toFixed(5)} with a ${radius} m radius.`;
+      } catch (error) {
+        els.googleCoordinatesStatus.textContent = error.message || 'Could not parse the coordinates.';
+      }
+    }
+
+    function initMap() {
+      if (!window.L) {
+        els.mapHint.textContent = 'Leaflet failed to load. Reload the page to initialize the map.';
+        return;
+      }
+      state.map = window.L.map('map', { zoomControl: true }).setView([43.5, 12.5], 6);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(state.map);
+      state.drawnItems = new window.L.FeatureGroup();
+      state.map.addLayer(state.drawnItems);
+      state.drawControl = new window.L.Control.Draw({
+        edit: { featureGroup: state.drawnItems, edit: false, remove: false },
+        draw: {
+          polyline: false,
+          rectangle: false,
+          marker: false,
+          circlemarker: false,
+          polygon: { allowIntersection: false, showArea: true },
+          circle: true,
+        },
+      });
+      state.map.addControl(state.drawControl);
+      state.map.on(window.L.Draw.Event.CREATED, (event) => {
+        resetGeometry();
+        state.activeLayer = event.layer;
+        state.drawnItems.addLayer(event.layer);
+        updateAreaLabel();
+      });
+    }
+
+    function startDraw(mode) {
+      if (!window.L || !state.map) {
+        return;
+      }
+      if (mode === 'polygon') {
+        new window.L.Draw.Polygon(state.map, state.drawControl.options.draw.polygon).enable();
+      }
+      if (mode === 'circle') {
+        new window.L.Draw.Circle(state.map, state.drawControl.options.draw.circle).enable();
+      }
+    }
+
+    function setDateDefaults() {
+      const end = new Date();
+      const start = new Date(end.getTime() - (29 * 24 * 60 * 60 * 1000));
+      els.dateStart.value = start.toISOString().slice(0, 10);
+      els.dateEnd.value = end.toISOString().slice(0, 10);
+      els.windowStatus.textContent = `Window: ${els.dateStart.value} to ${els.dateEnd.value}`;
+    }
+
+    function formatNumber(value, digits = 2, suffix = '') {
+      if (!Number.isFinite(Number(value))) {
+        return '--';
+      }
+      return `${Number(value).toFixed(digits)}${suffix}`;
+    }
+
+    function computeDailyMeans(daily) {
+      if (!daily.length) {
+        return {
+          rainTotal: 0,
+          tempMean: 0,
+          humidityMean: 0,
+        };
+      }
+      const totals = daily.reduce((acc, item) => ({
+        rain: acc.rain + Number(item.PRECTOTCORR || 0),
+        temp: acc.temp + Number(item.T2M || 0),
+        humidity: acc.humidity + Number(item.RH2M || 0),
+      }), { rain: 0, temp: 0, humidity: 0 });
+      return {
+        rainTotal: totals.rain,
+        tempMean: totals.temp / daily.length,
+        humidityMean: totals.humidity / daily.length,
+      };
+    }
+
+    function renderResults(payload) {
+      const nasa = payload.nasa_power || {};
+      const daily = Array.isArray(nasa.daily) ? nasa.daily : [];
+      const summary = nasa.summary || {};
+      const aggregates = computeDailyMeans(daily);
+      document.getElementById('results').hidden = false;
+
+      els.metricSource.textContent = nasa.source || 'NASA POWER';
+      els.metricDays.textContent = String(daily.length);
+      els.metricRain.textContent = formatNumber(aggregates.rainTotal, 1, ' mm');
+      els.metricEt0.textContent = formatNumber(summary.et0_total, 1, ' mm');
+      els.metricGdd.textContent = formatNumber(summary.gdd_total, 1);
+      els.metricTemp.textContent = formatNumber(aggregates.tempMean, 1, ' °C');
+      els.metricHumidity.textContent = formatNumber(aggregates.humidityMean, 1, ' %');
+      els.metricFungal.textContent = formatNumber(summary.fungal_risk_peak, 2);
+
+      els.summaryTable.innerHTML = '';
+      [
+        ['Source', nasa.source || '--'],
+        ['Latitude', formatNumber(nasa.latitude, 5)],
+        ['Longitude', formatNumber(nasa.longitude, 5)],
+        ['Period start', nasa.start || '--'],
+        ['Period end', nasa.end || '--'],
+        ['ET0 mean', formatNumber(summary.et0_mean, 2, ' mm/day')],
+        ['Water stress mean', formatNumber(summary.water_stress_mean, 2)],
+        ['Water stress peak', formatNumber(summary.water_stress_peak, 2)],
+        ['Fungal risk mean', formatNumber(summary.fungal_risk_mean, 2)],
+        ['High fungal risk days', String(summary.high_fungal_risk_days ?? '--')],
+      ].forEach(([label, value]) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<th>${label}</th><td>${value}</td>`;
+        els.summaryTable.appendChild(row);
+      });
+
+      els.dailyTable.innerHTML = '';
+      daily.forEach((item) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.day || '--'}</td>
+          <td>${formatNumber(item.T2M, 1)}</td>
+          <td>${formatNumber(item.PRECTOTCORR, 1)}</td>
+          <td>${formatNumber(item.RH2M, 1)}</td>
+          <td>${formatNumber(item.ET0, 2)}</td>
+          <td>${formatNumber(item.GDD, 1)}</td>
+        `;
+        els.dailyTable.appendChild(row);
+      });
+    }
+
+    async function runAnalysis() {
+      if (!state.apiAvailable) {
+        els.analysisStatus.textContent = 'Live API unavailable. This page does not use local demo data.';
+        return;
+      }
+      try {
+        els.analysisStatus.textContent = 'Requesting NASA POWER data...';
+        els.windowStatus.textContent = `Window: ${els.dateStart.value} to ${els.dateEnd.value}`;
+        const response = await fetch(resolveApiUrl('/api/nisar/nasa-only'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            geo_data: buildGeoPayload(),
+            date_range: { start: els.dateStart.value, end: els.dateEnd.value },
+            user_token: getUserToken(),
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(await response.text() || `HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        state.analysisResult = payload;
+        renderResults(payload);
+        els.analysisStatus.textContent = 'NASA-only diagnosis completed.';
+      } catch (error) {
+        els.analysisStatus.textContent = error.message || 'NASA request failed.';
+      }
+    }
+
+    function cacheElements() {
+      els.drawPolygon = document.getElementById('draw-polygon');
+      els.drawCircle = document.getElementById('draw-circle');
+      els.clearMap = document.getElementById('clear-map');
+      els.googleCoordinates = document.getElementById('google-coordinates');
+      els.googleRadius = document.getElementById('google-radius');
+      els.googleCoordinatesStatus = document.getElementById('google-coordinates-status');
+      els.applyGoogleCoordinates = document.getElementById('apply-google-coordinates');
+      els.mapHint = document.getElementById('map-hint');
+      els.mapArea = document.getElementById('map-area');
+      els.dateStart = document.getElementById('date-start');
+      els.dateEnd = document.getElementById('date-end');
+      els.runAnalysis = document.getElementById('run-analysis');
+      els.apiStatus = document.getElementById('api-status');
+      els.analysisStatus = document.getElementById('analysis-status');
+      els.centroidStatus = document.getElementById('centroid-status');
+      els.windowStatus = document.getElementById('window-status');
+      els.metricSource = document.getElementById('metric-source');
+      els.metricDays = document.getElementById('metric-days');
+      els.metricRain = document.getElementById('metric-rain');
+      els.metricEt0 = document.getElementById('metric-et0');
+      els.metricGdd = document.getElementById('metric-gdd');
+      els.metricTemp = document.getElementById('metric-temp');
+      els.metricHumidity = document.getElementById('metric-humidity');
+      els.metricFungal = document.getElementById('metric-fungal');
+      els.summaryTable = document.getElementById('summary-table');
+      els.dailyTable = document.getElementById('daily-table');
+    }
+
+    function wireEvents() {
+      els.drawPolygon.addEventListener('click', () => startDraw('polygon'));
+      els.drawCircle.addEventListener('click', () => startDraw('circle'));
+      els.clearMap.addEventListener('click', resetGeometry);
+      els.applyGoogleCoordinates.addEventListener('click', applyGoogleCoordinates);
+      els.googleCoordinates.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applyGoogleCoordinates();
+        }
+      });
+      els.dateStart.addEventListener('change', () => {
+        els.windowStatus.textContent = `Window: ${els.dateStart.value} to ${els.dateEnd.value}`;
+      });
+      els.dateEnd.addEventListener('change', () => {
+        els.windowStatus.textContent = `Window: ${els.dateStart.value} to ${els.dateEnd.value}`;
+      });
+      els.runAnalysis.addEventListener('click', runAnalysis);
+    }
+
+    async function boot() {
+      cacheElements();
+      initMap();
+      setDateDefaults();
+      wireEvents();
+      getUserToken();
+      await probeApiHealth();
+    }
+
+    window.addEventListener('load', () => {
+      boot().catch((error) => {
+        els.analysisStatus.textContent = error.message || 'Initialization failed.';
+      });
+    });
+  </script>
+</body>
+</html>

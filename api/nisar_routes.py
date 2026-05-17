@@ -97,6 +97,19 @@ class AreaAnalysisRequest(BaseModel):
         return [_sanitize_text(answer, max_length=80) for answer in value[:5]]
 
 
+class NasaOnlyRequest(BaseModel):
+    geo_data: dict[str, Any]
+    date_range: DateRangePayload
+    user_token: str
+
+    @field_validator("user_token")
+    @classmethod
+    def validate_user_token(cls, value: str) -> str:
+        if not USER_TOKEN_PATTERN.fullmatch(value):
+            raise ValueError("Invalid user_token format")
+        return value
+
+
 class CropQuestionRequest(BaseModel):
     question_number: int = Field(ge=0, le=5)
     answer: str | None = None
@@ -157,6 +170,25 @@ async def area_analysis(request: Request, payload: AreaAnalysisRequest) -> JSONR
             crop_answers=payload.crop_answers,
             local_sensor_data=payload.local_sensor_data,
             enable_llm=llm_enabled,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return JSONResponse(content=result)
+
+
+@router.post("/nasa-only")
+@limiter.limit("10/minute")
+async def nasa_only(request: Request, payload: NasaOnlyRequest) -> JSONResponse:
+    _require_session(request)
+    try:
+        result = await request.app.state.orchestrator.analyze_nasa_only(
+            geo_data=payload.geo_data,
+            date_range=payload.date_range.model_dump(),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
