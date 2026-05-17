@@ -100,7 +100,7 @@ class VoiceService:
         )
         return translation.strip() or text
 
-    @staticmethod
+    
     def _content_type(audio: BytesIO) -> str:
         suffix = Path(getattr(audio, "name", "voice.wav")).suffix.lower()
         if suffix == ".mp3":
@@ -236,7 +236,7 @@ class NASADeltaPlantOrchestrator:
             "warnings": warnings,
         }
 
-    @staticmethod
+    
     async def _build_nasa_only_sar_context(
         self,
         geo_data: dict[str, Any],
@@ -276,7 +276,7 @@ class NASADeltaPlantOrchestrator:
                 "fallback_reason": warnings[-1],
             }
 
-    @staticmethod
+    
     def _build_climate_proxy_soil_series(power_data: dict[str, Any]) -> dict[str, Any]:
         daily = power_data.get("daily", []) or []
         recent_daily = daily[-7:]
@@ -321,7 +321,7 @@ class NASADeltaPlantOrchestrator:
             "summary": summary,
         }
 
-    @staticmethod
+    
     def _build_nasa_only_dashboard(power_data: dict[str, Any], sar_context: dict[str, Any] | None = None) -> dict[str, Any]:
         climate_proxy = NASADeltaPlantOrchestrator._build_climate_proxy_soil_series(power_data)
         summary = dict(climate_proxy.get("summary", {}) or {})
