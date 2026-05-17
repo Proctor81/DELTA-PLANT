@@ -1693,6 +1693,93 @@
       }
     }
 
+    .delta-language-switcher {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 85;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.24);
+      background: rgba(4, 12, 22, 0.78);
+      box-shadow: 0 8px 28px rgba(2, 7, 13, 0.36);
+      backdrop-filter: blur(12px);
+    }
+
+    .delta-language-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(121, 231, 255, 0.86);
+      white-space: nowrap;
+    }
+
+    .delta-language-select {
+      border: 1px solid rgba(121, 231, 255, 0.2);
+      border-radius: 999px;
+      background: rgba(7, 17, 29, 0.92);
+      color: #edf7ff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.1;
+      padding: 0.43rem 0.72rem;
+      min-width: 7.8rem;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .delta-language-select:focus {
+      border-color: rgba(25, 245, 193, 0.62);
+      box-shadow: 0 0 0 3px rgba(25, 245, 193, 0.14);
+    }
+
+    .delta-google-translate-anchor,
+    .goog-logo-link,
+    .goog-te-gadget span {
+      display: none !important;
+    }
+
+    .goog-te-banner-frame.skiptranslate,
+    iframe.goog-te-banner-frame {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    .goog-te-balloon-frame,
+    #goog-gt-tt {
+      display: none !important;
+    }
+
+    body {
+      top: 0 !important;
+    }
+
+    @media (max-width: 768px) {
+      .delta-language-switcher {
+        top: 20px;
+        right: 20px;
+        padding: 0.42rem 0.55rem;
+        gap: 0.45rem;
+      }
+
+      .delta-language-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+      }
+
+      .delta-language-select {
+        min-width: 6.95rem;
+        font-size: 0.74rem;
+        padding: 0.4rem 0.62rem;
+      }
+    }
+
     @media (min-width: 1024px) {
       .hero-home-layout {
         grid-template-columns: minmax(21rem, 0.78fr) minmax(0, 1.22fr);
@@ -2700,6 +2787,20 @@
       </div>
     </div>
   </section>
+
+  <div id="delta-language-switcher" class="delta-language-switcher" aria-label="Language switcher">
+    <label for="delta-language-select" class="delta-language-label">Language</label>
+    <select id="delta-language-select" class="delta-language-select" aria-label="Select language">
+      <option value="en">English</option>
+      <option value="it">Italiano</option>
+      <option value="fr">Français</option>
+      <option value="de">Deutsch</option>
+      <option value="es">Español</option>
+      <option value="pt">Português</option>
+      <option value="nl">Nederlands</option>
+    </select>
+  </div>
+  <div id="google_translate_element" class="delta-google-translate-anchor" aria-hidden="true"></div>
 
   <script>
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3799,6 +3900,269 @@
     window.addEventListener('pointerleave', () => {
       pointer.active = false;
     });
+  </script>
+  <script>
+    (() => {
+      // Translation config designed for easy extension with new languages.
+      const DELTA_TRANSLATION_CONFIG = {
+        sourceLanguage: 'en',
+        storageKey: 'deltaPreferredLanguage',
+        cookieKey: 'deltaPreferredLanguage',
+        googleCookieKey: 'googtrans',
+        geolocationEndpoint: 'https://geolocation-db.com/json/',
+        supportedLanguages: {
+          en: { label: 'English' },
+          it: { label: 'Italiano' },
+          fr: { label: 'Français' },
+          de: { label: 'Deutsch' },
+          es: { label: 'Español' },
+          pt: { label: 'Português' },
+          nl: { label: 'Nederlands' },
+        },
+        countryLanguageMap: {
+          IT: 'it',
+          FR: 'fr',
+          DE: 'de',
+          ES: 'es',
+          PT: 'pt',
+          BR: 'pt',
+          NL: 'nl',
+          BE: 'nl',
+          CH: 'de',
+          AT: 'de',
+          LU: 'fr',
+        },
+      };
+
+      const switcher = document.getElementById('delta-language-switcher');
+      const select = document.getElementById('delta-language-select');
+      if (!switcher || !select) {
+        return;
+      }
+
+      const supported = Object.keys(DELTA_TRANSLATION_CONFIG.supportedLanguages);
+      const includedLanguages = supported.join(',');
+      let translatorReady = false;
+      let translatorInitPromise = null;
+      let comboResolveQueue = [];
+
+      const normalizeLanguage = (raw) => {
+        const value = String(raw || '').trim().toLowerCase();
+        if (!value) {
+          return '';
+        }
+        const base = value.split('-')[0].split('_')[0];
+        return supported.includes(base) ? base : '';
+      };
+
+      const setCookie = (name, value, days = 365) => {
+        const maxAge = Math.max(1, Math.floor(days * 24 * 60 * 60));
+        document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      };
+
+      const getCookie = (name) => {
+        const prefix = `${name}=`;
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        for (const item of cookies) {
+          if (item.startsWith(prefix)) {
+            return decodeURIComponent(item.slice(prefix.length));
+          }
+        }
+        return '';
+      };
+
+      const persistLanguagePreference = (lang) => {
+        try {
+          window.localStorage.setItem(DELTA_TRANSLATION_CONFIG.storageKey, lang);
+        } catch (error) {
+          // Ignore storage failures and keep cookie persistence.
+        }
+        setCookie(DELTA_TRANSLATION_CONFIG.cookieKey, lang);
+      };
+
+      const readPersistedLanguage = () => {
+        try {
+          const fromStorage = normalizeLanguage(window.localStorage.getItem(DELTA_TRANSLATION_CONFIG.storageKey));
+          if (fromStorage) {
+            return fromStorage;
+          }
+        } catch (error) {
+          // Ignore localStorage access errors.
+        }
+        return normalizeLanguage(getCookie(DELTA_TRANSLATION_CONFIG.cookieKey));
+      };
+
+      const detectBrowserLanguage = () => normalizeLanguage(navigator.language || navigator.userLanguage || '');
+
+      const detectGeoLanguage = async () => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = window.setTimeout(() => controller.abort(), 2200);
+          const response = await fetch(DELTA_TRANSLATION_CONFIG.geolocationEndpoint, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          });
+          window.clearTimeout(timeoutId);
+          if (!response.ok) {
+            return '';
+          }
+          const payload = await response.json();
+          const countryCode = String(payload?.country_code || '').toUpperCase();
+          const mapped = DELTA_TRANSLATION_CONFIG.countryLanguageMap[countryCode] || '';
+          return normalizeLanguage(mapped);
+        } catch (error) {
+          return '';
+        }
+      };
+
+      const detectInitialLanguage = async () => {
+        const persisted = readPersistedLanguage();
+        if (persisted) {
+          return persisted;
+        }
+
+        const browserLang = detectBrowserLanguage();
+        if (browserLang) {
+          return browserLang;
+        }
+
+        const geoLang = await detectGeoLanguage();
+        if (geoLang) {
+          return geoLang;
+        }
+
+        return DELTA_TRANSLATION_CONFIG.sourceLanguage;
+      };
+
+      const applyGoogleCookie = (lang) => {
+        if (lang === DELTA_TRANSLATION_CONFIG.sourceLanguage) {
+          setCookie(DELTA_TRANSLATION_CONFIG.googleCookieKey, '/auto/en', 7);
+          return;
+        }
+        setCookie(DELTA_TRANSLATION_CONFIG.googleCookieKey, `/en/${lang}`, 7);
+      };
+
+      const waitForGoogleCombo = () => new Promise((resolve) => {
+        const existing = document.querySelector('.goog-te-combo');
+        if (existing) {
+          resolve(existing);
+          return;
+        }
+        comboResolveQueue.push(resolve);
+      });
+
+      const notifyComboReady = () => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo || !comboResolveQueue.length) {
+          return;
+        }
+        const queue = comboResolveQueue;
+        comboResolveQueue = [];
+        queue.forEach((resolve) => resolve(combo));
+      };
+
+      const setComboLanguage = async (lang) => {
+        const combo = await waitForGoogleCombo();
+        if (!combo) {
+          return;
+        }
+        const targetValue = lang === 'en' ? '' : lang;
+        if (combo.value === targetValue) {
+          return;
+        }
+        combo.value = targetValue;
+        combo.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      const setActiveLanguage = async (lang, { persist = true } = {}) => {
+        const normalized = normalizeLanguage(lang) || DELTA_TRANSLATION_CONFIG.sourceLanguage;
+        select.value = normalized;
+        if (persist) {
+          persistLanguagePreference(normalized);
+        }
+        applyGoogleCookie(normalized);
+        await setComboLanguage(normalized);
+      };
+
+      const initializeTranslator = () => {
+        if (translatorInitPromise) {
+          return translatorInitPromise;
+        }
+
+        translatorInitPromise = new Promise((resolve, reject) => {
+          const callbackName = 'deltaGoogleTranslateInit';
+          window[callbackName] = () => {
+            try {
+              new window.google.translate.TranslateElement(
+                {
+                  pageLanguage: DELTA_TRANSLATION_CONFIG.sourceLanguage,
+                  includedLanguages,
+                  autoDisplay: false,
+                },
+                'google_translate_element',
+              );
+
+              const observer = new MutationObserver(() => {
+                const combo = document.querySelector('.goog-te-combo');
+                if (combo) {
+                  observer.disconnect();
+                  translatorReady = true;
+                  notifyComboReady();
+                  resolve();
+                }
+              });
+
+              observer.observe(document.body, { childList: true, subtree: true });
+
+              const combo = document.querySelector('.goog-te-combo');
+              if (combo) {
+                observer.disconnect();
+                translatorReady = true;
+                notifyComboReady();
+                resolve();
+              }
+            } catch (error) {
+              reject(error);
+            }
+          };
+
+          if (window.google && window.google.translate) {
+            window[callbackName]();
+            return;
+          }
+
+          const script = document.createElement('script');
+          script.src = `//translate.google.com/translate_a/element.js?cb=${callbackName}`;
+          script.async = true;
+          script.onerror = () => reject(new Error('Google Translate script load failed'));
+          document.body.appendChild(script);
+        });
+
+        return translatorInitPromise;
+      };
+
+      const bootTranslator = async () => {
+        const initialLang = await detectInitialLanguage();
+        select.value = initialLang;
+
+        try {
+          await initializeTranslator();
+          if (translatorReady) {
+            await setActiveLanguage(initialLang, { persist: true });
+          }
+        } catch (error) {
+          // Graceful fallback: keep switcher visible even if external script fails.
+          console.warn('Google Translate initialization failed:', error);
+        }
+      };
+
+      select.addEventListener('change', async (event) => {
+        const nextLanguage = normalizeLanguage(event.target.value) || DELTA_TRANSLATION_CONFIG.sourceLanguage;
+        await setActiveLanguage(nextLanguage, { persist: true });
+      });
+
+      void bootTranslator();
+    })();
   </script>
 </body>
 </html>
