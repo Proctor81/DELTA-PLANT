@@ -1289,6 +1289,10 @@
     }
 
     @media (max-width: 768px) {
+      .hero-shell {
+        min-height: auto;
+      }
+
       .audio-dock {
         position: absolute !important;
         width: min(290px, calc(100vw - 1.5rem)) !important;
@@ -1330,7 +1334,7 @@
       }
 
       body.privacy-banner-visible .hero-shell {
-        padding-bottom: calc(var(--privacy-banner-offset) + 3rem);
+        padding-bottom: calc(var(--privacy-banner-offset) + 2rem);
       }
 
       body.privacy-manage-visible .audio-dock {
@@ -1344,7 +1348,7 @@
 
       .hero-map-panel,
       .hero-map-image {
-        min-height: 18.5rem;
+        min-height: 16.5rem;
       }
 
       .hero-summary-grid {
@@ -1379,11 +1383,40 @@
       }
 
       .hero-home-layout {
-        padding-bottom: 18rem;
+        gap: 1.9rem;
+        padding: 1.5rem 1rem 12.5rem;
       }
 
       .dashboard-content {
-        padding: 1.1rem;
+        padding: 0.95rem;
+      }
+
+      .dashboard-shell {
+        border-radius: 1.5rem;
+      }
+
+      .dashboard-panel {
+        border-radius: 1.2rem;
+        padding: 0.95rem;
+      }
+
+      #features,
+      #technology,
+      #demo,
+      #impact,
+      #docs,
+      #contact {
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+      }
+
+      #features .mt-12,
+      #technology .mt-12,
+      #demo .mt-12,
+      #impact .mt-12,
+      #docs .mt-12,
+      #contact .mt-12 {
+        margin-top: 2rem;
       }
 
       .hero-days-row {
