@@ -1723,7 +1723,7 @@
                   <div class="hero-demo-quickfact">
                     <div class="text-xs uppercase tracking-[0.2em] text-cyan-200/62">Weekly output</div>
                     <div class="mt-3 text-2xl font-semibold text-white">1 mean value</div>
-                    <div class="mt-2 text-sm text-slate-300/68">Single weekly mean plus a verbal label: BASSO, MEDIO, or ALTO.</div>
+                    <div class="mt-2 text-sm text-slate-300/68">Single weekly mean plus a verbal label: LOW, MEDIUM, or HIGH.</div>
                   </div>
                   <div class="hero-demo-quickfact">
                     <div class="text-xs uppercase tracking-[0.2em] text-cyan-200/62">L-band depth</div>
@@ -1782,7 +1782,7 @@
                       </div>
                       <div class="hero-summary-card">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Weekly fungal risk</div>
-                        <div id="hero-risk-badge" class="hero-risk-badge hero-risk-medium mt-3">MEDIO</div>
+                        <div id="hero-risk-badge" class="hero-risk-badge hero-risk-medium mt-3">MEDIUM</div>
                         <div id="hero-risk-copy" class="mt-3 text-sm leading-7 text-slate-300/68">Weekly mean risk 0.52. Moisture persistence and official weather support indicate a medium fungal pressure around this GPS micro-zone.</div>
                       </div>
                       <div class="hero-summary-card">
@@ -2556,9 +2556,9 @@
     const computeFungalRiskValue = (temperature, humidity, precipitation, previousRisk) => {
       const humidityFactor = humidity >= 80 ? 1 : humidity / 80;
       const tempCentered = Math.max(0, 1 - Math.abs(temperature - 20) / 10);
-      const rainFactor = Math.min(Math.max(precipitation / 8, 0), 1);
-      const sustained = previousRisk * 0.45;
-      return clamp((0.5 * humidityFactor) + (0.35 * tempCentered) + (0.15 * rainFactor) + sustained, 0, 1);
+      const rainFactor = Math.min(Math.max(precipitation / 14, 0), 1);
+      const sustained = previousRisk * 0.05;
+      return clamp((0.4 * humidityFactor) + (0.35 * tempCentered) + (0.25 * rainFactor) + sustained, 0, 1);
     };
 
     const buildWeeklyFungalRiskWindow = (dailyWeather) => {
@@ -2573,25 +2573,25 @@
         daily,
         meanValue: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0,
         peakValue: values.length ? Math.max(...values) : 0,
-        highRiskDays: values.filter((value) => value >= 0.7).length,
+        highRiskDays: values.filter((value) => value >= 0.75).length,
       };
     };
 
     const classifyHeroRisk = (averageRisk, peakRisk, highRiskDays) => {
-      if (peakRisk >= 0.8 || highRiskDays >= 3 || averageRisk >= 0.65) {
-        return 'ALTO';
+      if (peakRisk >= 0.86 || highRiskDays >= 4 || averageRisk >= 0.74) {
+        return 'HIGH';
       }
-      if (peakRisk >= 0.6 || highRiskDays >= 1 || averageRisk >= 0.45) {
-        return 'MEDIO';
+      if (peakRisk >= 0.66 || highRiskDays >= 2 || averageRisk >= 0.52) {
+        return 'MEDIUM';
       }
-      return 'BASSO';
+      return 'LOW';
     };
 
     const buildHeroRiskCopy = (level, averageRisk, humidityMean, rainTotal, soilMoistureMean, sourceLabel) => {
-      if (level === 'ALTO') {
+      if (level === 'HIGH') {
         return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area shows high fungal favorability because the SAR moisture proxy stays near ${soilMoistureMean.toFixed(1)}%, humidity averages ${humidityMean.toFixed(0)}%, and rainfall reaches ${rainTotal.toFixed(1)} mm from ${sourceLabel}.`;
       }
-      if (level === 'MEDIO') {
+      if (level === 'MEDIUM') {
         return `Weekly mean risk ${averageRisk.toFixed(2)}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.`;
       }
       return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.`;
@@ -2841,7 +2841,7 @@
       const temperatureMean = combinedSeries.reduce((sum, item) => sum + item.temperature, 0) / combinedSeries.length;
       const soilMoistureMean = combinedSeries.reduce((sum, item) => sum + item.soilMoisture, 0) / combinedSeries.length;
       const riskLevel = classifyHeroRisk(averageRisk, peakRisk, riskWindow.highRiskDays);
-      const riskClass = riskLevel === 'ALTO' ? 'hero-risk-high' : riskLevel === 'MEDIO' ? 'hero-risk-medium' : 'hero-risk-low';
+      const riskClass = riskLevel === 'HIGH' ? 'hero-risk-high' : riskLevel === 'MEDIUM' ? 'hero-risk-medium' : 'hero-risk-low';
 
       heroDemoCenter.textContent = `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`;
       heroDemoFootprint.textContent = `Footprint ${Math.round(HERO_FOOTPRINT_M2).toLocaleString('en-US')} m²`;
