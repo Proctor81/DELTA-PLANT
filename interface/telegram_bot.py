@@ -23,6 +23,14 @@ from typing import Any, Dict, Optional, Set, List, Tuple
 
 import requests
 
+try:
+    from PIL import Image, ImageDraw
+    PIL_AVAILABLE = True
+except ImportError:
+    Image = None
+    ImageDraw = None
+    PIL_AVAILABLE = False
+
 from core.config import (
     TELEGRAM_CONFIG,
     API_CONFIG,
@@ -1599,6 +1607,91 @@ def _build_nasa_sar_map_url(latitude: float, longitude: float, context_meters: f
     return "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" + requests.compat.urlencode(params)
 
 
+def _build_nasa_sar_map_photo_payload(latitude: float, longitude: float) -> Optional[BytesIO]:
+    map_url = _build_nasa_sar_map_url(latitude, longitude)
+
+    try:
+        response = requests.get(map_url, timeout=10)
+        response.raise_for_status()
+
+        if not PIL_AVAILABLE:
+            payload = BytesIO(response.content)
+            payload.seek(0)
+            payload.name = "nasa_sar_dashboard.jpg"
+            return payload
+
+        image = Image.open(BytesIO(response.content)).convert("RGBA")
+        width, height = image.size
+        center_x, center_y = width // 2, height // 2
+
+        min_side = min(width, height)
+        # Match the landing page overlay proportions (inner ring ~22vw, outer dashed ring ~32vw).
+        inner_radius = int(min_side * 0.147)
+        outer_radius = int(min_side * 0.213)
+        core_radius = int(min_side * 0.07)
+        mid_ring_radius = int(min_side * 0.17)
+
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        # Mirror the landing page focus overlay: center cross + core glow + dual rings.
+        draw.line((0, center_y, width, center_y), fill=(237, 247, 255, 92), width=2)
+        draw.line((center_x, 0, center_x, height), fill=(237, 247, 255, 92), width=2)
+
+        core_bbox = (
+            center_x - core_radius,
+            center_y - core_radius,
+            center_x + core_radius,
+            center_y + core_radius,
+        )
+        draw.ellipse(core_bbox, fill=(25, 245, 193, 32))
+
+        mid_ring_bbox = (
+            center_x - mid_ring_radius,
+            center_y - mid_ring_radius,
+            center_x + mid_ring_radius,
+            center_y + mid_ring_radius,
+        )
+        draw.ellipse(mid_ring_bbox, outline=(121, 231, 255, 78), width=2)
+
+        inner_bbox = (
+            center_x - inner_radius,
+            center_y - inner_radius,
+            center_x + inner_radius,
+            center_y + inner_radius,
+        )
+        draw.ellipse(inner_bbox, outline=(25, 245, 193, 235), width=4)
+
+        for glow in (10, 20):
+            glow_bbox = (
+                center_x - inner_radius - glow,
+                center_y - inner_radius - glow,
+                center_x + inner_radius + glow,
+                center_y + inner_radius + glow,
+            )
+            alpha = 20 if glow == 10 else 10
+            draw.ellipse(glow_bbox, outline=(25, 245, 193, alpha), width=7)
+
+        outer_bbox = (
+            center_x - outer_radius,
+            center_y - outer_radius,
+            center_x + outer_radius,
+            center_y + outer_radius,
+        )
+        for degree in range(0, 360, 14):
+            draw.arc(outer_bbox, start=degree, end=degree + 7, fill=(121, 231, 255, 132), width=2)
+
+        merged = Image.alpha_composite(image, overlay).convert("RGB")
+        output = BytesIO()
+        merged.save(output, format="JPEG", quality=92)
+        output.seek(0)
+        output.name = "nasa_sar_dashboard.jpg"
+        return output
+    except Exception as exc:
+        logger.info("Snapshot NASA/SAR non disponibile in binario: %s", exc)
+        return None
+
+
 def _parse_meteoam_param_key(raw_param: Any) -> str:
     if isinstance(raw_param, dict):
         for key in ("id", "name", "code", "param"):
@@ -1845,7 +1938,7 @@ def _build_nasa_sar_scientific_interpretation(
         )
         or 0.0
     )
-    sar_source = str(soil_summary.get("sar_source", "Climate proxy fallback"))
+    sar_source = str(soil_summary.get("sar_source", "Stima climatica NASA POWER"))
     sar_product_name = soil_summary.get("sar_product_name")
     sar_acquired_at = soil_summary.get("sar_acquired_at")
 
@@ -1860,7 +1953,6 @@ def _build_nasa_sar_scientific_interpretation(
 
     locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
     weather_source = html.escape(str((weather_reference or {}).get("source", "Servizio meteo non disponibile")), quote=False)
-    weather_source_url = html.escape(str((weather_reference or {}).get("source_url", "")), quote=False)
     warning = str((weather_reference or {}).get("warning", "") or "").strip()
     weather_days = len(weather_daily)
 
@@ -1881,7 +1973,7 @@ def _build_nasa_sar_scientific_interpretation(
         f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni.",
         "Fonti dati:",
         f"- Umidita' del suolo: {html.escape(sar_source, quote=False)}" + (f" | scena {html.escape(str(sar_product_name), quote=False)}" if sar_product_name else ""),
-        f"- Meteo: {weather_source}" + (f" | {weather_source_url}" if weather_source_url else ""),
+        f"- Meteo: {weather_source}",
         "- Mappa: Esri World Imagery",
     ]
     if sar_acquired_at:
@@ -1911,7 +2003,7 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     centroid = geo_summary.get("centroid", {}) or {}
     radius_m = geo_summary.get("radius_m", 50)
     locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
-    sar_source = html.escape(str(summary.get("sar_source", "Climate proxy fallback")), quote=False)
+    sar_source = html.escape(str(summary.get("sar_source", "Stima climatica NASA POWER")), quote=False)
     sar_product_name = summary.get("sar_product_name")
     sar_acquired_at = summary.get("sar_acquired_at")
     weather_start = summary.get("weather_window_start")
@@ -1920,6 +2012,7 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     lines = [
         "<b>🛰️ NASA-ISRO/SAR Dashboard</b>",
         "<b>──────────────</b>",
+        "<i>Sintesi semplice SAR/NISAR + meteo ufficiale</i>",
         f"<b>Localita':</b> {locality_label}",
         f"<b>Area:</b> raggio {radius_m:.0f} m",
         f"<b>Centro GPS:</b> {float(centroid.get('lat', 0.0)):.6f}, {float(centroid.get('lon', 0.0)):.6f}",
@@ -1943,7 +2036,23 @@ async def _interpret_nasa_sar_dashboard(
     if not dashboard.get("summary"):
         return "Non ho trovato abbastanza dati SAR e meteo per produrre una sintesi agronomica." 
     weather_reference = await asyncio.to_thread(_fetch_external_weather_reference, result)
-    return _build_nasa_sar_scientific_interpretation(result, weather_reference)
+    technical_text = _build_nasa_sar_scientific_interpretation(result, weather_reference)
+    try:
+        engine = _get_chat_engine(context)
+        prompt = (
+            "Riscrivi il testo seguente in italiano molto semplice e sintetico (max 6 righe). "
+            "Mantieni i numeri principali (rischio medio, umidita' suolo, temperatura media, umidita' media, pioggia). "
+            "Non aggiungere link, non aggiungere avvertenze extra, non usare markdown.\n\n"
+            f"Testo tecnico:\n{technical_text}"
+        )
+        llm_text = await asyncio.to_thread(engine.chat_internal, prompt)
+        concise_text = re.sub(r"https?://\S+", "", str(llm_text or "")).strip()
+        if concise_text:
+            return f"Sintesi breve LLM:\n{concise_text}\n\nDettaglio tecnico:\n{technical_text}"
+        return technical_text
+    except Exception as exc:
+        logger.info("Sintesi LLM NASA non disponibile, uso testo tecnico: %s", exc)
+        return technical_text
 
 
 def _build_nasa_sar_followup_context(result: Dict[str, Any], interpretation: str) -> str:
@@ -2006,19 +2115,16 @@ async def _send_nasa_sar_map_snapshot(
     update: Update,
     latitude: float,
     longitude: float,
-    locality_label: Optional[str],
 ) -> None:
     chat = getattr(update, "effective_chat", None)
     if chat is None:
         return
-    caption_lines = [
-        f"Mappa satellite DELTA Plant: {locality_label or 'Localita\' non determinata'}",
-        "Stesso frame Esri World Imagery mostrato sul sito, centrato sul raggio operativo di 50 m.",
-    ]
     try:
+        photo_payload = await asyncio.to_thread(_build_nasa_sar_map_photo_payload, latitude, longitude)
+        if photo_payload is None:
+            return
         await chat.send_photo(
-            photo=_build_nasa_sar_map_url(latitude, longitude),
-            caption="\n".join(caption_lines),
+            photo=photo_payload,
         )
     except Exception as exc:
         logger.warning("Invio mappa NASA/SAR Telegram fallito: %s", exc)
@@ -2071,13 +2177,13 @@ async def _run_nasa_sar_analysis(
 
     dashboard_text = _format_nasa_sar_dashboard(result)
     interpretation = await _interpret_nasa_sar_dashboard(context, result)
+    await _send_nasa_sar_map_snapshot(update, latitude, longitude)
     await _send(
         update,
         dashboard_text,
         reply_markup=reply_markup,
         parse_mode="HTML",
     )
-    await _send_nasa_sar_map_snapshot(update, latitude, longitude, locality_label)
     await _send(
         update,
         "<b>🧠 Sintesi semplice SAR/NISAR + Servizio Meteorologico dell'Aeronautica Militare</b>\n" + interpretation,
@@ -2395,6 +2501,12 @@ async def chat_command_chiudi(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    now_ts = datetime.now().timestamp()
+    last_start_ts = float(context.user_data.get("_last_start_ts", 0.0) or 0.0)
+    if (now_ts - last_start_ts) < 2.5:
+        logger.info("Telegram /start duplicato ignorato da user_id=%s", update.effective_user.id if update.effective_user else "0")
+        return ConversationHandler.END
+    context.user_data["_last_start_ts"] = now_ts
     logger.info("Telegram /start ricevuto da user_id=%s", update.effective_user.id if update.effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
@@ -3513,6 +3625,10 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        context.user_data["chat_seed_context"] = (
+            "Contesto della piu recente diagnosi DELTA Plant:\n\n"
+            f"{opinion}"
+        )
     finally:
         _clear_diagnosis_state(context)
 
@@ -3633,6 +3749,10 @@ async def _send_ai_diagnosis_opinion(
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        context.user_data["chat_seed_context"] = (
+            "Contesto della piu recente diagnosi DELTA Plant:\n\n"
+            f"{opinion}"
+        )
     finally:
         # Pulizia garantita anche se _send_diagnosis_paginated lancia un'eccezione.
         # Senza questo, la chat potrebbe restare bloccata o ricevere marker residui.
