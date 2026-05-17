@@ -431,6 +431,7 @@ TELEGRAM_CONFIG = {
     "authorized_usernames": [],        # Lista nickname (con @) (vuota = accesso aperto)
     "authorized_usernames_file": str(BASE_DIR / "data" / "telegram_scientists.local.json"),
     "api_base_url": "http://localhost:5000",
+    "web_app_base_url": "https://deltaplant.ai",
     "request_timeout_sec": 5,
     "conversation_timeout_sec": 300,   # 5 minuti
     "poll_interval_sec": 1.0,

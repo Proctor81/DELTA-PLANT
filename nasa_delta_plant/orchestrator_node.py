@@ -217,12 +217,59 @@ class NASADeltaPlantOrchestrator:
             start=start,
             end=end,
         )
+        dashboard = self._build_nasa_only_dashboard(power_data)
 
         return {
             "mode": "nasa-only",
             "geo_summary": geo_summary,
             "nasa_power": power_data,
+            "dashboard": dashboard,
             "warnings": [],
+        }
+
+    @staticmethod
+    def _build_nasa_only_dashboard(power_data: dict[str, Any]) -> dict[str, Any]:
+        daily = power_data.get("daily", []) or []
+        recent_daily = daily[-7:]
+        soil_series: list[dict[str, Any]] = []
+
+        for index, day in enumerate(recent_daily):
+            window = recent_daily[max(0, index - 6): index + 1]
+            recent_precip = sum(float(item.get("PRECTOTCORR", 0.0)) for item in window)
+            recent_et0 = sum(float(item.get("ET0", 0.0)) for item in window)
+            water_stress_mean = (
+                sum(float(item.get("water_stress_index", 0.0)) for item in window) / len(window)
+                if window else 0.0
+            )
+            soil_moisture = float(
+                np.clip(
+                    58.0 + (recent_precip * 0.35) - (recent_et0 * 0.55) - (water_stress_mean * 25.0),
+                    0.0,
+                    100.0,
+                )
+            )
+            soil_series.append(
+                {
+                    "day": day.get("day"),
+                    "soil_moisture_percent": round(soil_moisture, 3),
+                    "precip_mm": round(float(day.get("PRECTOTCORR", 0.0)), 3),
+                    "et0_mm": round(float(day.get("ET0", 0.0)), 3),
+                    "water_stress_index": round(float(day.get("water_stress_index", 0.0)), 3),
+                }
+            )
+
+        values = [float(item["soil_moisture_percent"]) for item in soil_series]
+        summary = {
+            "days": len(soil_series),
+            "latest_soil_moisture_percent": round(values[-1], 3) if values else 0.0,
+            "average_soil_moisture_percent": round(float(np.mean(values)), 3) if values else 0.0,
+            "min_soil_moisture_percent": round(min(values), 3) if values else 0.0,
+            "max_soil_moisture_percent": round(max(values), 3) if values else 0.0,
+            "trend_delta_percent": round(values[-1] - values[0], 3) if len(values) >= 2 else 0.0,
+        }
+        return {
+            "soil_moisture_last_7_days": soil_series,
+            "summary": summary,
         }
 
     def _build_climate_proxy_field_state(

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DELTA Plant | NASA-ISRO/SAR Locator</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#06111c" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-1: #06111c;
+      --bg-2: #0d2230;
+      --fg: #f4fbff;
+      --muted: #9fc8d3;
+      --accent: #19f5c1;
+      --accent-2: #79e7ff;
+      --danger: #ff8a7a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(121, 231, 255, 0.18), transparent 32%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+      color: var(--fg);
+      padding: 24px;
+    }
+
+    .card {
+      width: min(100%, 440px);
+      border: 1px solid rgba(121, 231, 255, 0.22);
+      border-radius: 24px;
+      background: rgba(6, 17, 28, 0.92);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+      padding: 28px 24px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.5rem;
+      line-height: 1.15;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(121, 231, 255, 0.08);
+      color: var(--fg);
+      font-size: 0.98rem;
+    }
+
+    .status.error {
+      background: rgba(255, 138, 122, 0.12);
+      color: #ffd7d2;
+    }
+
+    .spinner {
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      border: 3px solid rgba(121, 231, 255, 0.18);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+      margin-bottom: 18px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font: inherit;
+      cursor: pointer;
+      color: #031018;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      font-weight: 700;
+    }
+
+    button.secondary {
+      color: var(--fg);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>NASA-ISRO/SAR GPS</h1>
+    <p>Sto richiedendo automaticamente la posizione del telefono per analizzare un raggio di 50 metri e rimandare i dati a DELTAPLANO_bot.</p>
+    <div id="status" class="status">Richiesta GPS in corso...</div>
+    <div class="actions">
+      <button id="retry" type="button">Riprova</button>
+      <button id="close" type="button" class="secondary">Chiudi</button>
+    </div>
+  </main>
+
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    const statusBox = document.getElementById("status");
+    const retryButton = document.getElementById("retry");
+    const closeButton = document.getElementById("close");
+
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.MainButton) {
+        tg.MainButton.hide();
+      }
+    }
+
+    function setStatus(message, isError = false) {
+      statusBox.textContent = message;
+      statusBox.classList.toggle("error", isError);
+    }
+
+    function sendPayload(payload) {
+      if (tg && typeof tg.sendData === "function") {
+        tg.sendData(JSON.stringify(payload));
+        setStatus("Posizione acquisita. Invio al bot in corso...");
+        window.setTimeout(() => tg.close(), 450);
+        return true;
+      }
+      setStatus("Apri questa utility dal bottone Telegram del bot per inviare automaticamente il GPS.", true);
+      return false;
+    }
+
+    function requestLocation() {
+      if (!navigator.geolocation) {
+        setStatus("Questo telefono non espone la geolocalizzazione al browser integrato.", true);
+        sendPayload({ type: "nasa_sar_location", status: "error", reason: "unsupported" });
+        return;
+      }
+
+      setStatus("Attendo il consenso GPS del telefono...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const payload = {
+            type: "nasa_sar_location",
+            status: "ok",
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy_m: position.coords.accuracy,
+            timestamp_ms: position.timestamp,
+          };
+          sendPayload(payload);
+        },
+        (error) => {
+          const message = error && error.message ? error.message : "permesso negato o GPS non disponibile";
+          setStatus(`Geolocalizzazione non disponibile: ${message}.`, true);
+          sendPayload({ type: "nasa_sar_location", status: "error", reason: message });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        }
+      );
+    }
+
+    retryButton.addEventListener("click", requestLocation);
+    closeButton.addEventListener("click", () => {
+      if (tg) {
+        tg.close();
+      } else {
+        window.close();
+      }
+    });
+
+    requestLocation();
+  </script>
+</body>
+</html>

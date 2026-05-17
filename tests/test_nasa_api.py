@@ -170,6 +170,36 @@ class FakeOrchestrator:
             "llm_remaining_today": 0 if enable_llm else 1,
         }
 
+    async def analyze_nasa_only(self, geo_data: dict, date_range: dict) -> dict:
+        return {
+            "mode": "nasa-only",
+            "geo_summary": {
+                "centroid": {"lat": 45.46, "lon": 9.19},
+                "radius_m": 50.0,
+            },
+            "nasa_power": {
+                "daily": [
+                    {"day": "2026-04-24", "PRECTOTCORR": 1.2, "ET0": 2.5, "water_stress_index": 0.32},
+                    {"day": "2026-04-25", "PRECTOTCORR": 0.8, "ET0": 2.2, "water_stress_index": 0.28},
+                ]
+            },
+            "dashboard": {
+                "soil_moisture_last_7_days": [
+                    {"day": "2026-04-24", "soil_moisture_percent": 54.8},
+                    {"day": "2026-04-25", "soil_moisture_percent": 56.1},
+                ],
+                "summary": {
+                    "days": 2,
+                    "latest_soil_moisture_percent": 56.1,
+                    "average_soil_moisture_percent": 55.45,
+                    "min_soil_moisture_percent": 54.8,
+                    "max_soil_moisture_percent": 56.1,
+                    "trend_delta_percent": 1.3,
+                },
+            },
+            "warnings": [],
+        }
+
     def handle_crop_question(self, session_id: str, question_number: int, answer: str | None, sar_signature: dict) -> dict:
         self.crop_calls.append(
             {
@@ -266,6 +296,26 @@ def test_area_analysis_uses_llm_consent_state(nasa_client):
     assert payload["diagnosis"]["probable_crop"] == "Tomato_healthy"
     assert fake_orchestrator.analysis_calls[0]["enable_llm"] is True
     assert fake_orchestrator.cookie_validator.feature_calls[-1][1] == "llm"
+
+
+def test_nasa_only_returns_dashboard_payload(nasa_client):
+    client, _ = nasa_client
+    client.get("/api/health")
+
+    response = client.post(
+        "/api/nisar/nasa-only",
+        json={
+            "geo_data": {"type": "circle", "center": {"lat": 45.46, "lng": 9.19}, "radius": 50.0},
+            "date_range": {"start": "2026-04-24", "end": "2026-04-30"},
+            "user_token": "dp_user_token_1234567890",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mode"] == "nasa-only"
+    assert payload["dashboard"]["summary"]["days"] == 2
+    assert payload["dashboard"]["soil_moisture_last_7_days"][0]["soil_moisture_percent"] == 54.8
 
 
 def test_privacy_consent_roundtrip_and_cookie_preferences(nasa_client):

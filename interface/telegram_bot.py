@@ -15,7 +15,7 @@ import shutil
 import random
 import wave
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional, Set, List, Tuple
 
@@ -71,7 +71,7 @@ except ImportError:
     PYDUB_AVAILABLE = False
 
 try:
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+    from telegram import KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, WebAppInfo
     from telegram.ext import (
         Application,
         ApplicationHandlerStop,
@@ -116,6 +116,7 @@ _FREE_CHAT_TRANSIENT_MARKERS = (
     "diag_user_description",
     "diag_followup_mode",
     "diag_pending_chunks",
+    "awaiting_nasa_sar_location",
 )
 
 _DIAG_TRANSIENT_KEYS = (
@@ -897,6 +898,7 @@ CMD_ACADEMY = "CMD_ACADEMY"
 CMD_LICENSE = "CMD_LICENSE"
 CMD_BATCH = "CMD_BATCH"
 CMD_CHAT = "CMD_CHAT"
+CMD_NASA_SAR = "CMD_NASA_SAR"
 CMD_VOICE_LANG_IT = "CMD_VOICE_LANG_IT"
 CMD_VOICE_LANG_EN = "CMD_VOICE_LANG_EN"
 CHAT_EXIT = "CHAT_EXIT"
@@ -988,6 +990,11 @@ def _load_allowed_usernames() -> Set[str]:
     return {n for n in names if n}
 
 
+def _nasa_sar_webapp_url() -> str:
+    base = TELEGRAM_CONFIG.get("web_app_base_url", "https://deltaplant.ai").rstrip("/")
+    return f"{base}/telegram/nasa-sar-locator.html"
+
+
 def _menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
@@ -1009,6 +1016,12 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📄 Licenza", callback_data=CMD_LICENSE),
         ],
         [
+            InlineKeyboardButton(
+                "🛰️ Connettiti a NASA-ISRO/SAR",
+                web_app=WebAppInfo(url=_nasa_sar_webapp_url()),
+            ),
+        ],
+        [
             InlineKeyboardButton("👩‍🔬 Cris (IT)", callback_data=CMD_VOICE_LANG_IT),
         ],
         [
@@ -1017,7 +1030,7 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-async def _send(update: Update, text: str, reply_markup: Optional[InlineKeyboardMarkup] = None, parse_mode: str = None):
+async def _send(update: Update, text: str, reply_markup: Optional[Any] = None, parse_mode: str = None):
     # parse_mode è opzionale e passato come keyword argument
     import inspect
     frame = inspect.currentframe()
@@ -1459,12 +1472,27 @@ async def _api_request(
     path: str,
     json_body: Optional[Dict[str, Any]] = None,
     params: Optional[Dict[str, Any]] = None,
+    context: Optional["ContextTypes.DEFAULT_TYPE"] = None,
 ):
     url = _api_url(path)
     timeout = TELEGRAM_CONFIG.get("request_timeout_sec", 5)
 
+    def _session_request() -> requests.Response:
+        if context is None:
+            return requests.request(method, url, json=json_body, params=params, timeout=timeout)
+
+        session = context.application.bot_data.get("api_http_session")
+        if session is None:
+            session = requests.Session()
+            context.application.bot_data["api_http_session"] = session
+
+        if "deltaplant_session" not in session.cookies:
+            session.get(_api_url("/api/health"), timeout=timeout)
+
+        return session.request(method, url, json=json_body, params=params, timeout=timeout)
+
     def _do_request():
-        return requests.request(method, url, json=json_body, params=params, timeout=timeout)
+        return _session_request()
 
     try:
         return await asyncio.to_thread(_do_request)
@@ -1478,6 +1506,222 @@ def _parse_float(value: str) -> Optional[float]:
         return float(value.replace(",", ".").strip())
     except ValueError:
         return None
+
+
+def _nasa_sar_geo_payload(latitude: float, longitude: float) -> Dict[str, Any]:
+    return {
+        "type": "circle",
+        "center": {"lat": round(float(latitude), 7), "lng": round(float(longitude), 7)},
+        "radius": 50,
+    }
+
+
+def _nasa_sar_date_range_payload(days: int = 7) -> Dict[str, str]:
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=max(days - 1, 0))
+    return {"start": start.isoformat(), "end": end.isoformat()}
+
+
+def _soil_moisture_bar(value: float, width: int = 10) -> str:
+    normalized = max(0.0, min(float(value), 100.0))
+    filled = int(round((normalized / 100.0) * width))
+    return ("█" * filled) + ("░" * max(width - filled, 0))
+
+
+def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
+    geo_summary = result.get("geo_summary", {}) or {}
+    dashboard = result.get("dashboard", {}) or {}
+    summary = dashboard.get("summary", {}) or {}
+    soil_days = dashboard.get("soil_moisture_last_7_days", []) or []
+    centroid = geo_summary.get("centroid", {}) or {}
+    radius_m = geo_summary.get("radius_m", 50)
+
+    lines = [
+        "<b>🛰️ NASA-ISRO/SAR Dashboard</b>",
+        "<b>──────────────</b>",
+        f"<b>Area:</b> raggio {radius_m:.0f} m",
+        f"<b>Centro GPS:</b> {float(centroid.get('lat', 0.0)):.6f}, {float(centroid.get('lon', 0.0)):.6f}",
+        f"<b>Soil moisture oggi:</b> {float(summary.get('latest_soil_moisture_percent', 0.0)):.1f}%",
+        f"<b>Media 7 giorni:</b> {float(summary.get('average_soil_moisture_percent', 0.0)):.1f}%",
+        f"<b>Range 7 giorni:</b> {float(summary.get('min_soil_moisture_percent', 0.0)):.1f}% → {float(summary.get('max_soil_moisture_percent', 0.0)):.1f}%",
+        f"<b>Trend:</b> {float(summary.get('trend_delta_percent', 0.0)):+.1f} punti",
+        "",
+        "<b>Ultimi 7 giorni</b>",
+    ]
+    for item in soil_days:
+        value = float(item.get("soil_moisture_percent", 0.0))
+        day = str(item.get("day", ""))[5:]
+        lines.append(
+            f"<code>{day}  {_soil_moisture_bar(value)}  {value:5.1f}%</code>"
+        )
+    return "\n".join(lines)
+
+
+async def _interpret_nasa_sar_dashboard(
+    context: "ContextTypes.DEFAULT_TYPE",
+    result: Dict[str, Any],
+) -> str:
+    dashboard = result.get("dashboard", {}) or {}
+    series = dashboard.get("soil_moisture_last_7_days", []) or []
+    summary = dashboard.get("summary", {}) or {}
+    if not series:
+        return "Non ho trovato abbastanza dati NASA POWER per produrre un'interpretazione agronomica." 
+
+    engine = _get_chat_engine(context)
+    prompt = (
+        "Interpreta in italiano, in massimo 6 righe, una dashboard satellitare NASA-ISRO/SAR per umidità del suolo. "
+        "Usa tono tecnico ma operativo. Cita trend, stabilità o criticità e una raccomandazione pratica. "
+        "Non inventare colture o dati non presenti.\n\n"
+        f"SUMMARY: {json.dumps(summary, ensure_ascii=False)}\n"
+        f"SERIES: {json.dumps(series, ensure_ascii=False)}"
+    )
+
+    try:
+        interpretation = await asyncio.to_thread(engine.chat_internal, prompt)
+    except Exception as exc:
+        logger.warning("Interpretazione LLM NASA/SAR fallita: %s", exc)
+        interpretation = ""
+
+    interpretation = (interpretation or "").strip()
+    if interpretation:
+        return interpretation
+
+    latest = float(summary.get("latest_soil_moisture_percent", 0.0))
+    trend = float(summary.get("trend_delta_percent", 0.0))
+    trend_label = "in aumento" if trend > 1.0 else "in calo" if trend < -1.0 else "stabile"
+    return (
+        f"L'umidità del suolo stimata è {trend_label} negli ultimi 7 giorni. "
+        f"Il valore più recente è {latest:.1f}%. "
+        "Usa questo segnale come supporto operativo e confrontalo con rilievi agronomici in campo."
+    )
+
+
+def _get_nasa_orchestrator(context: ContextTypes.DEFAULT_TYPE):
+    orchestrator = context.application.bot_data.get("nasa_orchestrator")
+    if orchestrator is None:
+        from nasa_delta_plant.orchestrator_node import NASADeltaPlantOrchestrator
+
+        orchestrator = NASADeltaPlantOrchestrator()
+        context.application.bot_data["nasa_orchestrator"] = orchestrator
+        logger.info("NASADeltaPlantOrchestrator inizializzato per Telegram")
+    return orchestrator
+
+
+async def _run_nasa_sar_analysis(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    latitude: float,
+    longitude: float,
+    reply_markup: Optional[Any] = None,
+) -> None:
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    geo_payload = _nasa_sar_geo_payload(latitude, longitude)
+    date_range = _nasa_sar_date_range_payload(days=7)
+    orchestrator = _get_nasa_orchestrator(context)
+
+    try:
+        result = await orchestrator.analyze_nasa_only(
+            geo_data=geo_payload,
+            date_range=date_range,
+        )
+    except Exception as exc:
+        logger.warning("Analisi NASA-ISRO/SAR fallita: %s", exc, exc_info=True)
+        await _send(
+            update,
+            "Analisi NASA-ISRO/SAR non disponibile in questo momento.",
+            reply_markup=reply_markup or _menu_keyboard(),
+        )
+        return
+
+    dashboard_text = _format_nasa_sar_dashboard(result)
+    interpretation = await _interpret_nasa_sar_dashboard(context, result)
+    await _send(
+        update,
+        dashboard_text,
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+    )
+    await _send(
+        update,
+        "<b>🧠 Interpretazione LLM</b>\n" + interpretation,
+        reply_markup=_menu_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data["awaiting_nasa_sar_location"] = True
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("📍 Invia GPS per NASA-ISRO/SAR", request_location=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Condividi la tua posizione per analizzare un raggio di 50 metri.",
+    )
+    await _send(
+        update,
+        "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
+        "Invia la posizione GPS del telefono. Userò un'area circolare di 50 metri di raggio, "
+        "recupererò i dati degli ultimi 7 giorni tramite l'API NASA già attiva e ti mostrerò una dashboard con interpretazione LLM.",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+
+async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    location = getattr(getattr(update, "message", None), "location", None)
+    if location is None or not context.user_data.get("awaiting_nasa_sar_location"):
+        return
+
+    context.user_data.pop("awaiting_nasa_sar_location", None)
+    await _run_nasa_sar_analysis(
+        update,
+        context,
+        location.latitude,
+        location.longitude,
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
+async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+
+    message = getattr(update, "effective_message", None)
+    web_app_data = getattr(message, "web_app_data", None)
+    if web_app_data is None:
+        return
+
+    try:
+        payload = json.loads(web_app_data.data)
+    except Exception:
+        await _send(update, "Dati GPS automatici non validi ricevuti dalla Web App.", reply_markup=_menu_keyboard())
+        return
+
+    if payload.get("type") != "nasa_sar_location":
+        return
+
+    if payload.get("status") == "error":
+        await _send(
+            update,
+            "La posizione automatica non è disponibile. Consenti l'accesso GPS sul telefono oppure usa /nasa_sar per l'invio manuale.",
+            reply_markup=_menu_keyboard(),
+        )
+        return
+
+    try:
+        latitude = float(payload["latitude"])
+        longitude = float(payload["longitude"])
+    except (KeyError, TypeError, ValueError):
+        await _send(update, "Coordinate GPS automatiche non valide.", reply_markup=_menu_keyboard())
+        return
+
+    await _run_nasa_sar_analysis(update, context, latitude, longitude)
 
 
 def _format_diagnosis(record: Dict[str, Any]) -> str:
@@ -3121,6 +3365,8 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await academy_start(update, context)
     elif query.data == CMD_LICENSE:
         await license_text(update, context)
+    elif query.data == CMD_NASA_SAR:
+        await nasa_sar_connect(update, context)
     elif query.data == CMD_BATCH:
         await batch_analyze(update, context)
     elif query.data == CMD_VOICE_LANG_IT:
@@ -3770,6 +4016,7 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("preflight", preflight))
     application.add_handler(CommandHandler("voice", voice_mode_command))
     application.add_handler(CommandHandler("voice_lang", voice_language_command))
+    application.add_handler(CommandHandler("nasa_sar", nasa_sar_connect))
     # /continua globale: funziona anche dopo END del ConversationHandler
     application.add_handler(CommandHandler("continua", continue_diagnosis_message))
     # Pulsante inline "Continua lettura" (CMD_CONTINUA) — stesso handler
@@ -3782,6 +4029,8 @@ def run_telegram_bot(agent=None):
     application.add_handler(chat_conv_handler)
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
+    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_nasa_sar_web_app_data), group=9)
+    application.add_handler(MessageHandler(filters.LOCATION, handle_nasa_sar_location), group=10)
     application.add_handler(MessageHandler(filters.VOICE, handle_voice_message), group=-1)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, free_chat_handler), group=99)
     application.add_handler(CallbackQueryHandler(chat_exit, pattern=f"^{CHAT_EXIT}$"))
