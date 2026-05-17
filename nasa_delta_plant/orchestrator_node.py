@@ -217,18 +217,67 @@ class NASADeltaPlantOrchestrator:
             start=start,
             end=end,
         )
-        dashboard = self._build_nasa_only_dashboard(power_data)
+        warnings: list[str] = []
+        sar_context = await self._build_nasa_only_sar_context(
+            geo_data=geo_data,
+            power_data=power_data,
+            start=start,
+            end=end,
+            warnings=warnings,
+        )
+        dashboard = self._build_nasa_only_dashboard(power_data, sar_context)
 
         return {
             "mode": "nasa-only",
             "geo_summary": geo_summary,
             "nasa_power": power_data,
+            "sar_context": sar_context,
             "dashboard": dashboard,
-            "warnings": [],
+            "warnings": warnings,
         }
 
     @staticmethod
-    def _build_nasa_only_dashboard(power_data: dict[str, Any]) -> dict[str, Any]:
+    async def _build_nasa_only_sar_context(
+        self,
+        geo_data: dict[str, Any],
+        power_data: dict[str, Any],
+        start: date,
+        end: date,
+        warnings: list[str],
+    ) -> dict[str, Any]:
+        try:
+            sentinel_payload = await asyncio.wait_for(
+                self.sentinel_client.fetch(geo_data, start=start, end=end, max_results=2),
+                timeout=SENTINEL_PIPELINE_TIMEOUT_SECONDS,
+            )
+            processed = self.preprocessor.preprocess(
+                primary=sentinel_payload["primary"],
+                secondary=sentinel_payload.get("secondary"),
+            )
+            features = self.feature_extractor.extract(processed, power_data)
+            product = sentinel_payload["primary"].product
+            return {
+                "mode": "sar-live",
+                "source": "Sentinel-1 SAR operational fallback",
+                "soil_moisture_percent": round(float(features.soil_moisture_percent), 3),
+                "product_name": product.name,
+                "acquired_at": product.start_time.isoformat(),
+            }
+        except (asyncio.TimeoutError, LookupError, ModuleNotFoundError, OSError, RuntimeError, ValueError) as exc:
+            warnings.append(f"Sentinel soil-moisture fallback activated: {type(exc).__name__}: {exc}")
+            climate_proxy = self._build_climate_proxy_soil_series(power_data)
+            proxy_summary = climate_proxy["summary"]
+            return {
+                "mode": "climate-proxy",
+                "source": "Climate proxy fallback",
+                "soil_moisture_percent": round(float(proxy_summary.get("average_soil_moisture_percent", 0.0)), 3),
+                "product_name": None,
+                "acquired_at": None,
+                "fallback_reason": warnings[-1],
+            }
+
+    @staticmethod
+    def _build_climate_proxy_soil_series(power_data: dict[str, Any]) -> dict[str, Any]:
         daily = power_data.get("daily", []) or []
         recent_daily = daily[-7:]
         soil_series: list[dict[str, Any]] = []
@@ -271,6 +320,27 @@ class NASADeltaPlantOrchestrator:
             "soil_moisture_last_7_days": soil_series,
             "summary": summary,
         }
+
+    @staticmethod
+    def _build_nasa_only_dashboard(power_data: dict[str, Any], sar_context: dict[str, Any] | None = None) -> dict[str, Any]:
+        climate_proxy = NASADeltaPlantOrchestrator._build_climate_proxy_soil_series(power_data)
+        summary = dict(climate_proxy.get("summary", {}) or {})
+        recent_daily = (power_data.get("daily", []) or [])[-7:]
+        sar_context = sar_context or {}
+        summary.update(
+            {
+                "sar_soil_moisture_percent": round(float(sar_context.get("soil_moisture_percent", 0.0) or 0.0), 3),
+                "sar_source": str(sar_context.get("source", "Climate proxy fallback")),
+                "sar_mode": str(sar_context.get("mode", "climate-proxy")),
+                "sar_product_name": sar_context.get("product_name"),
+                "sar_acquired_at": sar_context.get("acquired_at"),
+                "weather_window_start": recent_daily[0].get("day") if recent_daily else None,
+                "weather_window_end": recent_daily[-1].get("day") if recent_daily else None,
+            }
+        )
+        climate_proxy["summary"] = summary
+        climate_proxy["weather_last_7_days"] = recent_daily
+        return climate_proxy
 
     def _build_climate_proxy_field_state(
         self,

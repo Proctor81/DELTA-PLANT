@@ -376,7 +376,8 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
         tg,
         "_fetch_external_weather_reference",
         lambda result: {
-            "source": "Open-Meteo Archive",
+            "source": "Servizio Meteorologico dell'Aeronautica Militare",
+            "source_url": "https://api.meteoam.it/deda-meteograms/meteograms",
             "daily": [
                 {"day": "2026-05-11", "T2M": 20.4, "RH2M": 80.0, "PRECTOTCORR": 2.0},
                 {"day": "2026-05-17", "T2M": 19.6, "RH2M": 84.0, "PRECTOTCORR": 4.0},
@@ -385,29 +386,16 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
     )
 
     result = {
-        "dashboard": {
-            "soil_moisture_last_7_days": [
-                {"day": "2026-05-11", "soil_moisture_percent": 28.1},
-                {"day": "2026-05-17", "soil_moisture_percent": 19.4},
-            ],
-            "summary": {
-                "latest_soil_moisture_percent": 19.4,
-                "average_soil_moisture_percent": 24.5,
-                "trend_delta_percent": -8.7,
-            },
+        "geo_summary": {
+            "locality_label": "Roma, Lazio, Italia",
         },
-        "nasa_power": {
+        "dashboard": {
             "summary": {
-                "water_stress_mean": 0.72,
-                "water_stress_peak": 0.91,
-                "fungal_risk_mean": 0.66,
-                "fungal_risk_peak": 0.84,
-                "high_fungal_risk_days": 3,
+                "sar_soil_moisture_percent": 31.4,
+                "sar_source": "Sentinel-1 SAR operational fallback",
+                "sar_product_name": "S1A_TEST_PRODUCT",
+                "sar_acquired_at": "2026-05-17T10:00:00+00:00",
             },
-            "daily": [
-                {"day": "2026-05-11", "fungal_disease_risk_index": 0.71, "RH2M": 83.0, "PRECTOTCORR": 2.4, "T2M": 20.1},
-                {"day": "2026-05-17", "fungal_disease_risk_index": 0.84, "RH2M": 86.0, "PRECTOTCORR": 4.2, "T2M": 19.8},
-            ],
         },
     }
 
@@ -418,39 +406,40 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
         )
     )
 
-    assert "rischio fungino" in text.lower()
-    assert "alto" in text.lower()
+    assert "valore medio settimanale" in text.lower()
+    assert "giudizio di rischio: alto" in text.lower()
     assert "50% umidita' relativa" in text.lower()
-    assert "open-meteo archive" in text.lower()
-    assert "quadro coerente" in text.lower()
-    assert "stress idrico" in text.lower()
+    assert "servizio meteorologico dell'aeronautica militare" in text.lower()
+    assert "umidita' del suolo sar" in text.lower()
+    assert "fonti dati:" in text.lower()
     assert "non e' una diagnosi di malattia" in text.lower()
 
 
-def test_format_nasa_sar_dashboard_shows_most_recent_day_first():
+def test_format_nasa_sar_dashboard_includes_locality_and_sar_source():
     text = tg._format_nasa_sar_dashboard(
         {
             "geo_summary": {
                 "centroid": {"lat": 41.9028, "lon": 12.4964},
                 "radius_m": 50,
+                "locality_label": "Roma, Lazio, Italia",
             },
             "dashboard": {
                 "summary": {
-                    "latest_soil_moisture_percent": 19.4,
-                    "average_soil_moisture_percent": 24.5,
-                    "min_soil_moisture_percent": 19.4,
-                    "max_soil_moisture_percent": 28.1,
-                    "trend_delta_percent": -8.7,
+                    "sar_soil_moisture_percent": 31.4,
+                    "sar_source": "Sentinel-1 SAR operational fallback",
+                    "sar_product_name": "S1A_TEST_PRODUCT",
+                    "sar_acquired_at": "2026-05-17T10:00:00+00:00",
+                    "weather_window_start": "2026-05-11",
+                    "weather_window_end": "2026-05-17",
                 },
-                "soil_moisture_last_7_days": [
-                    {"day": "2026-05-11", "soil_moisture_percent": 28.1},
-                    {"day": "2026-05-17", "soil_moisture_percent": 19.4},
-                ],
             },
         }
     )
 
-    assert text.index("05-17") < text.index("05-11")
+    assert "Roma, Lazio, Italia" in text
+    assert "Umidita' suolo SAR" in text
+    assert "Sentinel-1 SAR operational fallback" in text
+    assert "2026-05-17T10:00:00+00:00" in text
 
 
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
@@ -470,6 +459,7 @@ def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
             "chat_mode_active": True,
             "chat_pending_chunks": ["parte successiva"],
             "chat_pending_parse_mode": "Markdown",
+            "chat_seed_context": "Sintesi SAR recente",
         }
     )
 
@@ -480,6 +470,7 @@ def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
     assert "chat_mode_active" not in context.user_data
     assert "chat_pending_chunks" not in context.user_data
     assert "chat_pending_parse_mode" not in context.user_data
+    assert "chat_seed_context" not in context.user_data
 
 
 def test_continue_diagnosis_message_sends_next_and_final_smile(monkeypatch):
@@ -691,10 +682,13 @@ def test_free_chat_handler_ignores_sensor_collection_markers(monkeypatch):
     async def fake_send_action(*args, **kwargs):
         return None
 
+    async def fake_send_message(*args, **kwargs):
+        return None
+
     update = types.SimpleNamespace(
         message=types.SimpleNamespace(text="70"),
         effective_user=types.SimpleNamespace(id=88),
-        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action, send_message=fake_send_message),
     )
     context = types.SimpleNamespace(
         user_data={"sensor_index": 2},
@@ -718,6 +712,91 @@ def test_free_chat_handler_ignores_sensor_collection_markers(monkeypatch):
     finally:
         logger.handlers = old_handlers
         logger.propagate = old_propagate
+
+
+def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
+    prompts = []
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat(self, user_id, prompt, response_language=None):
+            prompts.append((user_id, prompt, response_language))
+            return "risposta contestuale"
+
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=42),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"chat_seed_context": "Sintesi SAR: rischio MEDIO su Roma."},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._generate_free_chat_response(update, context, "Perche'?"))
+
+    assert result == "risposta contestuale"
+    assert prompts[0][0] == "42"
+    assert "Sintesi SAR: rischio MEDIO su Roma." in prompts[0][1]
+    assert "Domanda utente: Perche'?" in prompts[0][1]
+    assert "chat_seed_context" not in context.user_data
+
+
+def test_run_nasa_sar_analysis_sets_chat_seed_context_and_sends_map(monkeypatch):
+    sends = []
+    photos = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup, parse_mode))
+
+    class FakeChat:
+        async def send_action(self, action):
+            return None
+
+        async def send_photo(self, photo, caption=None):
+            photos.append((photo, caption))
+
+    class FakeOrchestrator:
+        async def analyze_nasa_only(self, geo_data, date_range):
+            return {
+                "geo_summary": {
+                    "centroid": {"lat": 41.9028, "lon": 12.4964},
+                    "radius_m": 50,
+                },
+                "dashboard": {
+                    "summary": {
+                        "sar_soil_moisture_percent": 31.4,
+                        "sar_source": "Sentinel-1 SAR operational fallback",
+                        "sar_product_name": "S1A_TEST_PRODUCT",
+                        "sar_acquired_at": "2026-05-17T10:00:00+00:00",
+                    },
+                },
+                "nasa_power": {"daily": []},
+            }
+
+    async def fake_interpret(context, result):
+        return "Valore medio settimanale: 0.62\nGiudizio di rischio: MEDIO"
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_get_nasa_orchestrator", lambda context: FakeOrchestrator())
+    monkeypatch.setattr(tg, "_interpret_nasa_sar_dashboard", fake_interpret)
+    monkeypatch.setattr(tg, "_reverse_geocode_locality", lambda latitude, longitude: "Roma, Lazio, Italia")
+
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+
+    asyncio.run(tg._run_nasa_sar_analysis(update, context, 41.9028, 12.4964))
+
+    assert len(photos) == 1
+    assert "World_Imagery/MapServer/export" in photos[0][0]
+    assert "Roma, Lazio, Italia" in photos[0][1]
+    assert any("Sintesi semplice SAR/NISAR" in text for text, _, _ in sends)
+    assert any("Ora puoi chiedermi approfondimenti" in text for text, _, _ in sends)
+    assert "chat_seed_context" in context.user_data
+    assert "Valore medio settimanale" in context.user_data["chat_seed_context"]
 
 
 def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):

@@ -8,7 +8,9 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import json
+import html
 import logging
+import math
 import os
 import re
 import shutil
@@ -151,7 +153,7 @@ def _clear_user_data_keys(context: "ContextTypes.DEFAULT_TYPE", *keys: str) -> N
 
 
 def _clear_chat_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
-    _clear_user_data_keys(context, "chat_mode_active", "chat_pending_chunks", "chat_pending_parse_mode")
+    _clear_user_data_keys(context, "chat_mode_active", "chat_pending_chunks", "chat_pending_parse_mode", "chat_seed_context")
 
 
 def _clear_diagnosis_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
@@ -671,9 +673,18 @@ async def _generate_free_chat_response(
 
     engine = _get_chat_engine(context)
     response_language = _voice_language_mode(context)
+    chat_seed_context = str(context.user_data.pop("chat_seed_context", "") or "").strip()
 
     def _ask() -> str:
-        return engine.chat(user_id, user_text, response_language=response_language)
+        prompt = user_text
+        if chat_seed_context:
+            prompt = (
+                "Contesto recente DELTA Plant da usare solo se utile per la prossima risposta. "
+                "Non inventare dati oltre questo contesto.\n\n"
+                f"{chat_seed_context}\n\n"
+                f"Domanda utente: {user_text}"
+            )
+        return engine.chat(user_id, prompt, response_language=response_language)
 
     try:
         response = await asyncio.to_thread(_ask)
@@ -1557,172 +1568,328 @@ def _safe_average(values: List[float]) -> float:
     return sum(values) / len(values)
 
 
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _meters_to_latitude_degrees(meters: float) -> float:
+    return float(meters) / 111320.0
+
+
+def _meters_to_longitude_degrees(meters: float, latitude: float) -> float:
+    latitude_cos = math.cos((float(latitude) * math.pi) / 180.0)
+    return float(meters) / max(111320.0 * abs(latitude_cos), 1e-6)
+
+
+def _build_nasa_sar_map_url(latitude: float, longitude: float, context_meters: float = 220.0) -> str:
+    lat_delta = _meters_to_latitude_degrees(context_meters)
+    lon_delta = _meters_to_longitude_degrees(context_meters, latitude)
+    params = {
+        "bbox": f"{longitude - lon_delta},{latitude - lat_delta},{longitude + lon_delta},{latitude + lat_delta}",
+        "bboxSR": "4326",
+        "imageSR": "4326",
+        "size": "1200,900",
+        "format": "jpg",
+        "transparent": "false",
+        "f": "image",
+    }
+    return "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" + requests.compat.urlencode(params)
+
+
+def _parse_meteoam_param_key(raw_param: Any) -> str:
+    if isinstance(raw_param, dict):
+        for key in ("id", "name", "code", "param"):
+            value = raw_param.get(key)
+            if value:
+                return str(value).strip().lower()
+    return str(raw_param or "").strip().lower()
+
+
+def _find_meteoam_param_index(paramlist: List[Any], target_key: str) -> Optional[int]:
+    normalized_target = str(target_key).strip().lower()
+    for index, raw_param in enumerate(paramlist):
+        if _parse_meteoam_param_key(raw_param) == normalized_target:
+            return index
+    return None
+
+
+def _extract_meteoam_point_dataset(datasets: Any) -> Any:
+    if isinstance(datasets, dict):
+        if "0" in datasets:
+            return datasets.get("0")
+        if 0 in datasets:
+            return datasets.get(0)
+        for value in datasets.values():
+            return value
+        return None
+    if isinstance(datasets, list) and datasets:
+        return datasets[0]
+    return None
+
+
+def _unwrap_meteoam_series(raw_series: Any) -> List[Any]:
+    if isinstance(raw_series, dict):
+        for key in ("data", "values", "series"):
+            value = raw_series.get(key)
+            if isinstance(value, list):
+                return value
+    if isinstance(raw_series, list):
+        return raw_series
+    return []
+
+
+def _extract_meteoam_param_values(datasets: Any, param_index: int) -> List[Any]:
+    point_dataset = _extract_meteoam_point_dataset(datasets)
+    if point_dataset is None:
+        return []
+
+    raw_series: Any = None
+    if isinstance(point_dataset, dict):
+        raw_series = point_dataset.get(str(param_index))
+        if raw_series is None:
+            raw_series = point_dataset.get(param_index)
+    elif isinstance(point_dataset, list) and 0 <= param_index < len(point_dataset):
+        raw_series = point_dataset[param_index]
+
+    return _unwrap_meteoam_series(raw_series)
+
+
+def _parse_datetime_value(raw_value: Any) -> Optional[datetime]:
+    value = raw_value
+    if isinstance(raw_value, dict):
+        for key in ("time", "timestamp", "value"):
+            candidate = raw_value.get(key)
+            if candidate:
+                value = candidate
+                break
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _aggregate_meteoam_daily(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    timeseries = list(payload.get("timeseries", []) or [])
+    paramlist = list(payload.get("paramlist", []) or [])
+    datasets = payload.get("datasets", {}) or {}
+
+    temp_index = _find_meteoam_param_index(paramlist, "2t")
+    humidity_index = _find_meteoam_param_index(paramlist, "r")
+    rain_index = _find_meteoam_param_index(paramlist, "tpp")
+    if temp_index is None or humidity_index is None or rain_index is None:
+        return []
+
+    temp_values = _extract_meteoam_param_values(datasets, temp_index)
+    humidity_values = _extract_meteoam_param_values(datasets, humidity_index)
+    rain_values = _extract_meteoam_param_values(datasets, rain_index)
+
+    daily_buckets: Dict[str, Dict[str, Any]] = {}
+    for index, raw_time in enumerate(timeseries):
+        moment = _parse_datetime_value(raw_time)
+        if moment is None:
+            continue
+        day = moment.date().isoformat()
+        bucket = daily_buckets.setdefault(
+            day,
+            {
+                "day": day,
+                "temp_values": [],
+                "humidity_values": [],
+                "rain_total": 0.0,
+            },
+        )
+
+        temp_value = _coerce_float(temp_values[index] if index < len(temp_values) else None)
+        if temp_value is not None:
+            bucket["temp_values"].append(temp_value)
+
+        humidity_value = _coerce_float(humidity_values[index] if index < len(humidity_values) else None)
+        if humidity_value is not None:
+            bucket["humidity_values"].append(humidity_value)
+
+        rain_value = _coerce_float(rain_values[index] if index < len(rain_values) else None)
+        if rain_value is not None:
+            bucket["rain_total"] += rain_value
+
+    daily: List[Dict[str, Any]] = []
+    for day in sorted(daily_buckets.keys())[:7]:
+        bucket = daily_buckets[day]
+        if not bucket["temp_values"] or not bucket["humidity_values"]:
+            continue
+        daily.append(
+            {
+                "day": day,
+                "T2M": round(_safe_average(bucket["temp_values"]), 3),
+                "RH2M": round(_safe_average(bucket["humidity_values"]), 3),
+                "PRECTOTCORR": round(float(bucket["rain_total"]), 3),
+            }
+        )
+    return daily
+
+
+def _build_power_weather_reference(result: Dict[str, Any], reason: str) -> Dict[str, Any]:
+    daily = (result.get("nasa_power", {}) or {}).get("daily", []) or []
+    fallback_daily = [
+        {
+            "day": item.get("day"),
+            "T2M": float(item.get("T2M", 0.0) or 0.0),
+            "RH2M": float(item.get("RH2M", 0.0) or 0.0),
+            "PRECTOTCORR": float(item.get("PRECTOTCORR", 0.0) or 0.0),
+        }
+        for item in daily[-7:]
+        if item.get("day")
+    ]
+    if not fallback_daily:
+        return {}
+    return {
+        "source": "NASA POWER fallback",
+        "source_url": "https://power.larc.nasa.gov/",
+        "daily": fallback_daily,
+        "official_unavailable": True,
+        "warning": reason,
+    }
+
+
+def _compute_fungal_risk_value(
+    temperature: float,
+    humidity: float,
+    precipitation: float,
+    previous_risk: float,
+) -> float:
+    humidity_factor = 1.0 if humidity >= 80.0 else humidity / 80.0
+    temp_centered = max(0.0, 1.0 - abs(temperature - 20.0) / 10.0)
+    rain_factor = min(max(precipitation / 8.0, 0.0), 1.0)
+    sustained = previous_risk * 0.45
+    return max(min((0.5 * humidity_factor) + (0.35 * temp_centered) + (0.15 * rain_factor) + sustained, 1.0), 0.0)
+
+
+def _build_weekly_fungal_risk_window(daily_weather: List[Dict[str, Any]]) -> Dict[str, Any]:
+    previous_risk = 0.0
+    risk_series: List[Dict[str, Any]] = []
+    for item in daily_weather[:7]:
+        risk_value = _compute_fungal_risk_value(
+            temperature=float(item.get("T2M", 0.0) or 0.0),
+            humidity=float(item.get("RH2M", 0.0) or 0.0),
+            precipitation=float(item.get("PRECTOTCORR", 0.0) or 0.0),
+            previous_risk=previous_risk,
+        )
+        previous_risk = risk_value
+        risk_series.append({**item, "fungal_risk": round(risk_value, 3)})
+
+    values = [float(item.get("fungal_risk", 0.0) or 0.0) for item in risk_series]
+    return {
+        "daily": risk_series,
+        "mean_value": round(_safe_average(values), 3) if values else 0.0,
+        "peak_value": round(max(values), 3) if values else 0.0,
+        "high_risk_days": sum(1 for value in values if value >= 0.7),
+    }
+
+
 def _fetch_external_weather_reference(result: Dict[str, Any]) -> Dict[str, Any]:
     geo_summary = result.get("geo_summary", {}) or {}
     centroid = geo_summary.get("centroid", {}) or {}
-    daily = (result.get("nasa_power", {}) or {}).get("daily", []) or []
-    daily = daily[-7:]
     latitude = centroid.get("lat")
     longitude = centroid.get("lon")
-    start_date = daily[0].get("day") if daily else None
-    end_date = daily[-1].get("day") if daily else None
 
-    if latitude is None or longitude is None or not start_date or not end_date:
+    if latitude is None or longitude is None:
         return {}
 
     try:
         response = requests.get(
-            "https://archive-api.open-meteo.com/v1/archive",
+            "https://api.meteoam.it/deda-meteograms/meteograms",
             params={
-                "latitude": float(latitude),
-                "longitude": float(longitude),
-                "start_date": start_date,
-                "end_date": end_date,
-                "daily": "temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum",
-                "timezone": "UTC",
+                "request": "GetMeteogram",
+                "layers": "preset1",
+                "latlon": f"{float(latitude):.6f},{float(longitude):.6f}",
             },
+            headers={"User-Agent": "DELTA Plant/1.0 (+https://deltaplant.ai)"},
             timeout=8,
         )
         response.raise_for_status()
         payload = response.json() or {}
-        raw_daily = payload.get("daily", {}) or {}
-        times = raw_daily.get("time", []) or []
-        temps = raw_daily.get("temperature_2m_mean", []) or []
-        humidities = raw_daily.get("relative_humidity_2m_mean", []) or []
-        precipitations = raw_daily.get("precipitation_sum", []) or []
-
-        series: List[Dict[str, Any]] = []
-        for index, day in enumerate(times):
-            series.append(
-                {
-                    "day": day,
-                    "T2M": float(temps[index]) if index < len(temps) and temps[index] is not None else 0.0,
-                    "RH2M": float(humidities[index]) if index < len(humidities) and humidities[index] is not None else 0.0,
-                    "PRECTOTCORR": float(precipitations[index]) if index < len(precipitations) and precipitations[index] is not None else 0.0,
-                }
-            )
+        series = _aggregate_meteoam_daily(payload)
         if not series:
-            return {}
+            raise ValueError("Nessun dato giornaliero utile restituito da MeteoAM")
         return {
-            "source": "Open-Meteo Archive",
+            "source": "Servizio Meteorologico dell'Aeronautica Militare",
+            "source_url": "https://api.meteoam.it/deda-meteograms/meteograms",
             "daily": series,
         }
     except Exception as exc:
-        logger.info("Confronto meteo web non disponibile: %s", exc)
-        return {}
-
-
-def _build_weather_comparison_lines(
-    nasa_daily: List[Dict[str, Any]],
-    weather_reference: Dict[str, Any],
-) -> List[str]:
-    if not nasa_daily:
-        return []
-
-    weather_daily = weather_reference.get("daily", []) or []
-    weather_by_day = {str(item.get("day")): item for item in weather_daily if item.get("day")}
-    overlap = [
-        (day, weather_by_day.get(str(day.get("day"))))
-        for day in nasa_daily
-        if weather_by_day.get(str(day.get("day"))) is not None
-    ]
-    if not overlap:
-        return [
-            "Confronto meteo web: non disponibile in questo momento; la sintesi sotto usa solo i dati NASA POWER.",
-        ]
-
-    nasa_temp = _safe_average([float(nasa.get("T2M", 0.0) or 0.0) for nasa, _ in overlap])
-    nasa_humidity = _safe_average([float(nasa.get("RH2M", 0.0) or 0.0) for nasa, _ in overlap])
-    nasa_precip = sum(float(nasa.get("PRECTOTCORR", 0.0) or 0.0) for nasa, _ in overlap)
-
-    web_temp = _safe_average([float(web.get("T2M", 0.0) or 0.0) for _, web in overlap])
-    web_humidity = _safe_average([float(web.get("RH2M", 0.0) or 0.0) for _, web in overlap])
-    web_precip = sum(float(web.get("PRECTOTCORR", 0.0) or 0.0) for _, web in overlap)
-
-    temp_delta = abs(nasa_temp - web_temp)
-    humidity_delta = abs(nasa_humidity - web_humidity)
-    precip_delta = abs(nasa_precip - web_precip)
-
-    if temp_delta <= 2.0 and humidity_delta <= 10.0 and precip_delta <= 8.0:
-        alignment = "coerente"
-    elif temp_delta <= 4.0 and humidity_delta <= 18.0 and precip_delta <= 15.0:
-        alignment = "parzialmente coerente"
-    else:
-        alignment = "disallineato"
-
-    source = str(weather_reference.get("source", "fonte web"))
-    return [
-        (
-            f"Confronto con meteo web ({source}) sullo stesso periodo: NASA {nasa_temp:.1f} C / {nasa_humidity:.1f}% UR / {nasa_precip:.1f} mm, "
-            f"web {web_temp:.1f} C / {web_humidity:.1f}% UR / {web_precip:.1f} mm. Quadro {alignment}."
-        )
-    ]
+        logger.info("Meteo ufficiale Aeronautica non disponibile: %s", exc)
+        return _build_power_weather_reference(result, str(exc))
 
 
 def _build_nasa_sar_scientific_interpretation(
     result: Dict[str, Any],
     weather_reference: Optional[Dict[str, Any]] = None,
 ) -> str:
+    geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
     soil_summary = dashboard.get("summary", {}) or {}
-    nasa_power = result.get("nasa_power", {}) or {}
-    power_summary = nasa_power.get("summary", {}) or {}
-    daily = (nasa_power.get("daily", []) or [])[-7:]
+    weather_daily = (weather_reference or {}).get("daily", []) or []
+    risk_window = _build_weekly_fungal_risk_window(weather_daily)
 
-    latest_soil = float(soil_summary.get("latest_soil_moisture_percent", 0.0) or 0.0)
-    average_soil = float(soil_summary.get("average_soil_moisture_percent", 0.0) or 0.0)
-    soil_trend = float(soil_summary.get("trend_delta_percent", 0.0) or 0.0)
-    fungal_mean = float(power_summary.get("fungal_risk_mean", 0.0) or 0.0)
-    fungal_peak = float(power_summary.get("fungal_risk_peak", 0.0) or 0.0)
-    high_fungal_days = int(power_summary.get("high_fungal_risk_days", 0) or 0)
-    water_stress_mean = float(power_summary.get("water_stress_mean", 0.0) or 0.0)
-    water_stress_peak = float(power_summary.get("water_stress_peak", 0.0) or 0.0)
-
-    mean_humidity = (
-        sum(float(item.get("RH2M", 0.0) or 0.0) for item in daily) / len(daily)
-        if daily else 0.0
+    sar_soil = float(
+        soil_summary.get(
+            "sar_soil_moisture_percent",
+            soil_summary.get("average_soil_moisture_percent", 0.0),
+        )
+        or 0.0
     )
-    total_precip = sum(float(item.get("PRECTOTCORR", 0.0) or 0.0) for item in daily)
-    mean_temp = (
-        sum(float(item.get("T2M", 0.0) or 0.0) for item in daily) / len(daily)
-        if daily else 0.0
-    )
+    sar_source = str(soil_summary.get("sar_source", "Climate proxy fallback"))
+    sar_product_name = soil_summary.get("sar_product_name")
+    sar_acquired_at = soil_summary.get("sar_acquired_at")
 
-    fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days)
-    soil_level = _classify_soil_moisture_proxy(latest_soil)
-    stress_level = _classify_water_stress(water_stress_mean, water_stress_peak)
-    trend_label = "in aumento" if soil_trend > 1.0 else "in calo" if soil_trend < -1.0 else "stabile"
+    fungal_mean = float(risk_window.get("mean_value", 0.0) or 0.0)
+    fungal_peak = float(risk_window.get("peak_value", 0.0) or 0.0)
+    high_fungal_days = int(risk_window.get("high_risk_days", 0) or 0)
+    fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days).upper()
 
-    if fungal_level == "alto":
-        fungal_message = "Il contesto climatico degli ultimi giorni e' favorevole allo sviluppo fungino"
-    elif fungal_level == "medio":
-        fungal_message = "Il contesto climatico mostra una predisposizione fungina intermedia"
+    mean_humidity = _safe_average([float(item.get("RH2M", 0.0) or 0.0) for item in weather_daily])
+    total_precip = sum(float(item.get("PRECTOTCORR", 0.0) or 0.0) for item in weather_daily)
+    mean_temp = _safe_average([float(item.get("T2M", 0.0) or 0.0) for item in weather_daily])
+
+    locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
+    weather_source = html.escape(str((weather_reference or {}).get("source", "Servizio meteo non disponibile")), quote=False)
+    weather_source_url = html.escape(str((weather_reference or {}).get("source_url", "")), quote=False)
+    warning = str((weather_reference or {}).get("warning", "") or "").strip()
+    weather_days = len(weather_daily)
+
+    if fungal_level == "ALTO":
+        simple_message = "La combinazione tra umidita', temperatura e pioggia indica una favorevolezza fungina elevata"
+    elif fungal_level == "MEDIO":
+        simple_message = "La zona mostra una favorevolezza fungina intermedia e richiede attenzione"
     else:
-        fungal_message = "Il contesto climatico e' poco favorevole allo sviluppo fungino"
+        simple_message = "Il quadro climatico resta poco favorevole allo sviluppo fungino"
 
-    if stress_level == "alto":
-        stress_message = "lo stress idrico atmosferico e' elevato"
-    elif stress_level == "medio":
-        stress_message = "lo stress idrico atmosferico e' moderato"
-    else:
-        stress_message = "lo stress idrico atmosferico resta contenuto"
-
-    weather_lines = _build_weather_comparison_lines(daily, weather_reference or {})
-
-    return "\n".join(
-        [
-            "Il rischio fungino non e' calcolato dall'LLM: usa solo i dati NASA POWER giornalieri.",
-            "Formula NASA del rischio fungino: 50% umidita' relativa, 35% temperatura vicina a 20 C, 15% pioggia giornaliera, piu' una persistenza del 45% dal giorno precedente; il risultato e' limitato tra 0 e 1.",
-            "Classificazione usata qui: alto se picco >= 0.80, oppure almeno 3 giorni >= 0.70, oppure media >= 0.65; medio con soglie intermedie; basso negli altri casi.",
-            f"Il proxy di umidita' del suolo e' {soil_level} ({latest_soil:.1f}% oggi; media 7 giorni {average_soil:.1f}%) ed e' {trend_label}.",
-            f"Il rischio fungino climatico e' {fungal_level}. {fungal_message}: indice medio {fungal_mean:.2f}, picco {fungal_peak:.2f}, {high_fungal_days} giorni ad alta criticita'.",
-            f"Nei 7 giorni osservati: umidita' relativa media {mean_humidity:.1f}%, precipitazione cumulata {total_precip:.1f} mm, temperatura media {mean_temp:.1f} C.",
-            *weather_lines,
-            f"Sul bilancio idrico, {stress_message} (media {water_stress_mean:.2f}, picco {water_stress_peak:.2f}).",
-            "Interpretazione semplice per la zona GPS: rischio maggiore quando umidita' alta, temperatura vicina a 20 C e piogge recenti restano allineate tra NASA e meteo web.",
-            "Questa non e' una diagnosi di malattia: descrive solo la favorevolezza climatica allo sviluppo fungino nella zona rilevata dal GPS.",
-        ]
-    )
+    lines = [
+        "Formula del rischio fungino: 50% umidita' relativa, 35% temperatura vicina a 20 C, 15% pioggia giornaliera e 45% di persistenza dal giorno precedente.",
+        f"Valore medio settimanale: {fungal_mean:.2f}",
+        f"Giudizio di rischio: {fungal_level}",
+        f"Lettura semplice: {simple_message}.",
+        f"Localita': {locality_label}.",
+        f"Umidita' del suolo SAR: {sar_soil:.1f}%.",
+        f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni.",
+        "Fonti dati:",
+        f"- Umidita' del suolo: {html.escape(sar_source, quote=False)}" + (f" | scena {html.escape(str(sar_product_name), quote=False)}" if sar_product_name else ""),
+        f"- Meteo: {weather_source}" + (f" | {weather_source_url}" if weather_source_url else ""),
+        "- Mappa: Esri World Imagery",
+    ]
+    if sar_acquired_at:
+        lines.append(f"- Acquisizione SAR: {html.escape(str(sar_acquired_at), quote=False)}")
+    if warning:
+        lines.append(f"Nota tecnica: feed ufficiale MeteoAM non disponibile in tempo reale, usato fallback {html.escape(warning, quote=False)}.")
+    lines.append("Questa non e' una diagnosi di malattia: descrive solo la favorevolezza climatica e il contesto di umidita' del suolo della zona GPS.")
+    return "\n".join(lines)
 
 
 def _nasa_sar_reply_keyboard() -> ReplyKeyboardMarkup:
@@ -1741,28 +1908,30 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
     summary = dashboard.get("summary", {}) or {}
-    soil_days = list(dashboard.get("soil_moisture_last_7_days", []) or [])
     centroid = geo_summary.get("centroid", {}) or {}
     radius_m = geo_summary.get("radius_m", 50)
+    locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
+    sar_source = html.escape(str(summary.get("sar_source", "Climate proxy fallback")), quote=False)
+    sar_product_name = summary.get("sar_product_name")
+    sar_acquired_at = summary.get("sar_acquired_at")
+    weather_start = summary.get("weather_window_start")
+    weather_end = summary.get("weather_window_end")
 
     lines = [
         "<b>🛰️ NASA-ISRO/SAR Dashboard</b>",
         "<b>──────────────</b>",
+        f"<b>Localita':</b> {locality_label}",
         f"<b>Area:</b> raggio {radius_m:.0f} m",
         f"<b>Centro GPS:</b> {float(centroid.get('lat', 0.0)):.6f}, {float(centroid.get('lon', 0.0)):.6f}",
-        f"<b>Soil moisture oggi:</b> {float(summary.get('latest_soil_moisture_percent', 0.0)):.1f}%",
-        f"<b>Media 7 giorni:</b> {float(summary.get('average_soil_moisture_percent', 0.0)):.1f}%",
-        f"<b>Range 7 giorni:</b> {float(summary.get('min_soil_moisture_percent', 0.0)):.1f}% → {float(summary.get('max_soil_moisture_percent', 0.0)):.1f}%",
-        f"<b>Trend:</b> {float(summary.get('trend_delta_percent', 0.0)):+.1f} punti",
-        "",
-        "<b>Ultimi 7 giorni</b>",
+        f"<b>Umidita' suolo SAR:</b> {float(summary.get('sar_soil_moisture_percent', 0.0)):.1f}%",
+        f"<b>Fonte suolo:</b> {sar_source}",
     ]
-    for item in reversed(soil_days):
-        value = float(item.get("soil_moisture_percent", 0.0))
-        day = str(item.get("day", ""))[5:]
-        lines.append(
-            f"<code>{day}  {_soil_moisture_bar(value)}  {value:5.1f}%</code>"
-        )
+    if sar_product_name:
+        lines.append(f"<b>Scena SAR:</b> {html.escape(str(sar_product_name), quote=False)}")
+    if sar_acquired_at:
+        lines.append(f"<b>Acquisizione SAR:</b> {html.escape(str(sar_acquired_at), quote=False)}")
+    if weather_start and weather_end:
+        lines.append(f"<b>Finestra meteo:</b> {html.escape(str(weather_start), quote=False)} → {html.escape(str(weather_end), quote=False)}")
     return "\n".join(lines)
 
 
@@ -1771,11 +1940,88 @@ async def _interpret_nasa_sar_dashboard(
     result: Dict[str, Any],
 ) -> str:
     dashboard = result.get("dashboard", {}) or {}
-    series = dashboard.get("soil_moisture_last_7_days", []) or []
-    if not series:
-        return "Non ho trovato abbastanza dati NASA POWER per produrre un'interpretazione agronomica." 
+    if not dashboard.get("summary"):
+        return "Non ho trovato abbastanza dati SAR e meteo per produrre una sintesi agronomica." 
     weather_reference = await asyncio.to_thread(_fetch_external_weather_reference, result)
     return _build_nasa_sar_scientific_interpretation(result, weather_reference)
+
+
+def _build_nasa_sar_followup_context(result: Dict[str, Any], interpretation: str) -> str:
+    geo_summary = result.get("geo_summary", {}) or {}
+    dashboard = result.get("dashboard", {}) or {}
+    summary = dashboard.get("summary", {}) or {}
+    locality = str(geo_summary.get("locality_label") or "Localita' non determinata")
+    return "\n".join(
+        [
+            "Contesto della piu recente sintesi SAR/NISAR DELTA Plant:",
+            f"Localita': {locality}",
+            f"Centro GPS: {float((geo_summary.get('centroid', {}) or {}).get('lat', 0.0)):.6f}, {float((geo_summary.get('centroid', {}) or {}).get('lon', 0.0)):.6f}",
+            f"Umidita' suolo SAR: {float(summary.get('sar_soil_moisture_percent', 0.0) or 0.0):.1f}%",
+            interpretation,
+        ]
+    )
+
+
+def _reverse_geocode_locality(latitude: float, longitude: float) -> Optional[str]:
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={
+                "format": "jsonv2",
+                "lat": float(latitude),
+                "lon": float(longitude),
+                "zoom": 10,
+                "addressdetails": 1,
+            },
+            headers={"User-Agent": "DELTA Plant/1.0 (+https://deltaplant.ai)"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        payload = response.json() or {}
+        address = payload.get("address", {}) or {}
+        locality = (
+            address.get("city")
+            or address.get("town")
+            or address.get("village")
+            or address.get("municipality")
+            or address.get("county")
+        )
+        state = address.get("state") or address.get("region")
+        country = address.get("country")
+        parts: List[str] = []
+        for value in (locality, state, country):
+            text = str(value or "").strip()
+            if text and text not in parts:
+                parts.append(text)
+        if parts:
+            return ", ".join(parts[:3])
+        display_name = str(payload.get("display_name") or "").strip()
+        return display_name.split(",")[0].strip() or None
+    except Exception as exc:
+        logger.info("Reverse geocoding localita' non disponibile: %s", exc)
+        return None
+
+
+async def _send_nasa_sar_map_snapshot(
+    update: Update,
+    latitude: float,
+    longitude: float,
+    locality_label: Optional[str],
+) -> None:
+    chat = getattr(update, "effective_chat", None)
+    if chat is None:
+        return
+    caption_lines = [
+        f"Mappa satellite DELTA Plant: {locality_label or 'Localita\' non determinata'}",
+        "Stesso frame Esri World Imagery mostrato sul sito, centrato sul raggio operativo di 50 m.",
+    ]
+    try:
+        await chat.send_photo(
+            photo=_build_nasa_sar_map_url(latitude, longitude),
+            caption="\n".join(caption_lines),
+        )
+    except Exception as exc:
+        logger.warning("Invio mappa NASA/SAR Telegram fallito: %s", exc)
 
 
 def _get_nasa_orchestrator(context: ContextTypes.DEFAULT_TYPE):
@@ -1819,6 +2065,10 @@ async def _run_nasa_sar_analysis(
         )
         return
 
+    locality_label = await asyncio.to_thread(_reverse_geocode_locality, latitude, longitude)
+    if locality_label:
+        result.setdefault("geo_summary", {})["locality_label"] = locality_label
+
     dashboard_text = _format_nasa_sar_dashboard(result)
     interpretation = await _interpret_nasa_sar_dashboard(context, result)
     await _send(
@@ -1827,11 +2077,18 @@ async def _run_nasa_sar_analysis(
         reply_markup=reply_markup,
         parse_mode="HTML",
     )
+    await _send_nasa_sar_map_snapshot(update, latitude, longitude, locality_label)
     await _send(
         update,
-        "<b>🧠 Sintesi semplice NASA + meteo web</b>\n" + interpretation,
+        "<b>🧠 Sintesi semplice SAR/NISAR + Servizio Meteorologico dell'Aeronautica Militare</b>\n" + interpretation,
         reply_markup=_menu_keyboard(),
         parse_mode="HTML",
+    )
+    context.user_data["chat_seed_context"] = _build_nasa_sar_followup_context(result, interpretation)
+    await _send(
+        update,
+        "💬 Ora puoi chiedermi approfondimenti sulla diagnosi o altro. Usero' la sintesi SAR appena generata come contesto iniziale della prossima risposta.",
+        reply_markup=_menu_keyboard(),
     )
 
 
@@ -1842,7 +2099,7 @@ async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
         "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
         "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
-        "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard degli ultimi 7 giorni con sintesi semplice basata su NASA POWER e confronto meteo web.",
+        "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard SAR con mappa, localita' e sintesi semplice basata su umidita' del suolo satellitare e meteo ufficiale Aeronautica.",
         reply_markup=_nasa_sar_reply_keyboard(),
         parse_mode="HTML",
     )
@@ -2156,7 +2413,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
-    logger.info("Telegram /menu ricevuto da user_id=%s", update.effective_user.id if update.effective_user else "0")
+    effective_user = getattr(update, "effective_user", None)
+    logger.info("Telegram /menu ricevuto da user_id=%s", effective_user.id if effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
     await _send(update, "Menu principale:", reply_markup=_menu_keyboard())
