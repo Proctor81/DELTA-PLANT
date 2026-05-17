@@ -615,6 +615,99 @@
       color: #19f5c1;
     }
 
+    .hero-demo-input {
+      width: 100%;
+      min-height: 3.4rem;
+      padding: 0.95rem 1rem;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      background: rgba(2, 9, 16, 0.72);
+      color: #edf7ff;
+      font-size: 0.98rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .hero-demo-input:focus {
+      outline: none;
+      border-color: rgba(25, 245, 193, 0.48);
+      box-shadow: 0 0 0 3px rgba(25, 245, 193, 0.14);
+    }
+
+    .hero-demo-input::placeholder {
+      color: rgba(220, 236, 246, 0.42);
+    }
+
+    .hero-demo-button {
+      min-height: 3.4rem;
+      padding: 0.95rem 1.2rem;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(121, 231, 255, 0.16);
+      background: linear-gradient(90deg, rgba(25, 245, 193, 0.98), rgba(121, 231, 255, 0.92));
+      color: #04131c;
+      font-size: 0.92rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      box-shadow: 0 16px 34px rgba(25, 245, 193, 0.18);
+    }
+
+    .hero-demo-day {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(6, 17, 29, 0.34));
+      border-radius: 1.15rem;
+      padding: 0.9rem;
+    }
+
+    .hero-demo-track {
+      height: 0.48rem;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .hero-demo-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(121, 231, 255, 0.9), rgba(25, 245, 193, 0.95), rgba(155, 255, 131, 0.92));
+      box-shadow: 0 0 24px rgba(25, 245, 193, 0.2);
+    }
+
+    .hero-demo-note {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: rgba(3, 11, 18, 0.58);
+      border-radius: 1.25rem;
+      padding: 1rem;
+    }
+
+    .hero-risk-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 7.5rem;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      border: 1px solid rgba(121, 231, 255, 0.18);
+    }
+
+    .hero-risk-low {
+      color: #b8fff0;
+      background: rgba(25, 245, 193, 0.1);
+    }
+
+    .hero-risk-medium {
+      color: #e9ffbe;
+      background: rgba(155, 255, 131, 0.12);
+    }
+
+    .hero-risk-high {
+      color: #fff2c9;
+      background: rgba(255, 184, 77, 0.15);
+    }
+
     @keyframes drift {
       0% {
         transform: translate3d(0, 0, 0) scale(1);
@@ -880,12 +973,17 @@
           </h1>
 
           <p class="reveal mt-7 max-w-2xl text-lg leading-8 text-slate-200/78 sm:text-xl">
-            Explainable leaf disease detection, real-time sensor fusion, and conversational workflows for Raspberry Pi 5 edge deployment.
+            Explainable plant health intelligence, SAR-aware monitoring, weather fusion, and conversational workflows for Raspberry Pi 5 edge deployment.
           </p>
 
           <p class="reveal mt-5 max-w-2xl text-base leading-7 text-slate-300/72 sm:text-lg">
-            From field capture to actionable recommendations - transparent, offline-capable, and ready for operators.
+            From field capture to fungal-risk screening: transparent, offline-capable, and now paired with a hero demo that explains how a pasted GPS point becomes a 50 meter satellite observation zone.
           </p>
+
+          <div class="reveal mt-6 max-w-2xl rounded-[26px] border border-cyan-300/12 bg-slate-950/42 p-5 shadow-panel">
+            <div class="section-kicker">New hero demo</div>
+            <p class="mt-3 text-sm leading-7 text-slate-300/72 sm:text-base">Paste Google coordinates or a Google Maps URL, and DELTA Plant centers a circular footprint with a 50 m radius around that GPS point. The demo then shows a 7-day NISAR-style SAR view plus weather context and returns a simple fungal-risk outlook for that exact micro-area.</p>
+          </div>
 
           <div class="reveal mt-9 flex flex-col gap-4 sm:flex-row">
             <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em] sm:text-lg">
@@ -927,71 +1025,65 @@
           <div class="glass rounded-[32px] p-6 sm:p-8">
             <div class="flex items-center justify-between gap-4">
               <div>
-                <div class="section-kicker">Value proposition</div>
-                <h2 class="mt-2 font-display text-2xl text-white">A complete bio-digital orchestration platform.</h2>
+                <div class="section-kicker">Hero demo</div>
+                <h2 class="mt-2 font-display text-2xl text-white">Paste Google coordinates. Watch a 7-day NISAR-style scene appear.</h2>
               </div>
-              <div class="rounded-full border border-neonleaf/20 bg-neonleaf/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-neonleaf">v3.2 live</div>
+              <div class="rounded-full border border-neonleaf/20 bg-neonleaf/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-neonleaf">50 m radius</div>
             </div>
 
-            <p class="mt-4 text-base leading-7 text-slate-300/72">DELTA Plant combines edge computer vision, LayerCAM explainability, environmental sensor intelligence, and DELTAPLANO conversational operations into one deployable system.</p>
-            <p class="mt-3 text-sm leading-7 text-slate-300/68">Move beyond black-box classification with transparent diagnoses you can trust in the field or lab.</p>
+            <p class="mt-4 text-base leading-7 text-slate-300/72">This high-impact demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant reads the last 7 days of SAR and weather evidence around that micro-area.</p>
+            <p class="mt-3 text-sm leading-7 text-slate-300/68">SAR means <span class="font-semibold text-white">Synthetic Aperture Radar</span>, an advanced sensing technology that sends electromagnetic signals to Earth and reads the return signal to produce high-resolution surface information even through clouds or darkness.</p>
 
-            <div class="mt-7 rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5">
-              <div class="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-cyan-200/60">
-                <span>Platform core</span>
-                <span>Field ready</span>
+            <div class="mt-6 grid gap-3">
+              <label for="hero-google-coordinates" class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Google coordinates or Maps URL</label>
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
+                <button id="hero-demo-run" class="hero-demo-button" type="button">Run NISAR demo</button>
               </div>
-              <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Vision core</div>
-                  <div class="mt-3 text-lg font-semibold text-white">MobileNetV2 + EfficientFormerV2-S1</div>
-                  <div class="mt-2 text-sm text-slate-300/68">Hybrid inference tuned for Raspberry Pi 5 and offline deployment.</div>
+              <div id="hero-demo-status" class="text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point and render the last 7 days.</div>
+            </div>
+
+            <div class="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+              <div class="rounded-[28px] border border-cyan-300/10 bg-slate-950/45 p-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-cyan-200/60">
+                  <span>NISAR 7-day demonstrator</span>
+                  <span id="hero-demo-footprint">Footprint 7,854 m²</span>
                 </div>
-                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Explainer</div>
-                  <div class="mt-3 text-lg font-semibold text-white">LayerCAM overlays</div>
-                  <div class="mt-2 text-sm text-slate-300/68">See where the model focused before acting on the diagnosis.</div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">GPS center</div>
+                    <div id="hero-demo-center" class="mt-3 text-lg font-semibold text-white">41.90280, 12.49640</div>
+                    <div class="mt-2 text-sm text-slate-300/68">DELTA Plant analyzes a circular micro-area with a 50 m radius around this point.</div>
+                  </div>
+                  <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                    <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Simple fungal outlook</div>
+                    <div id="hero-risk-badge" class="hero-risk-badge hero-risk-medium mt-3">Moderate</div>
+                    <div id="hero-risk-copy" class="mt-3 text-sm leading-7 text-slate-300/68">Moisture and weather persistence suggest a moderate fungal pressure around this GPS micro-zone.</div>
+                  </div>
                 </div>
-                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Operations</div>
-                  <div class="mt-3 text-lg font-semibold text-white">DELTAPLANO + Admin + API</div>
-                  <div class="mt-2 text-sm text-slate-300/68">Natural-language diagnostics and follow-up workflows for operators.</div>
+                <div id="hero-demo-days" class="mt-4 grid gap-3"></div>
+              </div>
+
+              <div class="grid gap-4">
+                <div class="hero-demo-note">
+                  <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">How the demo works</div>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/72">The pasted Google coordinate defines the GPS center. DELTA Plant then inspects a circular area with a <span class="font-semibold text-white">50 m radius</span>, equivalent to the same micro-footprint used in the bot workflow.</p>
                 </div>
-                <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Signals</div>
-                  <div class="mt-3 text-lg font-semibold text-white">7 sensor channels + agronomic rules</div>
-                  <div class="mt-2 text-sm text-slate-300/68">Environmental context turns classification into actionable recommendations.</div>
+                <div class="hero-demo-note">
+                  <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">Why SAR matters</div>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/72"><span class="font-semibold text-white">Synthetic Aperture Radar</span> can image the surface in poor visibility, including clouds and night conditions, because it actively transmits and measures electromagnetic return signals instead of depending on sunlight.</p>
+                </div>
+                <div class="hero-demo-note">
+                  <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">NISAR L-band</div>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/72">NISAR L-band is valuable because it penetrates clouds, helps track soil moisture, and is sensitive to changes in vegetation and wet areas, with useful penetration down to roughly <span class="font-semibold text-white">30 cm</span> into the ground.</p>
                 </div>
               </div>
             </div>
 
-            <div class="mt-7 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-              <div>
-                <div class="section-kicker">Proven performance</div>
-                <div class="mt-3 grid gap-3">
-                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
-                    <span class="text-slate-300/70">Benchmark scope</span>
-                    <span class="font-semibold text-white">600 images | 33 classes</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
-                    <span class="text-slate-300/70">General model</span>
-                    <span class="font-semibold text-white">89.33% top-1 | 99.00% top-3</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
-                    <span class="text-slate-300/70">EfficientFormer estimate</span>
-                    <span class="font-semibold text-white">92.91% top-1 | 100.00% top-3</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
-                    <span class="text-slate-300/70">Mean edge latency</span>
-                    <span class="font-semibold text-white">41.36 ms</span>
-                  </div>
-                </div>
-              </div>
-              <div class="mx-auto flex h-28 w-28 items-center justify-center rounded-full border border-neonleaf/20 bg-gradient-to-br from-neonleaf/15 via-cyan-300/8 to-transparent shadow-pulse">
-                <div class="flex h-20 w-20 items-center justify-center rounded-full border border-cyan-300/16 bg-slate-950/70 text-center">
-                  <span class="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100/72">Leaf<br />Signal</span>
-                </div>
-              </div>
+            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">NISAR-style SAR signal over the last 7 days.</div>
+              <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">Weather context fused with radar moisture persistence.</div>
+              <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-slate-300/72">Simple fungal-risk outlook for the pasted GPS micro-area.</div>
             </div>
           </div>
         </div>
@@ -1560,6 +1652,166 @@
     const contactForm = document.getElementById('contact-form');
     const contactFormStatus = document.getElementById('contact-form-status');
     const contactFormSubmit = document.getElementById('contact-form-submit');
+    const heroDemoInput = document.getElementById('hero-google-coordinates');
+    const heroDemoRun = document.getElementById('hero-demo-run');
+    const heroDemoStatus = document.getElementById('hero-demo-status');
+    const heroDemoDays = document.getElementById('hero-demo-days');
+    const heroDemoCenter = document.getElementById('hero-demo-center');
+    const heroDemoFootprint = document.getElementById('hero-demo-footprint');
+    const heroRiskBadge = document.getElementById('hero-risk-badge');
+    const heroRiskCopy = document.getElementById('hero-risk-copy');
+
+    const HERO_RADIUS_METERS = 50;
+    const HERO_FOOTPRINT_M2 = Math.PI * HERO_RADIUS_METERS * HERO_RADIUS_METERS;
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const seededUnit = (seed) => {
+      const raw = Math.sin(seed) * 10000;
+      return raw - Math.floor(raw);
+    };
+
+    const formatCoordinate = (value) => Number(value).toFixed(5);
+
+    const parseGoogleCoordinates = (input) => {
+      const value = decodeURIComponent(String(input || '').trim());
+      if (!value) {
+        return null;
+      }
+
+      const patterns = [
+        /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+        /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+        /[?&](?:q|query)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+        /(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = value.match(pattern);
+        if (!match) {
+          continue;
+        }
+        const latitude = Number(match[1]);
+        const longitude = Number(match[2]);
+        if (Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+          return { latitude, longitude };
+        }
+      }
+      return null;
+    };
+
+    const classifyHeroRisk = (averageRisk, peakRisk) => {
+      if (peakRisk >= 0.78 || averageRisk >= 0.68) {
+        return 'High';
+      }
+      if (peakRisk >= 0.56 || averageRisk >= 0.48) {
+        return 'Moderate';
+      }
+      return 'Low';
+    };
+
+    const buildHeroRiskCopy = (level, averageRisk, humidityMean, rainTotal) => {
+      if (level === 'High') {
+        return `High fungal pressure: radar moisture persistence, ${humidityMean.toFixed(0)}% average humidity, and ${rainTotal.toFixed(1)} mm of rain align around this 50 m radius.`;
+      }
+      if (level === 'Moderate') {
+        return `Moderate fungal pressure: the zone shows some wet persistence and weather support, with an average risk index of ${averageRisk.toFixed(2)} over the last 7 days.`;
+      }
+      return `Low fungal pressure: the micro-area looks drier and less supportive for fungal development across the last 7 days.`;
+    };
+
+    const generateHeroDemoSeries = (latitude, longitude) => {
+      const today = new Date();
+      const seedBase = Math.round((latitude + 90) * 10000) + Math.round((longitude + 180) * 10000) * 3;
+      let previousRisk = 0.18;
+      const series = [];
+
+      for (let index = 0; index < 7; index += 1) {
+        const sampleDate = new Date(today);
+        sampleDate.setDate(today.getDate() - (6 - index));
+
+        const waveA = Math.sin((latitude * 0.11) + (index * 0.63));
+        const waveB = Math.cos((longitude * 0.09) - (index * 0.48));
+        const noise = seededUnit(seedBase + index * 17.731);
+        const radarBackscatter = clamp(0.34 + (waveA * 0.1) + (waveB * 0.07) + ((noise - 0.5) * 0.12), 0.18, 0.92);
+        const soilMoisture = clamp(26 + (radarBackscatter * 46) + ((noise - 0.5) * 14), 14, 88);
+        const humidity = clamp(54 + (radarBackscatter * 30) + (waveA * 8), 42, 98);
+        const rainfall = clamp((noise * 8.5) + (Math.max(0, waveB) * 4.6), 0, 14);
+        const risk = clamp((soilMoisture / 100) * 0.42 + (humidity / 100) * 0.33 + Math.min(rainfall / 10, 1) * 0.15 + previousRisk * 0.25, 0, 1);
+
+        previousRisk = risk;
+        series.push({
+          dayLabel: sampleDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }),
+          soilMoisture,
+          radarBackscatter,
+          humidity,
+          rainfall,
+          risk,
+        });
+      }
+
+      return series;
+    };
+
+    const renderHeroDemo = (coordinates) => {
+      if (!heroDemoDays || !heroDemoCenter || !heroDemoFootprint || !heroRiskBadge || !heroRiskCopy || !heroDemoStatus) {
+        return;
+      }
+
+      const { latitude, longitude } = coordinates;
+      const series = generateHeroDemoSeries(latitude, longitude);
+      const averageRisk = series.reduce((sum, item) => sum + item.risk, 0) / series.length;
+      const peakRisk = Math.max(...series.map((item) => item.risk));
+      const humidityMean = series.reduce((sum, item) => sum + item.humidity, 0) / series.length;
+      const rainTotal = series.reduce((sum, item) => sum + item.rainfall, 0);
+      const riskLevel = classifyHeroRisk(averageRisk, peakRisk);
+      const riskClass = riskLevel === 'High' ? 'hero-risk-high' : riskLevel === 'Moderate' ? 'hero-risk-medium' : 'hero-risk-low';
+
+      heroDemoCenter.textContent = `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`;
+      heroDemoFootprint.textContent = `Footprint ${Math.round(HERO_FOOTPRINT_M2).toLocaleString('en-US')} m²`;
+      heroDemoStatus.textContent = `GPS locked. DELTA Plant is inspecting a 50 m radius around the pasted point and summarizing the last 7 days of SAR-style moisture plus weather support.`;
+      heroRiskBadge.textContent = riskLevel;
+      heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
+      heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal);
+
+      heroDemoDays.innerHTML = series.map((item) => `
+        <article class="hero-demo-day">
+          <div class="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-cyan-200/60">
+            <span>${item.dayLabel}</span>
+            <span>Radar ${(item.radarBackscatter).toFixed(2)}</span>
+          </div>
+          <div class="mt-3 hero-demo-track"><div class="hero-demo-fill" style="width:${item.soilMoisture.toFixed(1)}%"></div></div>
+          <div class="mt-3 grid gap-2 text-xs text-slate-300/72 sm:grid-cols-4">
+            <span>Soil ${item.soilMoisture.toFixed(1)}%</span>
+            <span>Humidity ${item.humidity.toFixed(0)}%</span>
+            <span>Rain ${item.rainfall.toFixed(1)} mm</span>
+            <span>Risk ${item.risk.toFixed(2)}</span>
+          </div>
+        </article>
+      `).join('');
+    };
+
+    if (heroDemoRun && heroDemoInput) {
+      heroDemoRun.addEventListener('click', () => {
+        const coordinates = parseGoogleCoordinates(heroDemoInput.value);
+        if (!coordinates) {
+          if (heroDemoStatus) {
+            heroDemoStatus.textContent = 'Coordinates not recognized. Paste a plain pair like 41.9028, 12.4964 or a Google Maps URL containing the GPS point.';
+          }
+          return;
+        }
+        renderHeroDemo(coordinates);
+      });
+
+      heroDemoInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          heroDemoRun.click();
+        }
+      });
+
+      renderHeroDemo(parseGoogleCoordinates(heroDemoInput.value) || { latitude: 41.9028, longitude: 12.4964 });
+    }
 
     audio.volume = Number(audioVolume.value) / 100;
 
