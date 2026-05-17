@@ -1952,13 +1952,14 @@ def _build_nasa_sar_scientific_interpretation(
     fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days).upper()
 
     mean_humidity = _safe_average([float(item.get("RH2M", 0.0) or 0.0) for item in weather_daily])
+    weather_days = len(weather_daily)
     total_precip = sum(float(item.get("PRECTOTCORR", 0.0) or 0.0) for item in weather_daily)
+    mean_precip_daily = (total_precip / weather_days) if weather_days else 0.0
     mean_temp = _safe_average([float(item.get("T2M", 0.0) or 0.0) for item in weather_daily])
 
     locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
     weather_source = html.escape(str((weather_reference or {}).get("source", "Servizio meteo non disponibile")), quote=False)
     warning = str((weather_reference or {}).get("warning", "") or "").strip()
-    weather_days = len(weather_daily)
 
     if fungal_level == "ALTO":
         simple_message = "La combinazione tra umidita', temperatura e pioggia indica una favorevolezza fungina elevata"
@@ -1974,7 +1975,7 @@ def _build_nasa_sar_scientific_interpretation(
         f"Lettura semplice: {simple_message}.",
         f"Localita': {locality_label}.",
         f"Umidita' del suolo SAR: {sar_soil:.1f}%.",
-        f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni.",
+        f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni (media {mean_precip_daily:.1f} mm/giorno).",
         "Fonti dati:",
         f"- Umidita' del suolo: {html.escape(sar_source, quote=False)}" + (f" | scena {html.escape(str(sar_product_name), quote=False)}" if sar_product_name else ""),
         f"- Meteo: {weather_source}",
