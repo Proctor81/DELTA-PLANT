@@ -84,6 +84,7 @@
       --panel-strong: rgba(8, 23, 34, 0.84);
       --stroke: rgba(121, 231, 255, 0.14);
       --glow: rgba(25, 245, 193, 0.24);
+      --privacy-banner-offset: 0px;
     }
 
     * {
@@ -546,6 +547,15 @@
       border-color: rgba(25, 245, 193, 0.26);
     }
 
+    body.privacy-banner-visible .hero-shell {
+      padding-bottom: calc(var(--privacy-banner-offset) + 2rem);
+    }
+
+    body.privacy-banner-visible #hero-google-coordinates,
+    body.privacy-banner-visible #hero-demo-run {
+      scroll-margin-bottom: calc(var(--privacy-banner-offset) + 1.5rem);
+    }
+
     input[type='range'] {
       accent-color: var(--neonleaf);
     }
@@ -635,6 +645,11 @@
 
     .hero-demo-input::placeholder {
       color: rgba(220, 236, 246, 0.42);
+    }
+
+    #hero-google-coordinates,
+    #hero-demo-run {
+      scroll-margin-top: 7rem;
     }
 
     .hero-demo-button {
@@ -788,7 +803,8 @@
       .privacy-banner-shell {
         left: 0.75rem;
         right: 0.75rem;
-        bottom: 0.75rem;
+        top: 5.5rem;
+        bottom: auto;
         width: auto;
       }
 
@@ -801,6 +817,10 @@
         bottom: 14rem !important;
       }
 
+      body.privacy-banner-visible .hero-shell {
+        padding-bottom: calc(var(--privacy-banner-offset) + 3rem);
+      }
+
       body.privacy-manage-visible .audio-dock {
         bottom: 5.5rem !important;
       }
@@ -808,6 +828,13 @@
       .leaf-b {
         left: -20px;
         bottom: 18%;
+      }
+    }
+
+    @media (max-height: 860px) {
+      .privacy-banner-shell {
+        top: 5.5rem;
+        bottom: auto;
       }
     }
 
@@ -1877,9 +1904,34 @@
       return null;
     };
 
+    const shouldCompactPrivacyEntry = () => window.matchMedia('(max-width: 768px), (max-height: 860px)').matches;
+
     const syncPrivacyLayout = () => {
       pageBody.classList.toggle('privacy-banner-visible', !privacyBanner.classList.contains('hidden'));
       pageBody.classList.toggle('privacy-manage-visible', !privacyManage.classList.contains('hidden'));
+      const bannerOffset = !privacyBanner.classList.contains('hidden')
+        ? privacyBanner.getBoundingClientRect().height + 24
+        : !privacyManage.classList.contains('hidden')
+          ? privacyManage.getBoundingClientRect().height + 24
+          : 0;
+      pageBody.style.setProperty('--privacy-banner-offset', `${Math.ceil(bannerOffset)}px`);
+    };
+
+    const syncPrivacyEntryMode = () => {
+      if (privacyPreferences) {
+        showPrivacyBanner(false);
+        showPrivacyManage(true);
+        return;
+      }
+
+      if (shouldCompactPrivacyEntry()) {
+        showPrivacyBanner(false);
+        showPrivacyManage(true);
+        return;
+      }
+
+      showPrivacyBanner(true);
+      showPrivacyManage(false);
     };
 
     const showPrivacyBanner = (visible) => {
@@ -1997,17 +2049,21 @@
     const closePrivacyCenter = () => {
       setPrivacyModalVisibility(false);
       if (!privacyPreferences) {
-        showPrivacyBanner(true);
+        syncPrivacyEntryMode();
       }
     };
+
+    window.addEventListener('resize', () => {
+      syncPrivacyEntryMode();
+      syncPrivacyLayout();
+    }, { passive: true });
 
     setAudioState(false);
     setAudioPanel(false);
 
     privacyPreferences = readPrivacyPreferences();
     draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
-    showPrivacyBanner(!privacyPreferences);
-    showPrivacyManage(Boolean(privacyPreferences));
+    syncPrivacyEntryMode();
     applyPrivacyPreferences();
 
     privacyAcceptAll.addEventListener('click', () => {
@@ -2066,7 +2122,7 @@
         if (privacyPreferences) {
           openPrivacyCenter(audioToggle);
         } else {
-          showPrivacyBanner(true);
+          syncPrivacyEntryMode();
         }
         return;
       }
