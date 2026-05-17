@@ -690,6 +690,28 @@
       min-width: 0;
     }
 
+    .hero-copy-grid {
+      display: grid;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .hero-copy-main,
+    .hero-copy-side {
+      min-width: 0;
+    }
+
+    .hero-copy-side {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .hero-stats-grid {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .hero-home-demo {
       min-width: 0;
     }
@@ -724,6 +746,18 @@
       background: rgba(3, 11, 18, 0.58);
       border-radius: 1.4rem;
       padding: 1rem;
+    }
+
+    .hero-demo-science-grid {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .hero-demo-science-card {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(6, 17, 29, 0.3));
+      border-radius: 1rem;
+      padding: 0.95rem;
     }
 
     .hero-demo-input-row {
@@ -1051,8 +1085,19 @@
         grid-template-columns: 1fr;
       }
 
+      .hero-stats-grid {
+        grid-template-columns: 1fr;
+      }
+
       .hero-home-layout {
         padding-bottom: 18rem;
+      }
+
+      .hero-days-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: row;
+        grid-auto-columns: unset;
+        overflow-x: visible;
       }
 
       .hero-demo-controls-panel {
@@ -1069,7 +1114,7 @@
       }
 
       .hero-demo-day {
-        min-width: 11.5rem;
+        min-width: 0;
       }
     }
 
@@ -1088,6 +1133,10 @@
         padding-bottom: 7rem;
       }
 
+      .hero-copy-grid {
+        grid-template-columns: minmax(0, 1.04fr) minmax(22rem, 0.96fr);
+      }
+
       .hero-home-demo {
         grid-column: 1 / -1;
       }
@@ -1103,11 +1152,18 @@
       .hero-dashboard-grid {
         grid-template-columns: minmax(0, 1.16fr) minmax(0, 0.94fr);
       }
+
+      .hero-days-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-flow: row;
+        grid-auto-columns: unset;
+        overflow-x: visible;
+      }
     }
 
     @media (min-width: 1280px) {
       .hero-days-row {
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         grid-auto-flow: row;
         grid-auto-columns: unset;
         overflow-x: visible;
@@ -1262,64 +1318,70 @@
 
       <div class="hero-home-layout">
         <div class="hero-home-copy">
-          <div class="reveal flex flex-wrap gap-3">
-            <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
-              <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
-              Edge AI for Plant Health
-            </span>
-            <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Raspberry Pi 5 Ready</span>
-          </div>
+          <div class="hero-copy-grid">
+            <div class="hero-copy-main">
+              <div class="reveal flex flex-wrap gap-3">
+                <span class="chip inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
+                  <span class="h-2 w-2 rounded-full bg-neonleaf"></span>
+                  Edge AI for Plant Health
+                </span>
+                <span class="chip inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/80">Raspberry Pi 5 Ready</span>
+              </div>
 
-          <h1 class="reveal headline-glow mt-8 font-display text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
-            <span class="gradient-text">DELTA Plant</span><br />
-            Edge AI for Plant Health Operations.
-          </h1>
+              <h1 class="reveal headline-glow mt-8 font-display text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
+                <span class="gradient-text">DELTA Plant</span><br />
+                Edge AI for Plant Health Operations.
+              </h1>
 
-          <p class="reveal mt-7 max-w-2xl text-lg leading-8 text-slate-200/78 sm:text-xl">
-            Explainable plant health intelligence, SAR-aware monitoring, weather fusion, and conversational workflows for Raspberry Pi 5 edge deployment.
-          </p>
+              <p class="reveal mt-7 text-lg leading-8 text-slate-200/78 sm:text-xl">
+                Explainable plant health intelligence, SAR-aware monitoring, weather fusion, and conversational workflows for Raspberry Pi 5 edge deployment.
+              </p>
 
-          <p class="reveal mt-5 max-w-2xl text-base leading-7 text-slate-300/72 sm:text-lg">
-            From field capture to fungal-risk screening: transparent, offline-capable, and now paired with a hero demo that explains how a pasted GPS point becomes a 50 meter satellite observation zone.
-          </p>
-
-          <div class="reveal mt-6 max-w-2xl rounded-[26px] border border-cyan-300/12 bg-slate-950/42 p-5 shadow-panel">
-            <div class="section-kicker">New hero demo</div>
-            <p class="mt-3 text-sm leading-7 text-slate-300/72 sm:text-base">Paste Google coordinates or a Google Maps URL, and DELTA Plant centers a circular footprint with a 50 m radius around that GPS point. The demo then shows a 7-day NISAR-style SAR view plus weather context and returns a simple fungal-risk outlook for that exact micro-area.</p>
-          </div>
-
-          <div class="reveal mt-9 flex flex-col gap-4 sm:flex-row">
-            <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em] sm:text-lg">
-              <span>Open DELTAPLANO on Telegram</span>
-              <svg aria-hidden="true" viewBox="0 0 24 24" class="ml-3 h-[4.5rem] w-[4.5rem]" fill="currentColor">
-                <path d="M12 2.25C6.62 2.25 2.25 6.62 2.25 12S6.62 21.75 12 21.75 21.75 17.38 21.75 12 17.38 2.25 12 2.25Zm4.57 6.2-1.6 7.54c-.12.53-.44.66-.89.41l-2.48-1.83-1.2 1.15c-.13.13-.24.24-.49.24l.18-2.56 4.66-4.21c.2-.18-.05-.28-.31-.1l-5.76 3.63-2.48-.77c-.54-.17-.55-.54.11-.8l9.69-3.74c.45-.17.84.11.69.8Z" />
-              </svg>
-            </a>
-            <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer" class="cta-secondary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold">
-              Explore GitHub Repository
-            </a>
-          </div>
-
-          <div class="reveal mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="glass-soft rounded-3xl p-5">
-              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-1 accuracy</div>
-              <div class="mt-3 font-display text-3xl text-white">89.33%</div>
-              <div class="mt-2 text-sm text-slate-300/72">600-image, 33-class public benchmark.</div>
+              <p class="reveal mt-5 text-base leading-7 text-slate-300/72 sm:text-lg">
+                From field capture to fungal-risk screening: transparent, offline-capable, and now paired with a hero demo that explains how a pasted GPS point becomes a 50 meter satellite observation zone.
+              </p>
             </div>
-            <div class="glass-soft rounded-3xl p-5">
-              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-3 accuracy</div>
-              <div class="mt-3 font-display text-3xl text-white">99.00%</div>
-              <div class="mt-2 text-sm text-slate-300/72">High-confidence shortlisting for fast operator review.</div>
-            </div>
-            <div class="glass-soft rounded-3xl p-5">
-              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Mean edge latency</div>
-              <div class="mt-3 font-display text-3xl text-white">41.36 ms</div>
-              <div class="mt-2 text-sm text-slate-300/72">Measured public runtime profile on edge hardware.</div>
-            </div>
-            <div class="glass-soft rounded-3xl p-5">
-              <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Deployment</div>
-              <div class="mt-3 font-display text-3xl text-white">Raspberry Pi 5</div>
-              <div class="mt-2 text-sm text-slate-300/72">Offline-capable execution with production-oriented TFLite export paths.</div>
+
+            <div class="hero-copy-side">
+              <div class="reveal rounded-[26px] border border-cyan-300/12 bg-slate-950/42 p-5 shadow-panel">
+                <div class="section-kicker">New hero demo</div>
+                <p class="mt-3 text-sm leading-7 text-slate-300/72 sm:text-base">Paste Google coordinates or a Google Maps URL, and DELTA Plant centers a circular footprint with a 50 m radius around that GPS point. The demo then shows a 7-day NISAR-style SAR view plus weather context and returns a simple fungal-risk outlook for that exact micro-area.</p>
+              </div>
+
+              <div class="reveal flex flex-col gap-4 sm:flex-row lg:flex-col xl:flex-row">
+                <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer" class="cta-primary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-extrabold tracking-[0.02em] sm:text-lg">
+                  <span>Open DELTAPLANO on Telegram</span>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="ml-3 h-[4.5rem] w-[4.5rem]" fill="currentColor">
+                    <path d="M12 2.25C6.62 2.25 2.25 6.62 2.25 12S6.62 21.75 12 21.75 21.75 17.38 21.75 12 17.38 2.25 12 2.25Zm4.57 6.2-1.6 7.54c-.12.53-.44.66-.89.41l-2.48-1.83-1.2 1.15c-.13.13-.24.24-.49.24l.18-2.56 4.66-4.21c.2-.18-.05-.28-.31-.1l-5.76 3.63-2.48-.77c-.54-.17-.55-.54.11-.8l9.69-3.74c.45-.17.84.11.69.8Z" />
+                  </svg>
+                </a>
+                <a href="https://github.com/proctor81/delta-plant" target="_blank" rel="noreferrer" class="cta-secondary inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-semibold">
+                  Explore GitHub Repository
+                </a>
+              </div>
+
+              <div class="reveal hero-stats-grid">
+                <div class="glass-soft rounded-3xl p-5">
+                  <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-1 accuracy</div>
+                  <div class="mt-3 font-display text-3xl text-white">89.33%</div>
+                  <div class="mt-2 text-sm text-slate-300/72">600-image, 33-class public benchmark.</div>
+                </div>
+                <div class="glass-soft rounded-3xl p-5">
+                  <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Top-3 accuracy</div>
+                  <div class="mt-3 font-display text-3xl text-white">99.00%</div>
+                  <div class="mt-2 text-sm text-slate-300/72">High-confidence shortlisting for fast operator review.</div>
+                </div>
+                <div class="glass-soft rounded-3xl p-5">
+                  <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Mean edge latency</div>
+                  <div class="mt-3 font-display text-3xl text-white">41.36 ms</div>
+                  <div class="mt-2 text-sm text-slate-300/72">Measured public runtime profile on edge hardware.</div>
+                </div>
+                <div class="glass-soft rounded-3xl p-5">
+                  <div class="text-sm uppercase tracking-[0.18em] text-cyan-200/62">Deployment</div>
+                  <div class="mt-3 font-display text-3xl text-white">Raspberry Pi 5</div>
+                  <div class="mt-2 text-sm text-slate-300/72">Offline-capable execution with production-oriented TFLite export paths.</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1363,9 +1425,21 @@
                   <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point and render the last 7 days.</div>
                 </div>
                 <div class="hero-demo-controls-panel text-sm leading-7 text-slate-300/72">
-                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">What this horizontal view shows</div>
-                  <p class="mt-3">On desktop, the NISAR demo uses the full hero width: satellite focus map on the left, summary intelligence on the right, and the complete 7-day sequence below for left-to-right scanning.</p>
-                  <p class="mt-3">On mobile, the same content collapses into a clean vertical flow so the map, controls, and latest readings remain readable without pinching.</p>
+                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Scientific reading</div>
+                  <div class="hero-demo-science-grid mt-3">
+                    <div class="hero-demo-science-card">
+                      <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">Radar moisture signal</div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300/72">The SAR-style backscatter is used here as a wetness proxy: stronger surface moisture persistence usually raises the fungal-pressure baseline.</p>
+                    </div>
+                    <div class="hero-demo-science-card">
+                      <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">Weather support</div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300/72">Humidity and rainfall are read together with radar persistence, because fungal development needs sustained wet conditions rather than an isolated rain event.</p>
+                    </div>
+                    <div class="hero-demo-science-card">
+                      <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">L-band interpretation</div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300/72">NISAR L-band is valuable because it keeps observing through clouds and gives useful sensitivity to near-surface moisture and vegetation structure.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1404,7 +1478,7 @@
                         <div class="mt-2 text-sm text-slate-300/68">Satellite context helps show where the model is looking before the 7-day fungal-risk summary is rendered.</div>
                       </div>
                     </div>
-                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Horizontal layout: map on the left, key metrics on the right, and the 7-day timeline below for faster scanning on both desktop and mobile.</div>
+                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Scientific note: the fungal outlook is not a disease diagnosis. It is a micro-area favorability estimate derived from radar-style moisture persistence, humidity support, and rainfall accumulation over the last 7 days.</div>
                   </div>
                 </div>
                 <div id="hero-demo-days" class="hero-days-row mt-4"></div>
