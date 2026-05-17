@@ -667,10 +667,154 @@
     }
 
     .hero-demo-day {
+      min-width: 0;
       border: 1px solid rgba(121, 231, 255, 0.1);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(6, 17, 29, 0.34));
       border-radius: 1.15rem;
       padding: 0.9rem;
+    }
+
+    .hero-dashboard-grid {
+      display: grid;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .hero-map-panel {
+      position: relative;
+      overflow: hidden;
+      min-height: 23rem;
+      border-radius: 1.75rem;
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background:
+        radial-gradient(circle at 20% 22%, rgba(121, 231, 255, 0.2), transparent 26%),
+        radial-gradient(circle at 78% 18%, rgba(25, 245, 193, 0.18), transparent 24%),
+        linear-gradient(180deg, rgba(7, 17, 29, 0.92), rgba(4, 12, 22, 0.95));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 18px 42px rgba(2, 7, 13, 0.34);
+    }
+
+    .hero-map-image {
+      width: 100%;
+      height: 100%;
+      min-height: 23rem;
+      display: block;
+      object-fit: cover;
+      filter: saturate(1.08) contrast(1.04) brightness(0.92);
+      transform: scale(1.02);
+    }
+
+    .hero-map-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(2, 7, 13, 0.08), rgba(2, 7, 13, 0.26)),
+        radial-gradient(circle at center, transparent 0 16%, rgba(121, 231, 255, 0.06) 16.5%, transparent 17%),
+        radial-gradient(circle at center, rgba(25, 245, 193, 0.14) 0 7%, transparent 7.4%),
+        linear-gradient(90deg, transparent calc(50% - 1px), rgba(237, 247, 255, 0.36) calc(50% - 1px), rgba(237, 247, 255, 0.36) calc(50% + 1px), transparent calc(50% + 1px)),
+        linear-gradient(180deg, transparent calc(50% - 1px), rgba(237, 247, 255, 0.36) calc(50% - 1px), rgba(237, 247, 255, 0.36) calc(50% + 1px), transparent calc(50% + 1px));
+    }
+
+    .hero-map-overlay::before,
+    .hero-map-overlay::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+    }
+
+    .hero-map-overlay::before {
+      width: clamp(7rem, 22vw, 10.5rem);
+      height: clamp(7rem, 22vw, 10.5rem);
+      border: 2px solid rgba(25, 245, 193, 0.92);
+      box-shadow: 0 0 0 10px rgba(25, 245, 193, 0.08), 0 0 32px rgba(25, 245, 193, 0.18);
+    }
+
+    .hero-map-overlay::after {
+      width: clamp(11rem, 32vw, 15.5rem);
+      height: clamp(11rem, 32vw, 15.5rem);
+      border: 1px dashed rgba(121, 231, 255, 0.52);
+    }
+
+    .hero-map-chip {
+      position: absolute;
+      left: 1rem;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 999px;
+      background: rgba(4, 12, 22, 0.82);
+      border: 1px solid rgba(121, 231, 255, 0.14);
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(237, 247, 255, 0.88);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-map-chip::before {
+      content: '';
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(25, 245, 193, 1), rgba(121, 231, 255, 1));
+      box-shadow: 0 0 18px rgba(25, 245, 193, 0.48);
+    }
+
+    .hero-map-chip-top {
+      top: 1rem;
+    }
+
+    .hero-map-chip-bottom {
+      bottom: 1rem;
+      max-width: calc(100% - 2rem);
+      text-transform: none;
+      letter-spacing: 0.02em;
+      line-height: 1.45;
+      font-size: 0.82rem;
+    }
+
+    .hero-summary-grid {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hero-summary-card {
+      border: 1px solid rgba(121, 231, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(6, 17, 29, 0.34));
+      border-radius: 1.15rem;
+      padding: 1rem;
+    }
+
+    .hero-days-row {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(11rem, 1fr);
+      gap: 0.85rem;
+      overflow-x: auto;
+      padding-bottom: 0.35rem;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(121, 231, 255, 0.36) rgba(255, 255, 255, 0.04);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .hero-days-row::-webkit-scrollbar {
+      height: 0.5rem;
+    }
+
+    .hero-days-row::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 999px;
+    }
+
+    .hero-days-row::-webkit-scrollbar-thumb {
+      background: rgba(121, 231, 255, 0.34);
+      border-radius: 999px;
     }
 
     .hero-demo-track {
@@ -829,12 +973,49 @@
         left: -20px;
         bottom: 18%;
       }
+
+      .hero-map-panel,
+      .hero-map-image {
+        min-height: 18.5rem;
+      }
+
+      .hero-summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-map-chip {
+        left: 0.75rem;
+      }
+
+      .hero-map-chip-bottom {
+        bottom: 0.75rem;
+        max-width: calc(100% - 1.5rem);
+      }
+
+      .hero-demo-day {
+        min-width: 11.5rem;
+      }
     }
 
     @media (max-height: 860px) {
       .privacy-banner-shell {
         top: 5.5rem;
         bottom: auto;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .hero-dashboard-grid {
+        grid-template-columns: minmax(0, 1.16fr) minmax(0, 0.94fr);
+      }
+    }
+
+    @media (min-width: 1280px) {
+      .hero-days-row {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-auto-flow: row;
+        grid-auto-columns: unset;
+        overflow-x: visible;
       }
     }
 
@@ -1076,19 +1257,40 @@
                   <span>NISAR 7-day demonstrator</span>
                   <span id="hero-demo-footprint">Footprint 7,854 m²</span>
                 </div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">GPS center</div>
-                    <div id="hero-demo-center" class="mt-3 text-lg font-semibold text-white">41.90280, 12.49640</div>
-                    <div class="mt-2 text-sm text-slate-300/68">DELTA Plant analyzes a circular micro-area with a 50 m radius around this point.</div>
+                <div class="hero-dashboard-grid mt-4">
+                  <div class="hero-map-panel">
+                    <div class="hero-map-chip hero-map-chip-top">Satellite focus</div>
+                    <img id="hero-demo-map-image" class="hero-map-image" alt="Satellite focus around the selected GPS coordinate" decoding="async" loading="eager" />
+                    <div class="hero-map-overlay" aria-hidden="true"></div>
+                    <div id="hero-demo-map-caption" class="hero-map-chip hero-map-chip-bottom">The highlighted ring marks the 50 m inspection radius around the selected GPS coordinate.</div>
                   </div>
-                  <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
-                    <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Simple fungal outlook</div>
-                    <div id="hero-risk-badge" class="hero-risk-badge hero-risk-medium mt-3">Moderate</div>
-                    <div id="hero-risk-copy" class="mt-3 text-sm leading-7 text-slate-300/68">Moisture and weather persistence suggest a moderate fungal pressure around this GPS micro-zone.</div>
+                  <div class="grid gap-3">
+                    <div class="hero-summary-grid">
+                      <div class="hero-summary-card">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">GPS center</div>
+                        <div id="hero-demo-center" class="mt-3 text-lg font-semibold text-white">41.90280, 12.49640</div>
+                        <div class="mt-2 text-sm text-slate-300/68">DELTA Plant analyzes a circular micro-area with a 50 m radius around this point.</div>
+                      </div>
+                      <div class="hero-summary-card">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Simple fungal outlook</div>
+                        <div id="hero-risk-badge" class="hero-risk-badge hero-risk-medium mt-3">Moderate</div>
+                        <div id="hero-risk-copy" class="mt-3 text-sm leading-7 text-slate-300/68">Moisture and weather persistence suggest a moderate fungal pressure around this GPS micro-zone.</div>
+                      </div>
+                      <div class="hero-summary-card">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Model focus</div>
+                        <div id="hero-demo-focus-label" class="mt-3 text-lg font-semibold text-white">50 m SAR footprint</div>
+                        <div id="hero-demo-focus-copy" class="mt-2 text-sm text-slate-300/68">The model inspects the central ring, using that micro-zone as the radar and weather aggregation footprint.</div>
+                      </div>
+                      <div class="hero-summary-card">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Satellite source</div>
+                        <div id="hero-demo-map-source" class="mt-3 text-lg font-semibold text-white">Esri World Imagery</div>
+                        <div class="mt-2 text-sm text-slate-300/68">Satellite context helps show where the model is looking before the 7-day fungal-risk summary is rendered.</div>
+                      </div>
+                    </div>
+                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Horizontal layout: map on the left, key metrics on the right, and the 7-day timeline below for faster scanning on both desktop and mobile.</div>
                   </div>
                 </div>
-                <div id="hero-demo-days" class="mt-4 grid gap-3"></div>
+                <div id="hero-demo-days" class="hero-days-row mt-4"></div>
               </div>
 
               <div class="grid gap-4 md:grid-cols-3">
@@ -1687,8 +1889,14 @@
     const heroDemoFootprint = document.getElementById('hero-demo-footprint');
     const heroRiskBadge = document.getElementById('hero-risk-badge');
     const heroRiskCopy = document.getElementById('hero-risk-copy');
+    const heroDemoMapImage = document.getElementById('hero-demo-map-image');
+    const heroDemoMapCaption = document.getElementById('hero-demo-map-caption');
+    const heroDemoMapSource = document.getElementById('hero-demo-map-source');
+    const heroDemoFocusLabel = document.getElementById('hero-demo-focus-label');
+    const heroDemoFocusCopy = document.getElementById('hero-demo-focus-copy');
 
     const HERO_RADIUS_METERS = 50;
+    const HERO_MAP_CONTEXT_METERS = 220;
     const HERO_FOOTPRINT_M2 = Math.PI * HERO_RADIUS_METERS * HERO_RADIUS_METERS;
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -1699,6 +1907,28 @@
     };
 
     const formatCoordinate = (value) => Number(value).toFixed(5);
+
+    const metersToLatitudeDegrees = (meters) => meters / 111320;
+
+    const metersToLongitudeDegrees = (meters, latitude) => {
+      const latitudeCos = Math.cos((latitude * Math.PI) / 180);
+      return meters / Math.max(111320 * Math.abs(latitudeCos), 1e-6);
+    };
+
+    const buildHeroSatelliteMapUrl = (latitude, longitude) => {
+      const latDelta = metersToLatitudeDegrees(HERO_MAP_CONTEXT_METERS);
+      const lonDelta = metersToLongitudeDegrees(HERO_MAP_CONTEXT_METERS, latitude);
+      const params = new URLSearchParams({
+        bbox: `${longitude - lonDelta},${latitude - latDelta},${longitude + lonDelta},${latitude + latDelta}`,
+        bboxSR: '4326',
+        imageSR: '4326',
+        size: '1200,900',
+        format: 'jpg',
+        transparent: 'false',
+        f: 'image',
+      });
+      return `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?${params.toString()}`;
+    };
 
     const parseGoogleCoordinates = (input) => {
       const value = decodeURIComponent(String(input || '').trim());
@@ -1800,6 +2030,22 @@
       heroRiskBadge.textContent = riskLevel;
       heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
       heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal);
+      if (heroDemoMapImage) {
+        heroDemoMapImage.src = buildHeroSatelliteMapUrl(latitude, longitude);
+        heroDemoMapImage.alt = `Satellite view centered on ${formatCoordinate(latitude)}, ${formatCoordinate(longitude)} with the 50 meter focus ring used by the DELTA Plant demo`;
+      }
+      if (heroDemoMapCaption) {
+        heroDemoMapCaption.textContent = `The highlighted ring marks the 50 m inspection radius around ${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}.`;
+      }
+      if (heroDemoMapSource) {
+        heroDemoMapSource.textContent = 'Esri World Imagery';
+      }
+      if (heroDemoFocusLabel) {
+        heroDemoFocusLabel.textContent = `${HERO_RADIUS_METERS} m SAR footprint`;
+      }
+      if (heroDemoFocusCopy) {
+        heroDemoFocusCopy.textContent = `The model watches the central ${HERO_RADIUS_METERS} m ring and aggregates radar-style moisture and weather evidence around that micro-zone.`;
+      }
 
       heroDemoDays.innerHTML = [...series].reverse().map((item) => `
         <article class="hero-demo-day">
