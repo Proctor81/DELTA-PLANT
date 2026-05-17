@@ -1533,6 +1533,81 @@ def _classify_fungal_risk(mean_value: float, peak_value: float, high_risk_days: 
     return "basso"
 
 
+def _classify_soil_moisture_proxy(latest_value: float) -> str:
+    if latest_value >= 65.0:
+        return "molto elevato"
+    if latest_value >= 45.0:
+        return "moderato"
+    if latest_value >= 25.0:
+        return "contenuto"
+    return "basso"
+
+
+def _classify_water_stress(mean_value: float, peak_value: float) -> str:
+    if peak_value >= 0.85 or mean_value >= 0.7:
+        return "alto"
+    if peak_value >= 0.6 or mean_value >= 0.4:
+        return "medio"
+    return "basso"
+
+
+def _build_nasa_sar_scientific_interpretation(result: Dict[str, Any]) -> str:
+    dashboard = result.get("dashboard", {}) or {}
+    soil_summary = dashboard.get("summary", {}) or {}
+    nasa_power = result.get("nasa_power", {}) or {}
+    power_summary = nasa_power.get("summary", {}) or {}
+    daily = (nasa_power.get("daily", []) or [])[-7:]
+
+    latest_soil = float(soil_summary.get("latest_soil_moisture_percent", 0.0) or 0.0)
+    average_soil = float(soil_summary.get("average_soil_moisture_percent", 0.0) or 0.0)
+    soil_trend = float(soil_summary.get("trend_delta_percent", 0.0) or 0.0)
+    fungal_mean = float(power_summary.get("fungal_risk_mean", 0.0) or 0.0)
+    fungal_peak = float(power_summary.get("fungal_risk_peak", 0.0) or 0.0)
+    high_fungal_days = int(power_summary.get("high_fungal_risk_days", 0) or 0)
+    water_stress_mean = float(power_summary.get("water_stress_mean", 0.0) or 0.0)
+    water_stress_peak = float(power_summary.get("water_stress_peak", 0.0) or 0.0)
+
+    mean_humidity = (
+        sum(float(item.get("RH2M", 0.0) or 0.0) for item in daily) / len(daily)
+        if daily else 0.0
+    )
+    total_precip = sum(float(item.get("PRECTOTCORR", 0.0) or 0.0) for item in daily)
+    mean_temp = (
+        sum(float(item.get("T2M", 0.0) or 0.0) for item in daily) / len(daily)
+        if daily else 0.0
+    )
+
+    fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days)
+    soil_level = _classify_soil_moisture_proxy(latest_soil)
+    stress_level = _classify_water_stress(water_stress_mean, water_stress_peak)
+    trend_label = "in aumento" if soil_trend > 1.0 else "in calo" if soil_trend < -1.0 else "stabile"
+
+    if fungal_level == "alto":
+        fungal_message = "Il contesto climatico degli ultimi giorni e' favorevole allo sviluppo fungino"
+    elif fungal_level == "medio":
+        fungal_message = "Il contesto climatico mostra una predisposizione fungina intermedia"
+    else:
+        fungal_message = "Il contesto climatico e' poco favorevole allo sviluppo fungino"
+
+    if stress_level == "alto":
+        stress_message = "lo stress idrico atmosferico e' elevato"
+    elif stress_level == "medio":
+        stress_message = "lo stress idrico atmosferico e' moderato"
+    else:
+        stress_message = "lo stress idrico atmosferico resta contenuto"
+
+    return "\n".join(
+        [
+            f"Il proxy di umidita' del suolo e' {soil_level} ({latest_soil:.1f}% oggi; media 7 giorni {average_soil:.1f}%) ed e' {trend_label}.",
+            f"Il rischio fungino climatico e' {fungal_level}. {fungal_message}: indice medio {fungal_mean:.2f}, picco {fungal_peak:.2f}, {high_fungal_days} giorni ad alta criticita'.",
+            f"Nei 7 giorni osservati: umidita' relativa media {mean_humidity:.1f}%, precipitazione cumulata {total_precip:.1f} mm, temperatura media {mean_temp:.1f} C.",
+            f"Sul bilancio idrico, {stress_message} (media {water_stress_mean:.2f}, picco {water_stress_peak:.2f}).",
+            "Interpretazione scientifica: questo output descrive condizioni agroclimatiche favorevoli o sfavorevoli ai funghi, non conferma la presenza di una patologia.",
+            "Indicazione operativa: intensifica monitoraggio visivo e controlli in campo quando rischio fungino e umidita' restano elevati per piu' giorni consecutivi.",
+        ]
+    )
+
+
 def _nasa_sar_reply_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
@@ -1580,56 +1655,9 @@ async def _interpret_nasa_sar_dashboard(
 ) -> str:
     dashboard = result.get("dashboard", {}) or {}
     series = dashboard.get("soil_moisture_last_7_days", []) or []
-    summary = dashboard.get("summary", {}) or {}
-    nasa_power = result.get("nasa_power", {}) or {}
-    power_summary = nasa_power.get("summary", {}) or {}
-    fungal_daily = [
-        {
-            "day": item.get("day"),
-            "fungal_disease_risk_index": item.get("fungal_disease_risk_index"),
-            "RH2M": item.get("RH2M"),
-            "PRECTOTCORR": item.get("PRECTOTCORR"),
-            "T2M": item.get("T2M"),
-        }
-        for item in (nasa_power.get("daily", []) or [])[-7:]
-    ]
     if not series:
         return "Non ho trovato abbastanza dati NASA POWER per produrre un'interpretazione agronomica." 
-
-    fungal_mean = float(power_summary.get("fungal_risk_mean", 0.0) or 0.0)
-    fungal_peak = float(power_summary.get("fungal_risk_peak", 0.0) or 0.0)
-    high_fungal_days = int(power_summary.get("high_fungal_risk_days", 0) or 0)
-    fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days)
-
-    engine = _get_chat_engine(context)
-    prompt = (
-        "Interpreta in italiano, in massimo 7 righe, una dashboard satellitare NASA-ISRO/SAR per umidità del suolo e rischio fungino. "
-        "Usa tono tecnico ma operativo. Cita trend dell'umidità del suolo, livello di rischio fungino, fattori climatici favorevoli o sfavorevoli e una raccomandazione pratica. "
-        "Non inventare colture o dati non presenti.\n\n"
-        f"SOIL_SUMMARY: {json.dumps(summary, ensure_ascii=False)}\n"
-        f"SOIL_SERIES: {json.dumps(series, ensure_ascii=False)}\n"
-        f"FUNGAL_SUMMARY: {json.dumps({'fungal_risk_mean': fungal_mean, 'fungal_risk_peak': fungal_peak, 'high_fungal_risk_days': high_fungal_days, 'fungal_risk_level': fungal_level}, ensure_ascii=False)}\n"
-        f"FUNGAL_DAILY: {json.dumps(fungal_daily, ensure_ascii=False)}"
-    )
-
-    try:
-        interpretation = await asyncio.to_thread(engine.chat_internal, prompt)
-    except Exception as exc:
-        logger.warning("Interpretazione LLM NASA/SAR fallita: %s", exc)
-        interpretation = ""
-
-    interpretation = (interpretation or "").strip()
-    if interpretation:
-        return interpretation
-
-    latest = float(summary.get("latest_soil_moisture_percent", 0.0))
-    trend = float(summary.get("trend_delta_percent", 0.0))
-    trend_label = "in aumento" if trend > 1.0 else "in calo" if trend < -1.0 else "stabile"
-    return (
-        f"L'umidità del suolo stimata è {trend_label} negli ultimi 7 giorni e il valore più recente è {latest:.1f}%. "
-        f"Il rischio fungino climatico risulta {fungal_level}, con indice medio {fungal_mean:.2f}, picco {fungal_peak:.2f} e {high_fungal_days} giorni ad alta criticità. "
-        "Usa questo segnale come supporto operativo, aumenta il monitoraggio se umidità e bagnatura restano elevate e confronta sempre il dato con rilievi agronomici in campo."
-    )
+    return _build_nasa_sar_scientific_interpretation(result)
 
 
 def _get_nasa_orchestrator(context: ContextTypes.DEFAULT_TYPE):
@@ -1683,7 +1711,7 @@ async def _run_nasa_sar_analysis(
     )
     await _send(
         update,
-        "<b>🧠 Interpretazione LLM</b>\n" + interpretation,
+        "<b>🧠 Interpretazione scientifica assistita</b>\n" + interpretation,
         reply_markup=_menu_keyboard(),
         parse_mode="HTML",
     )

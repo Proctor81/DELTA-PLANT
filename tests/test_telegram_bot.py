@@ -372,12 +372,6 @@ def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
 
 
 def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch):
-    class FakeEngine:
-        def chat_internal(self, prompt):
-            raise RuntimeError("llm unavailable")
-
-    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
-
     result = {
         "dashboard": {
             "soil_moisture_last_7_days": [
@@ -386,16 +380,20 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
             ],
             "summary": {
                 "latest_soil_moisture_percent": 19.4,
+                "average_soil_moisture_percent": 24.5,
                 "trend_delta_percent": -8.7,
             },
         },
         "nasa_power": {
             "summary": {
+                "water_stress_mean": 0.72,
+                "water_stress_peak": 0.91,
                 "fungal_risk_mean": 0.66,
                 "fungal_risk_peak": 0.84,
                 "high_fungal_risk_days": 3,
             },
             "daily": [
+                {"day": "2026-05-11", "fungal_disease_risk_index": 0.71, "RH2M": 83.0, "PRECTOTCORR": 2.4, "T2M": 20.1},
                 {"day": "2026-05-17", "fungal_disease_risk_index": 0.84, "RH2M": 86.0, "PRECTOTCORR": 4.2, "T2M": 19.8},
             ],
         },
@@ -410,6 +408,8 @@ def test_interpret_nasa_sar_dashboard_fallback_mentions_fungal_risk(monkeypatch)
 
     assert "rischio fungino" in text.lower()
     assert "alto" in text.lower()
+    assert "non conferma la presenza di una patologia" in text.lower()
+    assert "stress idrico" in text.lower()
 
 
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
