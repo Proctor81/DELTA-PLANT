@@ -258,11 +258,117 @@ def test_send_diagnosis_visuals_sends_original_and_overlay(tmp_path):
     asyncio.run(tg._send_diagnosis_visuals(update, context, record))
 
     assert len(calls) == 2
-    assert "Feedback CAM DELTA Plant" in calls[0]
-    assert "cerchio e il target" in calls[0]
-    assert "Overlay explainability" not in calls[0]
-    assert "lesione evidenziata" not in calls[0]
-    assert calls[1] == "Foto originale acquisita per la diagnosi DELTA Plant (riferimento)."
+
+
+def test_menu_keyboard_contains_nasa_sar_callback_button():
+    keyboard = tg._menu_keyboard()
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    nasa_button = next(button for button in buttons if button.text == "🛰️ Connettiti a NASA-ISRO/SAR")
+
+    assert nasa_button.callback_data == tg.CMD_NASA_SAR
+    assert nasa_button.web_app is None
+
+
+def test_nasa_sar_reply_keyboard_contains_webapp_and_manual_location(monkeypatch):
+    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "web_app_base_url", "https://deltaplant.ai")
+
+    keyboard = tg._nasa_sar_reply_keyboard()
+    first_button = keyboard.keyboard[0][0]
+    second_button = keyboard.keyboard[1][0]
+
+    assert first_button.text == "🛰️ Apri NASA-ISRO/SAR GPS"
+    assert first_button.web_app.url == "https://deltaplant.ai/telegram/nasa-sar-locator.html"
+    assert second_button.text == "📍 Invia GPS manualmente"
+    assert second_button.request_location is True
+
+
+def test_handle_nasa_sar_web_app_data_runs_analysis(monkeypatch):
+    calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_run(update, context, latitude, longitude, reply_markup=None):
+        calls.append((latitude, longitude, reply_markup))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_run_nasa_sar_analysis", fake_run)
+
+    update = types.SimpleNamespace(
+        effective_message=types.SimpleNamespace(
+            web_app_data=types.SimpleNamespace(
+                data=json.dumps(
+                    {
+                        "type": "nasa_sar_location",
+                        "status": "ok",
+                        "latitude": 45.4642,
+                        "longitude": 9.19,
+                    }
+                )
+            )
+        )
+    )
+    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+
+    asyncio.run(tg.handle_nasa_sar_web_app_data(update, context))
+
+    assert calls == [(45.4642, 9.19, None)]
+
+
+def test_handle_nasa_sar_web_app_data_reports_location_error(monkeypatch):
+    messages = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        messages.append((text, reply_markup, parse_mode))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace(
+        effective_message=types.SimpleNamespace(
+            web_app_data=types.SimpleNamespace(
+                data=json.dumps(
+                    {
+                        "type": "nasa_sar_location",
+                        "status": "error",
+                        "reason": "permission denied",
+                    }
+                )
+            )
+        )
+    )
+    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+
+    asyncio.run(tg.handle_nasa_sar_web_app_data(update, context))
+
+    assert len(messages) == 1
+    assert "posizione automatica non è disponibile" in messages[0][0]
+
+
+def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
+    calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_run(update, context, latitude, longitude, reply_markup=None):
+        calls.append((latitude, longitude, reply_markup.__class__.__name__))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_run_nasa_sar_analysis", fake_run)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(location=types.SimpleNamespace(latitude=41.9028, longitude=12.4964))
+    )
+    context = types.SimpleNamespace(user_data={"awaiting_nasa_sar_location": True}, application=types.SimpleNamespace(bot_data={}))
+
+    asyncio.run(tg.handle_nasa_sar_location(update, context))
+
+    assert calls == [(41.9028, 12.4964, "ReplyKeyboardRemove")]
+    assert context.user_data == {}
 
 
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):

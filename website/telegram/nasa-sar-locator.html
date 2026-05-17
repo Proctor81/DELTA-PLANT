@@ -149,11 +149,11 @@
         window.setTimeout(() => tg.close(), 450);
         return true;
       }
-      setStatus("Apri questa utility dal bottone Telegram del bot per inviare automaticamente il GPS.", true);
+      setStatus("Apri questa utility dal bottone tastiera del bot per inviare automaticamente il GPS.", true);
       return false;
     }
 
-    function requestLocation() {
+    function requestNavigatorLocation() {
       if (!navigator.geolocation) {
         setStatus("Questo telefono non espone la geolocalizzazione al browser integrato.", true);
         sendPayload({ type: "nasa_sar_location", status: "error", reason: "unsupported" });
@@ -170,6 +170,7 @@
             longitude: position.coords.longitude,
             accuracy_m: position.coords.accuracy,
             timestamp_ms: position.timestamp,
+            source: "navigator.geolocation",
           };
           sendPayload(payload);
         },
@@ -184,6 +185,34 @@
           maximumAge: 0,
         }
       );
+    }
+
+    function requestLocation() {
+      if (tg && tg.LocationManager && typeof tg.LocationManager.init === "function" && typeof tg.LocationManager.getLocation === "function") {
+        setStatus("Richiedo la posizione tramite Telegram Mini App...");
+        tg.LocationManager.init(() => {
+          tg.LocationManager.getLocation((location) => {
+            if (location && typeof location.latitude === "number" && typeof location.longitude === "number") {
+              sendPayload({
+                type: "nasa_sar_location",
+                status: "ok",
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy_m: location.horizontal_accuracy,
+                altitude_m: location.altitude,
+                speed_mps: location.speed,
+                timestamp_ms: Date.now(),
+                source: "telegram.location_manager",
+              });
+              return;
+            }
+            requestNavigatorLocation();
+          });
+        });
+        return;
+      }
+
+      requestNavigatorLocation();
     }
 
     retryButton.addEventListener("click", requestLocation);

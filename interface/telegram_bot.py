@@ -1016,10 +1016,7 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📄 Licenza", callback_data=CMD_LICENSE),
         ],
         [
-            InlineKeyboardButton(
-                "🛰️ Connettiti a NASA-ISRO/SAR",
-                web_app=WebAppInfo(url=_nasa_sar_webapp_url()),
-            ),
+            InlineKeyboardButton("🛰️ Connettiti a NASA-ISRO/SAR", callback_data=CMD_NASA_SAR),
         ],
         [
             InlineKeyboardButton("👩‍🔬 Cris (IT)", callback_data=CMD_VOICE_LANG_IT),
@@ -1528,6 +1525,18 @@ def _soil_moisture_bar(value: float, width: int = 10) -> str:
     return ("█" * filled) + ("░" * max(width - filled, 0))
 
 
+def _nasa_sar_reply_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🛰️ Apri NASA-ISRO/SAR GPS", web_app=WebAppInfo(url=_nasa_sar_webapp_url()))],
+            [KeyboardButton("📍 Invia GPS manualmente", request_location=True)],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Apri il locator automatico oppure condividi manualmente la posizione.",
+    )
+
+
 def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
@@ -1655,18 +1664,13 @@ async def _run_nasa_sar_analysis(
 
 async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["awaiting_nasa_sar_location"] = True
-    keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("📍 Invia GPS per NASA-ISRO/SAR", request_location=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        input_field_placeholder="Condividi la tua posizione per analizzare un raggio di 50 metri.",
-    )
     await _send(
         update,
         "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
-        "Invia la posizione GPS del telefono. Userò un'area circolare di 50 metri di raggio, "
-        "recupererò i dati degli ultimi 7 giorni tramite l'API NASA già attiva e ti mostrerò una dashboard con interpretazione LLM.",
-        reply_markup=keyboard,
+        "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
+        "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
+        "Analizzerò un'area circolare di 50 metri e ti mostrerò la dashboard degli ultimi 7 giorni con interpretazione LLM.",
+        reply_markup=_nasa_sar_reply_keyboard(),
         parse_mode="HTML",
     )
 
