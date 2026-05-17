@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - website/Raspberrypi/index.html
+      - website/telegram/nasa-sar-locator.html
       - website/privacy.html
       - website/privacy-policy.html
       - website/cookie-policy.html
@@ -38,8 +39,9 @@ jobs:
 
       - name: Prepare minimal Pages bundle
         run: |
-          mkdir -p site-dist/assets site-dist/components
+          mkdir -p site-dist/assets site-dist/components site-dist/telegram
           cp website/Raspberrypi/index.html site-dist/index.html
+          cp website/telegram/nasa-sar-locator.html site-dist/telegram/
           cp website/privacy.html site-dist/
           cp website/privacy-policy.html site-dist/
           cp website/cookie-policy.html site-dist/
