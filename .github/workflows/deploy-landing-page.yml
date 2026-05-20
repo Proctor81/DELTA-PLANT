@@ -2,69 +2,68 @@ name: Deploy Landing Page
 
 on:
   push:
-      branches:
-            - main
-                paths:
-                      - website/Raspberrypi/index.html
-                            - website/nasa-monitor.html
-                                  - website/SAR/index.html
-                                        - website/telegram/nasa-sar-locator.html
-                                              - website/privacy.html
-                                                    - website/privacy-policy.html
-                                                          - website/cookie-policy.html
-                                                                - website/terms-of-service.html
-                                                                      - website/components/**
-                                                                            - website/CNAME
-                                                                                  - website/.nojekyll
-                                                                                        - website/robots.txt
-                                                                                              - website/sitemap.xml
-                                                                                                    - website/assets/contact-relay-config.js
-                                                                                                          - website/assets/social-preview.svg
-                                                                                                                - website/assets/social-preview.png
-                                                                                                                      - website/assets/social-preview-wa-20260514.png
-                                                                                                                            - .github/workflows/deploy-landing-page.yml
-                                                                                                                              workflow_dispatch:
-                                                                                                                              
-                                                                                                                              concurrency:
-                                                                                                                                group: deploy-landing-page
-                                                                                                                                  cancel-in-progress: true
-                                                                                                                                  
-                                                                                                                                  permissions:
-                                                                                                                                    contents: write
-                                                                                                                                    
-                                                                                                                                    jobs:
-                                                                                                                                      deploy:
-                                                                                                                                          runs-on: ubuntu-latest
-                                                                                                                                              steps:
-                                                                                                                                                    - name: Checkout repository
-                                                                                                                                                            uses: actions/checkout@v4
-                                                                                                                                                            
-                                                                                                                                                                  - name: Prepare minimal Pages bundle
-                                                                                                                                                                          run: |
-                                                                                                                                                                                    mkdir -p site-dist/assets site-dist/components site-dist/telegram site-dist/NISAR site-dist/SAR
-                                                                                                                                                                                              cp website/Raspberrypi/index.html site-dist/index.html
-                                                                                                                                                                                                        cp website/nasa-monitor.html site-dist/NISAR/index.html
-                                                                                                                                                                                                                  cp website/SAR/index.html site-dist/SAR/index.html
-                                                                                                                                                                                                                            cp website/telegram/nasa-sar-locator.html site-dist/telegram/
-                                                                                                                                                                                                                                      cp website/privacy.html site-dist/
-                                                                                                                                                                                                                                                cp website/privacy-policy.html site-dist/
-                                                                                                                                                                                                                                                          cp website/cookie-policy.html site-dist/
-                                                                                                                                                                                                                                                                    cp website/terms-of-service.html site-dist/
-                                                                                                                                                                                                                                                                              cp website/components/*.js site-dist/components/
-                                                                                                                                                                                                                                                                                        cp website/CNAME site-dist/
-                                                                                                                                                                                                                                                                                                  cp website/.nojekyll site-dist/
-                                                                                                                                                                                                                                                                                                            cp website/robots.txt site-dist/
-                                                                                                                                                                                                                                                                                                                      cp website/sitemap.xml site-dist/
-                                                                                                                                                                                                                                                                                                                                cp website/assets/contact-relay-config.js site-dist/assets/
-                                                                                                                                                                                                                                                                                                                                          cp website/assets/social-preview.svg site-dist/assets/
-                                                                                                                                                                                                                                                                                                                                                    cp website/assets/social-preview.png site-dist/assets/
-                                                                                                                                                                                                                                                                                                                                                              cp website/assets/social-preview-wa-20260514.png site-dist/assets/
-                                                                                                                                                                                                                                                                                                                                                              
-                                                                                                                                                                                                                                                                                                                                                                    - name: Publish gh-pages branch
-                                                                                                                                                                                                                                                                                                                                                                            uses: peaceiris/actions-gh-pages@v4
-                                                                                                                                                                                                                                                                                                                                                                                    with:
-                                                                                                                                                                                                                                                                                                                                                                                              github_token: ${{ secrets.GITHUB_TOKEN }}
-                                                                                                                                                                                                                                                                                                                                                                                                        publish_branch: gh-pages
-                                                                                                                                                                                                                                                                                                                                                                                                                  publish_dir: ./site-dist
-                                                                                                                                                                                                                                                                                                                                                                                                                            force_orphan: true
-                                                                                                                                                                                                                                                                                                                                                                                                                            
+    branches:
+      - main
+    paths:
+      - website/Raspberrypi/index.html
+      - website/nasa-monitor.html
+      - website/SAR/index.html
+      - website/telegram/nasa-sar-locator.html
+      - website/privacy.html
+      - website/privacy-policy.html
+      - website/cookie-policy.html
+      - website/terms-of-service.html
+      - website/components/**
+      - website/CNAME
+      - website/.nojekyll
+      - website/robots.txt
+      - website/sitemap.xml
+      - website/assets/contact-relay-config.js
+      - website/assets/social-preview.svg
+      - website/assets/social-preview.png
+      - website/assets/social-preview-wa-20260514.png
+      - .github/workflows/deploy-landing-page.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-landing-page
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare minimal Pages bundle
+        run: |
+          mkdir -p site-dist/assets site-dist/components site-dist/telegram site-dist/NISAR site-dist/SAR
+          cp website/Raspberrypi/index.html site-dist/index.html
+          cp website/nasa-monitor.html site-dist/NISAR/index.html
+          cp website/SAR/index.html site-dist/SAR/index.html
+          cp website/telegram/nasa-sar-locator.html site-dist/telegram/
+          cp website/privacy.html site-dist/
+          cp website/privacy-policy.html site-dist/
+          cp website/cookie-policy.html site-dist/
+          cp website/terms-of-service.html site-dist/
+          cp website/components/*.js site-dist/components/
+          cp website/CNAME site-dist/
+          cp website/.nojekyll site-dist/
+          cp website/robots.txt site-dist/
+          cp website/sitemap.xml site-dist/
+          cp website/assets/contact-relay-config.js site-dist/assets/
+          cp website/assets/social-preview.svg site-dist/assets/
+          cp website/assets/social-preview.png site-dist/assets/
+          cp website/assets/social-preview-wa-20260514.png site-dist/assets/
+
+      - name: Publish gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./site-dist
+          force_orphan: true
