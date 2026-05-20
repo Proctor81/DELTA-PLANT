@@ -1,3 +1,7 @@
+from bot.deltaplano_bot import DELTAPLANOBot
+
+# Istanza singleton DELTAPLANOBot per logica HERO DEMO
+_deltaplano_bot = DELTAPLANOBot()
 """
 DELTA - interface/telegram_bot.py
 Bot Telegram interattivo per accesso conversazionale alle API DELTA.
@@ -679,6 +683,17 @@ async def _generate_free_chat_response(
         await update.effective_chat.send_action("typing")
     except Exception:
         pass
+
+    # Integrazione HERO DEMO: dashboard NASA-ISRO/SAR
+    lowered = user_text.lower()
+    if any(key in lowered for key in ("dashboard", "riepilogo settimanale", "sar")):
+        try:
+            dashboard = _deltaplano_bot.handle_message(user_id, user_text)
+            logger.info("free_chat_response[%s]: [DASHBOARD] %s", user_id, dashboard[:120])
+            return dashboard
+        except Exception as exc:
+            logger.error("Errore dashboard NASA-ISRO/SAR: %s", exc, exc_info=True)
+            return f"Errore dashboard NASA-ISRO/SAR: {exc}"
 
     engine = _get_chat_engine(context)
     response_language = _voice_language_mode(context)
