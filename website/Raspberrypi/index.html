@@ -1973,8 +1973,6 @@
           </select>
         </div>
         <a class="nav-link" href="#home">Home</a>
-        <a class="nav-link" href="/NISAR/">NISAR Monitor</a>
-        <a class="nav-link" href="/SAR/">SAR Direct</a>
         <a class="nav-link" href="#features">Features</a>
         <a class="nav-link" href="#technology">Technology</a>
         <a class="nav-link" href="#demo">Demo</a>
@@ -2007,8 +2005,6 @@
           </select>
         </div>
         <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#home">Home</a>
-        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="/NISAR/">NISAR Monitor</a>
-        <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="/SAR/">SAR Direct</a>
         <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#features">Features</a>
         <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#technology">Technology</a>
         <a class="nav-link rounded-2xl px-3 py-2 hover:bg-white/5" href="#demo">Demo</a>
@@ -3013,6 +3009,35 @@
       return `Weekly mean risk ${averageRisk.toFixed(2)}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window (${rainTotal.toFixed(1)} mm total, ${rainDailyMean.toFixed(1)} mm/day).`;
     };
 
+    const fetchOpenMeteoArchiveDaily = async (latitude, longitude, startDate, endDate) => {
+      const formatDate = (d) => d.toISOString().slice(0, 10);
+      const endpoint = new URL('https://archive-api.open-meteo.com/v1/archive');
+      endpoint.searchParams.set('latitude', latitude.toFixed(6));
+      endpoint.searchParams.set('longitude', longitude.toFixed(6));
+      endpoint.searchParams.set('start_date', formatDate(startDate));
+      endpoint.searchParams.set('end_date', formatDate(endDate));
+      endpoint.searchParams.set('daily', 'temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum');
+      endpoint.searchParams.set('timezone', 'UTC');
+
+      const response = await fetch(endpoint.toString());
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const times = Array.isArray(payload.daily?.time) ? payload.daily.time : [];
+      const temps = Array.isArray(payload.daily?.temperature_2m_mean) ? payload.daily.temperature_2m_mean : [];
+      const humidities = Array.isArray(payload.daily?.relative_humidity_2m_mean) ? payload.daily.relative_humidity_2m_mean : [];
+      const precipitations = Array.isArray(payload.daily?.precipitation_sum) ? payload.daily.precipitation_sum : [];
+
+      return times.map((day, i) => ({
+        day,
+        T2M: temps[i] != null ? Number(temps[i]) : null,
+        RH2M: humidities[i] != null ? Number(humidities[i]) : null,
+        PRECTOTCORR: precipitations[i] != null ? Number(precipitations[i]) : null,
+      })).filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
+    };
+
     const fetchHeroWeatherReference = async (latitude, longitude) => {
       const parseMeteoAmParamKey = (rawParam) => {
         if (rawParam && typeof rawParam === 'object') {
@@ -3083,14 +3108,12 @@
 
         const temperatureIndex = findMeteoAmParamIndex(paramlist, '2t');
         const humidityIndex = findMeteoAmParamIndex(paramlist, 'r');
-        const rainIndex = findMeteoAmParamIndex(paramlist, 'tpp');
-        if (temperatureIndex < 0 || humidityIndex < 0 || rainIndex < 0) {
+        if (temperatureIndex < 0 || humidityIndex < 0) {
           return [];
         }
 
         const temperatures = extractMeteoAmValues(datasets, temperatureIndex);
         const humidities = extractMeteoAmValues(datasets, humidityIndex);
-        const rains = extractMeteoAmValues(datasets, rainIndex);
         const dailyBuckets = new Map();
 
         timeseries.forEach((rawTime, index) => {
@@ -3111,10 +3134,6 @@
           if (Number.isFinite(humidity)) {
             bucket.humidities.push(humidity);
           }
-          const rain = Number(rains[index]);
-          if (Number.isFinite(rain)) {
-            bucket.rainTotal += rain;
-          }
         });
 
         return [...dailyBuckets.entries()]
@@ -3131,11 +3150,15 @@
               day,
               T2M: tempMean,
               RH2M: humidityMean,
-              PRECTOTCORR: bucket.rainTotal,
+              PRECTOTCORR: null,
             };
           })
           .filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
       };
+
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 6);
 
       const meteoAmEndpoint = new URL('https://api.meteoam.it/deda-meteograms/meteograms');
       meteoAmEndpoint.searchParams.set('request', 'GetMeteogram');
@@ -3148,46 +3171,38 @@
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = await response.json();
-        const daily = aggregateMeteoAmDaily(payload);
-        if (!daily.length) {
+        const meteoDaily = aggregateMeteoAmDaily(payload);
+        if (!meteoDaily.length) {
           throw new Error('No MeteoAM daily payload available');
         }
+
+        let openMeteoRainByDay = {};
+        try {
+          const openMeteoDaily = await fetchOpenMeteoArchiveDaily(latitude, longitude, startDate, today);
+          openMeteoRainByDay = Object.fromEntries(
+            openMeteoDaily
+              .filter((item) => item.day && Number.isFinite(item.PRECTOTCORR))
+              .map((item) => [item.day, item.PRECTOTCORR])
+          );
+        } catch (rainError) {
+          console.warn('Hero Open-Meteo rain calibration unavailable:', rainError);
+        }
+
+        const daily = meteoDaily.map((item) => ({
+          ...item,
+          PRECTOTCORR: Number.isFinite(openMeteoRainByDay[item.day]) ? openMeteoRainByDay[item.day] : null,
+        }));
+
         return {
-          source: 'Servizio Meteorologico dell\'Aeronautica Militare',
+          source: 'Servizio Meteorologico dell\'Aeronautica Militare (temp/humidity) + Open-Meteo Archive (rain)',
           daily,
           live: true,
         };
       } catch (error) {
         console.warn('Hero MeteoAM fetch unavailable:', error);
 
-        const today = new Date();
-        const startDate = new Date(today);
-        startDate.setDate(today.getDate() - 6);
-        const formatDate = (d) => d.toISOString().slice(0, 10);
-        const fallbackEndpoint = new URL('https://archive-api.open-meteo.com/v1/archive');
-        fallbackEndpoint.searchParams.set('latitude', latitude.toFixed(6));
-        fallbackEndpoint.searchParams.set('longitude', longitude.toFixed(6));
-        fallbackEndpoint.searchParams.set('start_date', formatDate(startDate));
-        fallbackEndpoint.searchParams.set('end_date', formatDate(today));
-        fallbackEndpoint.searchParams.set('daily', 'temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum');
-        fallbackEndpoint.searchParams.set('timezone', 'UTC');
-
         try {
-          const fallbackResponse = await fetch(fallbackEndpoint.toString());
-          if (!fallbackResponse.ok) {
-            throw new Error(`HTTP ${fallbackResponse.status}`);
-          }
-          const fallbackPayload = await fallbackResponse.json();
-          const times = Array.isArray(fallbackPayload.daily?.time) ? fallbackPayload.daily.time : [];
-          const temps = Array.isArray(fallbackPayload.daily?.temperature_2m_mean) ? fallbackPayload.daily.temperature_2m_mean : [];
-          const humidities = Array.isArray(fallbackPayload.daily?.relative_humidity_2m_mean) ? fallbackPayload.daily.relative_humidity_2m_mean : [];
-          const precipitations = Array.isArray(fallbackPayload.daily?.precipitation_sum) ? fallbackPayload.daily.precipitation_sum : [];
-          const daily = times.map((day, i) => ({
-            day,
-            T2M: temps[i] != null ? Number(temps[i]) : 0,
-            RH2M: humidities[i] != null ? Number(humidities[i]) : 0,
-            PRECTOTCORR: precipitations[i] != null ? Number(precipitations[i]) : 0,
-          })).filter((item) => Number.isFinite(item.T2M) && Number.isFinite(item.RH2M));
+          const daily = await fetchOpenMeteoArchiveDaily(latitude, longitude, startDate, today);
           return {
             source: 'Open-Meteo Archive fallback',
             daily,
