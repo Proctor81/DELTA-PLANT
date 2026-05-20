@@ -22,7 +22,10 @@ class DELTAPLANOBot:
         self.vision_service = MobileNetService()
 
     def handle_message(self, user_id, text: str, image_path: str = None) -> str:
-        """Instrada messaggio testo/immagine e restituisce la risposta."""
+        """
+        Instrada messaggio testo/immagine e restituisce la risposta.
+        Dopo l'invio del risultato, la chat viene immediatamente sbloccata (nessun blocco processo).
+        """
         user_id_str = str(user_id)
         if image_path:
             try:
@@ -30,9 +33,12 @@ class DELTAPLANOBot:
                 cls = result.get("class", "Sconosciuto")
                 conf = result.get("confidence", 0.0)
                 logger.info(f"Vision: {cls} ({conf:.1%}) per user {user_id_str}")
+                # Rilascio processo/chat libera subito dopo output
+                # (hook per eventuale gestione async/process release qui)
                 return f"Analisi immagine: {cls} (confidenza {conf:.1%})"
             except Exception as exc:
                 logger.warning(f"Errore vision: {exc}")
+                # Chat libera subito dopo errore
                 return "Impossibile analizzare l'immagine."
 
         # Se il messaggio contiene "dashboard" o "riepilogo settimanale", attiva la logica HERO DEMO
@@ -48,13 +54,18 @@ class DELTAPLANOBot:
                 lines.append(f"{d['date']} | {d['soil']:.1f} | {d['temp']:.1f} | {d['humidity']} | {d['rain']:.1f} | {d['risk']:.2f}")
             lines.append("")
             lines.append(f"Rischio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})")
+            # Chat libera subito dopo output
+            # (hook per eventuale gestione async/process release qui)
             return "\n".join(lines)
         try:
             response = self.chat_engine.chat(user_id_str, text)
             logger.info(f"Chat LLM risposta per user {user_id_str}: {response[:60]}")
+            # Chat libera subito dopo output
+            # (hook per eventuale gestione async/process release qui)
             return response
         except Exception as exc:
             logger.error(f"Errore chat_engine: {exc}", exc_info=True)
+            # Chat libera subito dopo errore
             return "Errore durante l'elaborazione della richiesta."
 
     def handle_command(self, user_id, command: str) -> str:
