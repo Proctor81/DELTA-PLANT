@@ -6,6 +6,7 @@ Inizializza tutti i moduli, avvia i thread e lancia l'interfaccia utente.
 
 import sys
 import os
+import json
 
 # ── Auto-rilancio con venv se si sta usando il Python di sistema ─
 # Usa python3.12 (symlink robusto) se disponibile, altrimenti python
@@ -14,7 +15,11 @@ _VENV_PYTHON = os.path.join(_DELTA_ROOT, ".venv", "bin", "python3.12")
 if not os.path.isfile(_VENV_PYTHON):
     _VENV_PYTHON = os.path.join(_DELTA_ROOT, ".venv", "bin", "python")
 # Confronta il percorso reale (risolve symlink) per evitare loop di rilancio
-if os.path.isfile(_VENV_PYTHON) and os.path.realpath(sys.executable) != os.path.realpath(_VENV_PYTHON):
+if (
+    __name__ == "__main__"
+    and os.path.isfile(_VENV_PYTHON)
+    and os.path.realpath(sys.executable) != os.path.realpath(_VENV_PYTHON)
+):
     import subprocess
     sys.exit(subprocess.call([_VENV_PYTHON] + sys.argv))
 
@@ -43,36 +48,143 @@ logger = logging.getLogger("delta.main")
 
 # ── Singleton: impedisce più istanze in parallelo ────────────
 _PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "delta.pid")
+_MAIN_FILE = os.path.abspath(__file__)
+
+
+def _read_pid_lock() -> dict | None:
+    try:
+        with open(_PID_FILE, encoding="utf-8") as pid_file:
+            raw_payload = pid_file.read().strip()
+    except OSError:
+        return None
+
+    if not raw_payload:
+        return None
+
+    try:
+        payload = json.loads(raw_payload)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict) and payload.get("pid") is not None:
+        try:
+            payload["pid"] = int(payload["pid"])
+        except (TypeError, ValueError):
+            return None
+        return payload
+
+    try:
+        return {"pid": int(raw_payload)}
+    except ValueError:
+        return None
+
+
+def _read_process_start_ticks(pid: int) -> str | None:
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8") as stat_file:
+            fields = stat_file.read().split()
+    except OSError:
+        return None
+
+    if len(fields) <= 21:
+        return None
+    return fields[21]
+
+
+def _read_process_cmdline(pid: int) -> list[str]:
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as cmdline_file:
+            parts = cmdline_file.read().split(b"\0")
+    except OSError:
+        return []
+
+    return [os.fsdecode(part) for part in parts if part]
+
+
+def _resolve_process_arg(arg: str, cwd: str | None) -> str:
+    if os.path.isabs(arg):
+        return os.path.realpath(arg)
+    if cwd:
+        return os.path.realpath(os.path.join(cwd, arg))
+    return os.path.realpath(arg)
+
+
+def _is_active_delta_lock(lock_data: dict) -> bool:
+    pid = lock_data.get("pid")
+    if not isinstance(pid, int):
+        return False
+
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+
+    try:
+        process_cwd = os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        process_cwd = None
+
+    cmdline = _read_process_cmdline(pid)
+    if len(cmdline) < 2:
+        return False
+
+    main_args = [_resolve_process_arg(arg, process_cwd) for arg in cmdline[1:]]
+    if _MAIN_FILE not in main_args:
+        return False
+
+    expected_start_ticks = lock_data.get("start_ticks")
+    if expected_start_ticks is None:
+        return True
+
+    current_start_ticks = _read_process_start_ticks(pid)
+    return current_start_ticks is not None and str(expected_start_ticks) == current_start_ticks
+
+
+def _write_pid_lock() -> None:
+    payload = {
+        "pid": os.getpid(),
+        "main_file": _MAIN_FILE,
+        "start_ticks": _read_process_start_ticks(os.getpid()),
+    }
+    with open(_PID_FILE, "w", encoding="utf-8") as pid_file:
+        json.dump(payload, pid_file)
+
+
+def _release_pid_lock() -> None:
+    lock_data = _read_pid_lock()
+    if not lock_data:
+        return
+
+    if lock_data.get("pid") != os.getpid():
+        return
+
+    expected_start_ticks = lock_data.get("start_ticks")
+    current_start_ticks = _read_process_start_ticks(os.getpid())
+    if expected_start_ticks is not None and current_start_ticks is not None:
+        if str(expected_start_ticks) != current_start_ticks:
+            return
+
+    try:
+        if os.path.isfile(_PID_FILE):
+            os.remove(_PID_FILE)
+    except OSError:
+        pass
 
 
 def _acquire_pid_lock() -> None:
     """Scrive il PID corrente su file. Termina se un'altra istanza è attiva."""
-    if os.path.isfile(_PID_FILE):
-        try:
-            with open(_PID_FILE) as _pf:
-                old_pid = int(_pf.read().strip())
-            # Controlla se il processo è ancora vivo (kill -0 non invia segnale)
-            os.kill(old_pid, 0)
+    lock_data = _read_pid_lock()
+    if lock_data:
+        old_pid = lock_data["pid"]
+        if _is_active_delta_lock(lock_data):
             print(
                 f"[DELTA] Un'altra istanza è già in esecuzione (PID {old_pid}).\n"
                 f"  Terminarla prima di avviare DELTA, oppure eliminare: {_PID_FILE}"
             )
             sys.exit(1)
-        except (ValueError, ProcessLookupError, PermissionError):
-            # PID file stale o processo già terminato: si sovrascrive
-            pass
 
-    with open(_PID_FILE, "w") as _pf:
-        _pf.write(str(os.getpid()))
-
-    def _release():
-        try:
-            if os.path.isfile(_PID_FILE):
-                os.remove(_PID_FILE)
-        except OSError:
-            pass
-
-    atexit.register(_release)
+    _write_pid_lock()
+    atexit.register(_release_pid_lock)
 
 from core.agent import DeltaAgent
 from interface.cli import CLI
@@ -214,6 +326,7 @@ def main():
             sys.exit(1)
 
         if args.preflight_only:
+            _release_pid_lock()
             return
 
     if args.enable_api:

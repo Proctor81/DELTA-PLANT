@@ -7,7 +7,6 @@ Tutti i parametri operativi, soglie e percorsi sono definiti qui.
 import os
 from pathlib import Path
 from typing import Any
-from pathlib import Path
 
 try:
     import yaml  # type: ignore
