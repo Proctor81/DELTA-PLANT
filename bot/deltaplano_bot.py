@@ -3,6 +3,9 @@ import logging
 from chat.chat_engine import ChatEngine
 from vision.mobilenet_service import MobileNetService
 
+# HERO DEMO LOGIC: dashboard NASA-ISRO/SAR
+from bot.nasa_sar_dashboard import generate_dashboard
+
 logger = logging.getLogger("delta.deltaplano_bot")
 
 
@@ -31,6 +34,21 @@ class DELTAPLANOBot:
             except Exception as exc:
                 logger.warning(f"Errore vision: {exc}")
                 return "Impossibile analizzare l'immagine."
+
+        # Se il messaggio contiene "dashboard" o "riepilogo settimanale", attiva la logica HERO DEMO
+        lowered = (text or "").lower()
+        if "dashboard" in lowered or "riepilogo settimanale" in lowered or "sar" in lowered:
+            # MOCK: estrai lat/lon da testo, qui fissi (esempio Roma)
+            lat, lon = 41.9028, 12.4964
+            dashboard = generate_dashboard(lat, lon)
+            # Costruisci risposta testuale
+            lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n"]
+            lines.append("Data | Soil | Temp | Humidity | Rain | Risk")
+            for d in dashboard["dashboard"]:
+                lines.append(f"{d['date']} | {d['soil']:.1f} | {d['temp']:.1f} | {d['humidity']} | {d['rain']:.1f} | {d['risk']:.2f}")
+            lines.append("")
+            lines.append(f"Rischio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})")
+            return "\n".join(lines)
         try:
             response = self.chat_engine.chat(user_id_str, text)
             logger.info(f"Chat LLM risposta per user {user_id_str}: {response[:60]}")
