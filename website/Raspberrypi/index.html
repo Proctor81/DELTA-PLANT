@@ -2121,7 +2121,7 @@
                 <div>
                   <div class="section-kicker">Hero demo</div>
                   <h2 class="mt-2 font-display text-2xl text-white sm:text-3xl">Paste Google coordinates. Get a weekly fungal-risk reading.</h2>
-                  <p class="mt-4 max-w-3xl text-base leading-7 text-slate-300/72">This public demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant fuses a 7-day SAR moisture proxy with official Aeronautica Militare weather to produce a single weekly fungal-risk reading.</p>
+                  <p class="mt-4 max-w-3xl text-base leading-7 text-slate-300/72">This public demo mirrors the DELTAPLANO bot logic: your pasted GPS point becomes the center of a circular footprint with a 50 meter radius, and DELTA Plant fuses a 7-day SAR moisture proxy with Open-Meteo weather (temperature, humidity, rain) to produce a single weekly fungal-risk reading.</p>
                   <p class="mt-3 text-sm leading-7 text-slate-300/68">SAR means <span class="font-semibold text-white">Synthetic Aperture Radar</span>, an advanced sensing technology that sends electromagnetic signals to Earth and reads the return signal to produce high-resolution surface information even through clouds or darkness.</p>
                 </div>
                 <div class="hero-demo-quickfacts">
@@ -2150,7 +2150,7 @@
                     <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
                     <button id="hero-demo-run" class="hero-demo-button" type="button">Run NISAR demo</button>
                   </div>
-                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point, fetch official MeteoAM weather, and return one weekly risk reading.</div>
+                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. The demo will lock a 50 m radius around the GPS point, fetch Open-Meteo weather, and return one weekly risk reading.</div>
                 </div>
                 <div class="hero-demo-controls-panel text-sm leading-7 text-slate-300/72">
                   <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Scientific reading</div>
@@ -2161,7 +2161,7 @@
                     </div>
                     <div class="hero-demo-science-card">
                       <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">Weather support</div>
-                      <p class="mt-2 text-sm leading-6 text-slate-300/72">Humidity is read from the official Aeronautica Militare weather service, while rainfall is calibrated with Open-Meteo Archive daily precipitation, then fused with radar persistence because fungal development needs sustained wet conditions rather than an isolated rain event.</p>
+                      <p class="mt-2 text-sm leading-6 text-slate-300/72">Temperature, humidity e rainfall sono letti da Open-Meteo Archive (daily), poi fusi con la persistenza SAR per stimare la pressione fungina settimanale. La componente radar serve a valutare la persistenza dell'umidità superficiale, fondamentale per lo sviluppo fungino.</p>
                     </div>
                     <div class="hero-demo-science-card">
                       <div class="text-xs uppercase tracking-[0.18em] text-cyan-200/60">L-band interpretation</div>
@@ -2198,15 +2198,15 @@
                       <div class="hero-summary-card">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Weekly mean</div>
                         <div id="hero-demo-focus-label" class="mt-3 text-lg font-semibold text-white">Risk 0.52</div>
-                        <div id="hero-demo-focus-copy" class="mt-2 text-sm text-slate-300/68">The public demo combines a 7-day SAR moisture proxy with official MeteoAM weather for this 50 m micro-zone.</div>
+                        <div id="hero-demo-focus-copy" class="mt-2 text-sm text-slate-300/68">The public demo combines a 7-day SAR moisture proxy with Open-Meteo weather (temperature, humidity, rain) for this 50 m micro-zone.</div>
                       </div>
                       <div class="hero-summary-card">
                         <div class="text-xs uppercase tracking-[0.2em] text-slate-300/58">Data sources</div>
-                        <div id="hero-demo-map-source" class="mt-3 text-lg font-semibold text-white">Esri World Imagery + MeteoAM</div>
-                        <div class="mt-2 text-sm text-slate-300/68">The public landing uses official MeteoAM weather and a client-side SAR moisture proxy to mirror the bot logic.</div>
+                        <div id="hero-demo-map-source" class="mt-3 text-lg font-semibold text-white">Esri World Imagery + Open-Meteo</div>
+                        <div class="mt-2 text-sm text-slate-300/68">The public landing uses Open-Meteo weather and a client-side SAR moisture proxy to mirror the bot logic.</div>
                       </div>
                     </div>
-                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Scientific note: the fungal outlook is not a disease diagnosis. It is a micro-area favorability estimate derived from a SAR moisture proxy, official Aeronautica Militare weather, and the same weekly risk formula used in the DELTAPLANO bot.</div>
+                    <div class="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm leading-7 text-slate-300/72">Scientific note: the fungal outlook is not a disease diagnosis. It is a micro-area favorability estimate derived from a SAR moisture proxy, Open-Meteo weather, and the same weekly risk formula used in the DELTAPLANO bot.</div>
                   </div>
                 </div>
                 <div id="hero-demo-days" class="hero-days-row mt-4"></div>
@@ -2219,7 +2219,7 @@
                 </div>
                 <div class="hero-demo-note dashboard-panel">
                   <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">Weather source</div>
-                  <p class="mt-3 text-sm leading-7 text-slate-300/72">Temperature and humidity are pulled from <span class="font-semibold text-white">Servizio Meteorologico dell'Aeronautica Militare</span>, while rainfall is taken from Open-Meteo Archive daily precipitation for stable millimeter values in the public browser demo.</p>
+                  <p class="mt-3 text-sm leading-7 text-slate-300/72">Temperature, humidity e rainfall sono forniti da <span class="font-semibold text-white">Open-Meteo Archive</span> (daily) per garantire valori stabili e trasparenti nella demo pubblica.</p>
                 </div>
                 <div class="hero-demo-note dashboard-panel">
                   <div class="text-xs uppercase tracking-[0.22em] text-cyan-200/60">Public data note</div>
