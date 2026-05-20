@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Set, List, Tuple
 
 import requests
+from nasa_delta_plant.utils.power_client import compute_fungal_risk_score
 
 try:
     from PIL import Image, ImageDraw
@@ -113,7 +114,6 @@ except ImportError:
     DELTA_ORCHESTRATOR_AVAILABLE = False
 # ----------------------------------------
 
-logger = logging.getLogger("delta.interface.telegram")
 logger = logging.getLogger("delta.interface.telegram")
 
 _FREE_CHAT_TRANSIENT_MARKERS = (
@@ -393,7 +393,7 @@ def _select_piper_voice_profile(
     text: str,
     context: Optional["ContextTypes.DEFAULT_TYPE"] = None,
 ) -> str:
-    override = _voice_language_mode(context)
+    override = _voice_language_mode(context) if context is not None else VOICE_LANGUAGE_AUTO
     if override in {VOICE_LANGUAGE_IT, VOICE_LANGUAGE_EN}:
         return override
 
@@ -554,7 +554,7 @@ async def _tts_with_elevenlabs(text: str) -> BytesIO:
 
 
 async def _tts_with_edge(text: str) -> BytesIO:
-    if not EDGE_TTS_AVAILABLE:
+    if edge_tts is None:
         raise RuntimeError("edge-tts non installato.")
     temp_dir = _voice_temp_dir()
     temp_path = temp_dir / f"tts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.mp3"
@@ -1862,11 +1862,12 @@ def _compute_fungal_risk_value(
     precipitation: float,
     previous_risk: float,
 ) -> float:
-    humidity_factor = 1.0 if humidity >= 80.0 else humidity / 80.0
-    temp_centered = max(0.0, 1.0 - abs(temperature - 20.0) / 10.0)
-    rain_factor = min(max(precipitation / 8.0, 0.0), 1.0)
-    sustained = previous_risk * 0.45
-    return max(min((0.5 * humidity_factor) + (0.35 * temp_centered) + (0.15 * rain_factor) + sustained, 1.0), 0.0)
+    return compute_fungal_risk_score(
+        temperature=temperature,
+        humidity=humidity,
+        precipitation=precipitation,
+        previous_risk=previous_risk,
+    )
 
 
 def _build_weekly_fungal_risk_window(daily_weather: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1970,7 +1971,7 @@ def _build_nasa_sar_scientific_interpretation(
         simple_message = "Il quadro climatico resta poco favorevole allo sviluppo fungino"
 
     lines = [
-        "Formula del rischio fungino: 50% umidita' relativa, 35% temperatura vicina a 20 C, 15% pioggia giornaliera e 45% di persistenza dal giorno precedente.",
+        "Formula del rischio fungino: 35% aria umida favorevole (attiva da 70% RH e massima sopra 90%), 40% bagnatura superficiale da pioggia o rugiada, 25% finestra termica favorevole tra 16 e 24 C e 25% di memoria dal giorno precedente.",
         f"Valore medio settimanale: {fungal_mean:.2f}",
         f"Giudizio di rischio: {fungal_level}",
         f"Lettura semplice: {simple_message}.",
