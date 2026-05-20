@@ -3160,57 +3160,42 @@
       const startDate = new Date(today);
       startDate.setDate(today.getDate() - 6);
 
-      const meteoAmEndpoint = new URL('https://api.meteoam.it/deda-meteograms/meteograms');
-      meteoAmEndpoint.searchParams.set('request', 'GetMeteogram');
-      meteoAmEndpoint.searchParams.set('layers', 'preset1');
-      meteoAmEndpoint.searchParams.set('latlon', `${latitude.toFixed(6)},${longitude.toFixed(6)}`);
-
       try {
-        const response = await fetch(meteoAmEndpoint.toString(), { headers: { Accept: 'application/json' } });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        const daily = await fetchOpenMeteoArchiveDaily(latitude, longitude, startDate, today);
+        if (!daily.length) {
+          throw new Error('No Open-Meteo daily payload available');
         }
-        const payload = await response.json();
-        const meteoDaily = aggregateMeteoAmDaily(payload);
-        if (!meteoDaily.length) {
-          throw new Error('No MeteoAM daily payload available');
-        }
-
-        let openMeteoRainByDay = {};
-        try {
-          const openMeteoDaily = await fetchOpenMeteoArchiveDaily(latitude, longitude, startDate, today);
-          openMeteoRainByDay = Object.fromEntries(
-            openMeteoDaily
-              .filter((item) => item.day && Number.isFinite(item.PRECTOTCORR))
-              .map((item) => [item.day, item.PRECTOTCORR])
-          );
-        } catch (rainError) {
-          console.warn('Hero Open-Meteo rain calibration unavailable:', rainError);
-        }
-
-        const daily = meteoDaily.map((item) => ({
-          ...item,
-          PRECTOTCORR: Number.isFinite(openMeteoRainByDay[item.day]) ? openMeteoRainByDay[item.day] : null,
-        }));
-
         return {
-          source: 'Servizio Meteorologico dell\'Aeronautica Militare (temp/humidity) + Open-Meteo Archive (rain)',
+          source: 'Open-Meteo Archive (temperature/humidity/rain)',
           daily,
           live: true,
         };
-      } catch (error) {
-        console.warn('Hero MeteoAM fetch unavailable:', error);
+      } catch (openMeteoError) {
+        console.warn('Hero Open-Meteo weekly fetch unavailable:', openMeteoError);
+
+        const meteoAmEndpoint = new URL('https://api.meteoam.it/deda-meteograms/meteograms');
+        meteoAmEndpoint.searchParams.set('request', 'GetMeteogram');
+        meteoAmEndpoint.searchParams.set('layers', 'preset1');
+        meteoAmEndpoint.searchParams.set('latlon', `${latitude.toFixed(6)},${longitude.toFixed(6)}`);
 
         try {
-          const daily = await fetchOpenMeteoArchiveDaily(latitude, longitude, startDate, today);
+          const response = await fetch(meteoAmEndpoint.toString(), { headers: { Accept: 'application/json' } });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          const meteoDaily = aggregateMeteoAmDaily(payload);
+          if (!meteoDaily.length) {
+            throw new Error('No MeteoAM daily payload available');
+          }
           return {
-            source: 'Open-Meteo Archive fallback',
-            daily,
+            source: 'Servizio Meteorologico dell\'Aeronautica Militare fallback (temperature/humidity) + SAR rain proxy',
+            daily: meteoDaily,
             live: false,
-            warning: error instanceof Error ? error.message : 'MeteoAM unavailable',
+            warning: openMeteoError instanceof Error ? openMeteoError.message : 'Open-Meteo unavailable',
           };
         } catch (fallbackError) {
-          console.warn('Hero Open-Meteo fallback unavailable:', fallbackError);
+          console.warn('Hero MeteoAM fallback unavailable:', fallbackError);
           return {
             source: 'Built-in demo fallback',
             daily: [],
@@ -3296,8 +3281,8 @@
       heroDemoCenter.textContent = `${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`;
       heroDemoFootprint.textContent = `Footprint ${Math.round(HERO_FOOTPRINT_M2).toLocaleString('en-US')} m²`;
       heroDemoStatus.textContent = weatherReference.live
-        ? 'GPS locked. DELTA Plant merged a 7-day SAR moisture proxy with official MeteoAM weather for this 50 m radius and reduced the output to one weekly mean risk.'
-        : `GPS locked. Official MeteoAM weather is temporarily unavailable, so the landing page is showing the same weekly risk logic with a fallback weather source (${weatherReference.warning || 'unavailable source'}).`;
+        ? 'GPS locked. DELTA Plant merged a 7-day SAR moisture proxy with Open-Meteo weekly weather (temperature, humidity, rain) for this 50 m radius and reduced the output to one weekly mean risk.'
+        : `GPS locked. The primary weekly weather source is temporarily unavailable, so the landing page is showing the same weekly risk logic with a fallback source (${weatherReference.warning || 'unavailable source'}).`;
       heroRiskBadge.textContent = riskLevel;
       heroRiskBadge.className = `hero-risk-badge ${riskClass} mt-3`;
       heroRiskCopy.textContent = buildHeroRiskCopy(riskLevel, averageRisk, humidityMean, rainTotal, rainDailyMean, soilMoistureMean, weatherReference.source);
