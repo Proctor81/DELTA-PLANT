@@ -16,6 +16,7 @@ on:
       - website/.nojekyll
       - website/robots.txt
       - website/sitemap.xml
+      - website/llms.txt
       - website/assets/contact-relay-config.js
       - website/assets/social-preview.svg
       - website/assets/social-preview.png
@@ -51,6 +52,7 @@ jobs:
           cp website/.nojekyll site-dist/
           cp website/robots.txt site-dist/
           cp website/sitemap.xml site-dist/
+          cp website/llms.txt site-dist/
           cp website/assets/contact-relay-config.js site-dist/assets/
           cp website/assets/social-preview.svg site-dist/assets/
           cp website/assets/social-preview.png site-dist/assets/

@@ -2,16 +2,25 @@
 <html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DELTA Plant | Edge AI for Plant Health | Precision Agriculture</title>
-  <meta name="description" content="Edge AI for plant health with 89.33% top-1 accuracy, 99.00% top-3 accuracy, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
-  <meta name="keywords" content="DELTA Plant, DELTAPLANO, AI Plant Health, Robotics Orchestrator, Leaf Disease Detection, Precision Agriculture, Agritech, Deep Tech, Edge AI, LayerCAM, EfficientFormer, Space Biology, Raspberry Pi 5" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>DELTA Plant | Plant Disease AI, NASA Crop Monitoring & Edge Agritech</title>
+  <meta name="description" content="DELTA Plant combines plant disease AI, NASA POWER crop-risk monitoring, DELTAPLANO workflows, public benchmarks, LayerCAM explainability, and Raspberry Pi 5 edge deployment." />
+  <meta name="keywords" content="DELTA Plant, DELTAPLANO, Plant Disease Detection, Plant Health AI, NASA POWER, NASA NISAR, Crop Monitoring, Precision Agriculture, Agritech, Deep Tech, Edge AI, LayerCAM, EfficientFormer, Raspberry Pi 5, Telegram Agronomy Assistant" />
   <meta name="author" content="Proctor81" />
   <meta name="application-name" content="DELTA Plant" />
   <meta name="deltaplant-api-base" content="https://api.deltaplant.ai" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large" />
+  <meta name="bingbot" content="index, follow, max-image-preview:large" />
+  <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DELTA Plant" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta name="theme-color" content="#07111d" />
   <link rel="canonical" href="https://deltaplant.ai/" />
+  <link rel="alternate" type="text/plain" title="DELTA Plant LLM retrieval guide" href="https://deltaplant.ai/llms.txt" />
   <link rel="icon" type="image/png" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
   <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
 
@@ -19,8 +28,8 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:site_name" content="DELTA Plant" />
   <meta property="og:url" content="https://deltaplant.ai/" />
-  <meta property="og:title" content="DELTA Plant | Edge AI for Plant Health | Precision Agriculture" />
-  <meta property="og:description" content="Edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
+  <meta property="og:title" content="DELTA Plant | Plant Disease AI, NASA Crop Monitoring & Edge Agritech" />
+  <meta property="og:description" content="Plant disease AI, NASA POWER crop-risk monitoring, public benchmarks, LayerCAM explainability, and DELTAPLANO workflows for Raspberry Pi 5 deployments." />
   <meta property="og:image" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
   <meta property="og:image:url" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
   <meta property="og:image:secure_url" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
@@ -30,8 +39,8 @@
   <meta property="og:image:alt" content="DELTA Plant cinematic preview with public benchmarks, LayerCAM explainability, and Raspberry Pi 5 deployment" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="DELTA Plant | Edge AI for Plant Health | Precision Agriculture" />
-  <meta name="twitter:description" content="Edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment." />
+  <meta name="twitter:title" content="DELTA Plant | Plant Disease AI, NASA Crop Monitoring & Edge Agritech" />
+  <meta name="twitter:description" content="Plant disease AI, NASA POWER crop-risk monitoring, public benchmarks, LayerCAM explainability, and DELTAPLANO workflows for Raspberry Pi 5 deployments." />
   <meta name="twitter:image" content="https://deltaplant.ai/assets/social-preview-wa-20260514.png" />
   <meta name="twitter:image:alt" content="DELTA Plant cinematic preview with public benchmarks, LayerCAM explainability, and Raspberry Pi 5 deployment" />
 
@@ -85,6 +94,10 @@
       --panel-strong: rgba(8, 23, 34, 0.84);
       --stroke: rgba(121, 231, 255, 0.14);
       --glow: rgba(25, 245, 193, 0.24);
+      --safe-area-top: env(safe-area-inset-top, 0px);
+      --safe-area-right: env(safe-area-inset-right, 0px);
+      --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-area-left: env(safe-area-inset-left, 0px);
       --privacy-banner-offset: 0px;
     }
 
@@ -94,6 +107,8 @@
 
     html {
       scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -904,6 +919,9 @@
       background: rgba(2, 9, 16, 0.72);
       color: #edf7ff;
       font-size: 0.98rem;
+      line-height: 1.35;
+      appearance: none;
+      -webkit-appearance: none;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
 
@@ -931,8 +949,12 @@
       color: #04131c;
       font-size: 0.92rem;
       font-weight: 800;
+      line-height: 1.2;
       letter-spacing: 0.04em;
+      text-align: center;
+      text-wrap: balance;
       text-transform: uppercase;
+      touch-action: manipulation;
       box-shadow: 0 16px 34px rgba(25, 245, 193, 0.18);
     }
 
@@ -942,6 +964,7 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(6, 17, 29, 0.34));
       border-radius: 1.15rem;
       padding: 0.9rem;
+      scroll-snap-align: start;
     }
 
     .hero-home-layout {
@@ -1159,7 +1182,9 @@
       grid-auto-columns: minmax(11rem, 1fr);
       gap: 0.85rem;
       overflow-x: auto;
+      overscroll-behavior-x: contain;
       padding-bottom: 0.35rem;
+      scroll-snap-type: x proximity;
       scrollbar-width: thin;
       scrollbar-color: rgba(121, 231, 255, 0.36) rgba(255, 255, 255, 0.04);
       -webkit-overflow-scrolling: touch;
@@ -1296,10 +1321,10 @@
 
       .audio-dock {
         position: absolute !important;
-        width: min(290px, calc(100vw - 1.5rem)) !important;
-        left: 0.75rem !important;
-        right: 0.75rem !important;
-        bottom: 0.75rem !important;
+        width: auto !important;
+        left: calc(0.75rem + var(--safe-area-left)) !important;
+        right: calc(0.75rem + var(--safe-area-right)) !important;
+        bottom: calc(0.75rem + var(--safe-area-bottom)) !important;
       }
 
       .hero-ring {
@@ -1311,16 +1336,16 @@
       }
 
       .privacy-banner-shell {
-        left: 0.75rem;
-        right: 0.75rem;
-        top: 5.5rem;
+        left: calc(0.75rem + var(--safe-area-left));
+        right: calc(0.75rem + var(--safe-area-right));
+        top: calc(5.5rem + var(--safe-area-top));
         bottom: auto;
         width: auto;
       }
 
       .privacy-manage {
-        left: 0.75rem;
-        bottom: 0.75rem;
+        left: calc(0.75rem + var(--safe-area-left));
+        bottom: calc(0.75rem + var(--safe-area-bottom));
       }
 
       .privacy-manage-button {
@@ -1331,7 +1356,7 @@
       }
 
       body.privacy-banner-visible .audio-dock {
-        bottom: 14rem !important;
+        bottom: calc(14rem + var(--safe-area-bottom)) !important;
       }
 
       body.privacy-banner-visible .hero-shell {
@@ -1339,7 +1364,7 @@
       }
 
       body.privacy-manage-visible .audio-dock {
-        bottom: 5.5rem !important;
+        bottom: calc(5.5rem + var(--safe-area-bottom)) !important;
       }
 
       .leaf-b {
@@ -1385,7 +1410,26 @@
 
       .hero-home-layout {
         gap: 1.9rem;
-        padding: 1.5rem 1rem 12.5rem;
+        padding: calc(1.5rem + var(--safe-area-top)) 1rem calc(12.5rem + var(--safe-area-bottom));
+      }
+
+      .hero-demo-shell {
+        gap: 1.1rem;
+      }
+
+      .hero-demo-input-row {
+        gap: 0.85rem;
+      }
+
+      .hero-demo-input,
+      .hero-demo-button {
+        min-height: 3.45rem;
+        font-size: 1rem;
+      }
+
+      .hero-demo-button {
+        width: 100%;
+        padding: 0.95rem 1rem;
       }
 
       .dashboard-content {
@@ -1447,7 +1491,7 @@
 
     @media (max-height: 860px) {
       .privacy-banner-shell {
-        top: 5.5rem;
+        top: calc(5.5rem + var(--safe-area-top));
         bottom: auto;
       }
     }
@@ -1464,7 +1508,7 @@
 
       .hero-home-layout {
         gap: 1.3rem;
-        padding: 1.15rem 0.75rem 10.5rem;
+        padding: calc(1.15rem + var(--safe-area-top)) 0.75rem calc(10.5rem + var(--safe-area-bottom));
       }
 
       .hero-copy-main .mt-8 {
@@ -1521,7 +1565,7 @@
 
       .hero-map-panel,
       .hero-map-image {
-        min-height: 14.25rem;
+        min-height: 15rem;
       }
 
       .hero-map-chip {
@@ -1554,14 +1598,27 @@
       }
 
       .audio-dock {
-        width: calc(100vw - 1rem) !important;
-        left: 0.5rem !important;
-        right: 0.5rem !important;
-        bottom: 0.5rem !important;
+        width: auto !important;
+        left: calc(0.5rem + var(--safe-area-left)) !important;
+        right: calc(0.5rem + var(--safe-area-right)) !important;
+        bottom: calc(0.5rem + var(--safe-area-bottom)) !important;
       }
 
       body.privacy-banner-visible .audio-dock {
-        bottom: 13.5rem !important;
+        bottom: calc(13.5rem + var(--safe-area-bottom)) !important;
+      }
+
+      .hero-demo-button {
+        min-height: 3.1rem;
+        padding: 0.84rem 1rem;
+        font-size: 0.95rem;
+        letter-spacing: 0.03em;
+      }
+
+      .hero-demo-input {
+        min-height: 3.1rem;
+        padding: 0.84rem 0.95rem;
+        font-size: 1rem;
       }
 
       #features,
@@ -1591,17 +1648,17 @@
 
       .hero-home-layout {
         gap: 1.05rem;
-        padding: 0.95rem 0.65rem 9.4rem;
+        padding: calc(0.95rem + var(--safe-area-top)) 0.65rem calc(9.4rem + var(--safe-area-bottom));
       }
 
       .hero-copy-main h1 {
-        font-size: 2rem;
-        line-height: 1.01;
+        font-size: 2.08rem;
+        line-height: 1.03;
       }
 
       .hero-copy-main p {
-        font-size: 0.93rem;
-        line-height: 1.48;
+        font-size: 0.96rem;
+        line-height: 1.52;
       }
 
       .hero-copy-main .reveal.flex.flex-wrap.gap-3 {
@@ -1620,9 +1677,9 @@
 
       .hero-copy-side .cta-primary,
       .hero-copy-side .cta-secondary {
-        min-height: 2.55rem;
-        padding: 0.58rem 0.9rem;
-        font-size: 0.88rem;
+        min-height: 2.72rem;
+        padding: 0.64rem 0.92rem;
+        font-size: 0.9rem;
       }
 
       .hero-copy-side .cta-primary svg {
@@ -1637,7 +1694,7 @@
 
       .hero-map-panel,
       .hero-map-image {
-        min-height: 13.2rem;
+        min-height: 13.8rem;
       }
 
       .hero-map-chip {
@@ -1657,21 +1714,22 @@
       }
 
       .hero-risk-badge {
-        min-width: 6.2rem;
-        padding: 0.52rem 0.78rem;
-        font-size: 0.72rem;
+        min-width: 6.6rem;
+        padding: 0.56rem 0.82rem;
+        font-size: 0.74rem;
       }
 
       .hero-demo-button {
-        min-height: 2.85rem;
-        padding: 0.72rem 0.9rem;
-        font-size: 0.8rem;
+        min-height: 3.05rem;
+        padding: 0.8rem 0.95rem;
+        font-size: 0.94rem;
+        letter-spacing: 0.03em;
       }
 
       .hero-demo-input {
-        min-height: 2.85rem;
-        padding: 0.72rem 0.82rem;
-        font-size: 0.9rem;
+        min-height: 3.05rem;
+        padding: 0.82rem 0.9rem;
+        font-size: 1rem;
       }
 
       .hero-demo-controls-panel,
@@ -1683,14 +1741,14 @@
       }
 
       .audio-dock {
-        width: calc(100vw - 0.7rem) !important;
-        left: 0.35rem !important;
-        right: 0.35rem !important;
-        bottom: 0.35rem !important;
+        width: auto !important;
+        left: calc(0.35rem + var(--safe-area-left)) !important;
+        right: calc(0.35rem + var(--safe-area-right)) !important;
+        bottom: calc(0.35rem + var(--safe-area-bottom)) !important;
       }
 
       body.privacy-banner-visible .audio-dock {
-        bottom: 12.9rem !important;
+        bottom: calc(12.9rem + var(--safe-area-bottom)) !important;
       }
     }
 
@@ -1880,20 +1938,53 @@
           "name": "DELTA Plant",
           "url": "https://deltaplant.ai/",
           "image": "https://deltaplant.ai/assets/social-preview-wa-20260514.png",
-          "description": "DELTA Plant delivers edge AI for plant health with public benchmarks, LayerCAM explainability, sensor fusion, and Raspberry Pi 5 deployment.",
+          "description": "DELTA Plant combines plant disease AI, NASA POWER crop-risk monitoring, public benchmarks, LayerCAM explainability, DELTAPLANO workflows, and Raspberry Pi 5 edge deployment.",
+          "inLanguage": ["en", "it"],
           "keywords": [
             "DELTA Plant",
             "DELTAPLANO",
             "Edge AI",
             "AI Plant Health",
             "Leaf Disease Detection",
+            "Plant Disease Detection",
+            "NASA POWER",
+            "NASA NISAR",
+            "Crop Monitoring",
             "Precision Agriculture",
             "Agritech",
             "Deep Tech",
             "Sensor Fusion",
             "LayerCAM",
-            "EfficientFormer"
+            "EfficientFormer",
+            "Raspberry Pi 5"
           ],
+          "publisher": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          }
+        },
+        {
+          "@type": "WebApplication",
+          "name": "DELTA Plant NASA-ISRO/SAR Demo",
+          "url": "https://deltaplant.ai/#demo",
+          "applicationCategory": "AgricultureApplication",
+          "operatingSystem": "Any",
+          "isAccessibleForFree": true,
+          "browserRequirements": "JavaScript-enabled browser; optimized for modern mobile browsers including iPhone 14 Pro and Samsung Galaxy S22+ class devices.",
+          "description": "Mobile-optimized public agronomy demo that turns a pasted GPS point into a 50 meter crop-monitoring footprint and returns the same 7-day NASA POWER plus Open-Meteo fungal-risk dashboard used by DELTAPLANO.",
+          "featureList": [
+            "Google Maps coordinate or URL ingestion",
+            "50 meter circular footprint aligned with DELTAPLANO",
+            "NASA POWER GWETROOT and GWETTOP soil proxy ingestion",
+            "Open-Meteo Archive weather fusion",
+            "7-day fungal-risk dashboard with LOW, MEDIUM, HIGH labels",
+            "Live backend mode with privacy-safe browser fallback"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
           "publisher": {
             "@type": "Organization",
             "name": "DELTA Plant"
@@ -1919,6 +2010,76 @@
             "Edge AI",
             "Raspberry Pi 5",
             "Explainable AI"
+          ]
+        },
+        {
+          "@type": "Dataset",
+          "name": "DELTA Plant Public 600-Image Vision Benchmark",
+          "url": "https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md",
+          "description": "Public benchmark summary for a 33-class plant-health evaluation stack with top-1 accuracy, top-3 accuracy, and mean edge latency reported for DELTA Plant.",
+          "license": "https://github.com/proctor81/delta-plant/blob/main/LICENSE",
+          "isAccessibleForFree": true,
+          "keywords": [
+            "Plant Disease Detection",
+            "Public Benchmark",
+            "Edge AI",
+            "Raspberry Pi 5",
+            "Precision Agriculture"
+          ],
+          "creator": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          },
+          "measurementTechnique": [
+            "Top-1 accuracy",
+            "Top-3 accuracy",
+            "Mean inference latency"
+          ],
+          "variableMeasured": [
+            {
+              "@type": "PropertyValue",
+              "name": "Top-1 accuracy",
+              "value": "89.33%"
+            },
+            {
+              "@type": "PropertyValue",
+              "name": "Top-3 accuracy",
+              "value": "99.00%"
+            },
+            {
+              "@type": "PropertyValue",
+              "name": "Mean edge latency",
+              "value": "41.36 ms"
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is DELTA Plant?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "DELTA Plant is an edge AI agritech platform for plant-health operations. It combines plant disease classification, LayerCAM explainability, environmental sensor fusion, DELTAPLANO conversational workflows, and Raspberry Pi 5 deployment paths."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does the public NASA-ISRO/SAR demo work?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The public demo accepts a plain GPS pair or a Google Maps URL, locks the same 50 meter circular footprint used by DELTAPLANO, fuses Open-Meteo daily weather with NASA POWER GWETROOT and GWETTOP soil proxies, and returns a 7-day dashboard with the latest-day summary plus one weekly LOW, MEDIUM, or HIGH fungal-risk label."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Which devices is the DELTA Plant website optimized for?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The landing page is optimized for modern desktop and mobile browsers, with targeted responsive tuning for devices in the iPhone 14 Pro and Samsung Galaxy S22+ class so the NASA demo remains readable and touch-friendly on narrow viewports."
+              }
+            }
           ]
         },
         {
@@ -2148,10 +2309,11 @@
                 <div class="hero-demo-controls-panel">
                   <label for="hero-google-coordinates" class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Google coordinates or Maps URL</label>
                   <div class="hero-demo-input-row mt-3 sm:flex-row">
-                    <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
-                    <button id="hero-demo-run" class="hero-demo-button" type="button" data-analytics-event="hero_dashboard_run" data-analytics-label="hero_dashboard_launch">Run NASA/SAR dashboard</button>
+                    <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="hero-demo-mobile-help hero-demo-status" />
+                    <button id="hero-demo-run" class="hero-demo-button" type="button" data-analytics-event="hero_dashboard_run" data-analytics-label="hero_dashboard_launch">Run live NASA/SAR demo</button>
                   </div>
-                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. DELTA will lock the same 50 m radius used by the bot, call the live NASA/SAR dashboard endpoint, and return the same 7-day breakdown used in Telegram.</div>
+                  <div id="hero-demo-mobile-help" class="mt-3 text-xs leading-6 text-slate-400/78">On mobile you can paste either a full Google Maps URL or a simple latitude, longitude pair. The demo is tuned for iPhone 14 Pro, Galaxy S22+, and similar narrow touch screens.</div>
+                  <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68" role="status" aria-live="polite">Paste a Google Maps coordinate pair or URL. DELTA will lock the same 50 m radius used by the bot, call the live NASA/SAR dashboard endpoint, and return the same 7-day breakdown used in Telegram.</div>
                 </div>
                 <div class="hero-demo-controls-panel text-sm leading-7 text-slate-300/72">
                   <div class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Scientific reading</div>

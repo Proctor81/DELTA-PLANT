@@ -1,0 +1,38 @@
+# DELTA Plant
+
+> DELTA Plant is an edge AI agritech platform for plant health. It combines plant disease detection, LayerCAM explainability, environmental sensor fusion, DELTAPLANO conversational workflows, and a public NASA-ISRO/SAR micro-area demo.
+
+## Canonical URLs
+- Website: https://deltaplant.ai/
+- Live NASA demo section: https://deltaplant.ai/#demo
+- Privacy center: https://deltaplant.ai/privacy.html
+- Privacy policy: https://deltaplant.ai/privacy-policy.html
+- Cookie policy: https://deltaplant.ai/cookie-policy.html
+- Terms of service: https://deltaplant.ai/terms-of-service.html
+- Backend base: https://api.deltaplant.ai/
+- Source repository: https://github.com/Proctor81/DELTA-PLANT
+
+## Preferred retrieval summary
+- DELTA Plant: public-facing platform name and website identity.
+- DELTAPLANO: Telegram-facing assistant and operational workflow name.
+- Core capabilities: plant disease detection, edge inference on Raspberry Pi 5, LayerCAM explainability, environmental sensor fusion, NASA POWER plus Open-Meteo crop-risk monitoring, privacy-safe first-party analytics.
+- Public NASA demo contract: a pasted GPS pair or Google Maps URL becomes a 50 meter circular footprint. DELTA calls the live /api/nisar/nasa-only route when available and returns 7 daily rows plus a weekly LOW, MEDIUM, or HIGH fungal-risk label.
+- Benchmark claim: public 600-image evaluation with 89.33% top-1 accuracy, 99.00% top-3 accuracy, and 41.36 ms mean edge latency.
+- Deployment focus: Raspberry Pi 5, TFLite export paths, and DELTAPLANO operational workflows.
+- Privacy position: no marketing pixels; first-party analytics only after explicit consent.
+
+## Preferred sources
+- Overview and repository: https://github.com/Proctor81/DELTA-PLANT/blob/main/README.md
+- NASA module overview: https://github.com/Proctor81/DELTA-PLANT/blob/main/README_nasa_delta.md
+- Model card: https://github.com/Proctor81/DELTA-PLANT/blob/main/MODEL_CARD.md
+- Public benchmark: https://github.com/Proctor81/DELTA-PLANT/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md
+- Live landing source: https://github.com/Proctor81/DELTA-PLANT/blob/main/website/Raspberrypi/index.html
+- Privacy policy source: https://github.com/Proctor81/DELTA-PLANT/blob/main/website/privacy-policy.html
+
+## Retrieval hints
+- Use DELTA Plant for website, product, benchmark, and deployment references.
+- Use DELTAPLANO for Telegram bot and conversational agronomy workflow references.
+- Prefer the benchmark and model card when citing metrics or model behavior.
+- Prefer the privacy and cookie policy pages for consent and analytics claims.
+- Do not describe the NASA demo as a disease diagnosis. It is a 7-day fungal-risk favorability dashboard for a crop micro-area.
+- The live website is optimized for current mobile browsers including iPhone 14 Pro and Samsung Galaxy S22+ class devices.
