@@ -4,20 +4,18 @@ Backend EfficientFormerV2-S1 per inferenza TFLite edge + explainability LayerCAM
 """
 
 from __future__ import annotations
+import time
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 import importlib
+from .vision_backend import VisionBackend
+from ai.tflite_inference_runner import decode_prediction
+import numpy as np
 import logging
 import math
 import os
-import time
-
-import numpy as np
-
-from ai.tflite_inference_runner import decode_prediction
-from .vision_backend import VisionBackend
 
 LOGGER = logging.getLogger("delta.vision.efficientformer")
 
@@ -56,9 +54,6 @@ class EfficientFormerClassifier(VisionBackend):
         from core.config import ACTIVE_MODEL, DEFAULT_LABELS, MODEL_CONFIG, MODELS_REGISTRY
 
         requested_key = model_key if model_key in MODELS_REGISTRY else ACTIVE_MODEL
-        if requested_key not in MODELS_REGISTRY:
-            requested_key = next(iter(MODELS_REGISTRY), "generale")
-
         self._registry = MODELS_REGISTRY
         self._default_labels = list(DEFAULT_LABELS)
         self._global_model_cfg = MODEL_CONFIG
@@ -208,6 +203,21 @@ class EfficientFormerClassifier(VisionBackend):
                 class_index = int(prediction.get("class_index", 0))
 
             heatmap = self._compute_layercam(original, class_index)
+            # --- PATCH: maschera la heatmap con la foglia (ROI) ---
+            try:
+                from vision.organ_detector import PlantOrganDetector, ORGAN_LEAF
+                detector = PlantOrganDetector()
+                organs = detector.detect_all(original)
+                leaf = organs.get(ORGAN_LEAF)
+                if leaf and leaf.mask is not None:
+                    # Normalizza la maschera foglia a [0,1] float32
+                    mask = (leaf.mask > 0).astype(heatmap.dtype)
+                    if mask.shape != heatmap.shape:
+                        import cv2
+                        mask = cv2.resize(mask, (heatmap.shape[1], heatmap.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    heatmap = heatmap * mask
+            except Exception as exc:
+                LOGGER.warning(f"[Explainability] Impossibile applicare maschera foglia: {exc}")
             overlay = self._overlay_heatmap(original, heatmap)
             explanation = {
                 "model": self.model_name,
