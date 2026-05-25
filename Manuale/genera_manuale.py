@@ -1302,6 +1302,26 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Se il restart non sostituisce il PID del processo oppure va in timeout, verificare 'systemctl status delta' e forzare un ciclo pulito con 'sudo systemctl kill -s SIGKILL delta && sudo systemctl start delta'.",
         "Per diagnostica rapida: 'journalctl -u delta -n 50 --no-pager' oppure 'journalctl -u delta -f'.",
     ])
+    pdf._subsection("Flusso NASA-ISRO/SAR sul sito pubblico deltaplant.ai")
+    pdf._body(
+        "La landing pubblica deltaplant.ai espone una demo NASA-ISRO/SAR live "
+        "allineata alla stessa logica operativa della dashboard Telegram. "
+        "Quando il backend api.deltaplant.ai e raggiungibile, la pagina usa "
+        "lo stesso payload di analisi e restituisce gli stessi indicatori chiave "
+        "per la lettura rapida del rischio agronomico."
+    )
+    pdf._kv_table([
+        ("Input area",            "Coordinate GPS dell'area selezionata e buffer operativo di 50 m, coerente con il flusso Telegram"),
+        ("Pipeline dati",         "Open-Meteo Archive per meteo storico recente + NASA POWER per proxy umidita del suolo, con stesso ordinamento della dashboard Telegram"),
+        ("Output principali",     "Mappa area, localita, dashboard testuale live con riga Oggi, daily breakdown giornaliero e rischio settimanale sintetico"),
+        ("Fallback web",          "Se il backend live non e disponibile, la pagina resta utilizzabile in modalita demo locale senza bloccare la navigazione del sito"),
+        ("Privacy analytics",     "Gli eventi del sito e della hero demo vengono inviati al monitor visitatori solo dopo consenso analytics esplicito; la demo NASA resta consultabile anche senza tracking"),
+    ])
+    pdf._bullet([
+        "La landing e il bot Telegram condividono le stesse regole di lettura del rischio fungino e la stessa logica di presentazione del giorno piu recente disponibile.",
+        "Le richieste live del sito passano dall'endpoint /api/nisar/nasa-only del backend pubblico, cosi la descrizione mostrata sul web resta coerente con quella restituita in chat.",
+        "Il monitor visitatori first-party puo registrare anche l'avvio della hero dashboard, ma soltanto dopo consenso analytics valido lato server.",
+    ])
     pdf._subsection("Learning-by-Doing (upload + metadati)")
     lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
     pdf._body(

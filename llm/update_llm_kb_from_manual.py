@@ -12,6 +12,8 @@ LLM_DIR = ROOT / "llm"
 KB_FILE = LLM_DIR / "knowledge_base_delta.md"
 PROMPT_FILE = LLM_DIR / "prompt_fewshot_delta.md"
 MANUALE = ROOT / "Manuale" / "genera_manuale.py"
+PROMPT_TOC_START = "<!-- MANUAL_TOC_EXAMPLE:START -->"
+PROMPT_TOC_END = "<!-- MANUAL_TOC_EXAMPLE:END -->"
 
 # Indice da main()
 def estrai_indice():
@@ -45,14 +47,38 @@ def aggiorna_kb(toc):
 
 def aggiorna_prompt(toc):
     prompt = PROMPT_FILE.read_text(encoding="utf-8")
-    # Rimuovi vecchio esempio indice
-    prompt = re.sub(r"### Domanda: Mostrami l['’]indice del manuale[\s\S]+?(?=\n###|\n---|$)", "", prompt, flags=re.MULTILINE)
+    toc_block = "\n".join(toc)
+    # Rimuovi blocchi generati legacy o marker-based, cosi l'update resta idempotente.
+    prompt = re.sub(
+        rf"{re.escape(PROMPT_TOC_START)}[\s\S]+?{re.escape(PROMPT_TOC_END)}\s*",
+        "",
+        prompt,
+        flags=re.MULTILINE,
+    )
+    prompt = re.sub(
+        r"### Domanda: Mostrami l['’]indice del manuale[\s\S]+?(?=\n###|\n---|$)",
+        "",
+        prompt,
+        flags=re.MULTILINE,
+    )
+
+    # Pulisce i vecchi blocchi raw dell'indice eventualmente accumulati nel file.
+    while toc_block in prompt:
+        prompt = prompt.replace(toc_block, "")
+    prompt = re.sub(r"\n{3,}", "\n\n", prompt)
+
     # Inserisci nuovo esempio prima di ---
     idx = prompt.find('---')
     if idx == -1:
         prompt = prompt.rstrip() + "\n\n---\n"
         idx = prompt.find('---')
-    esempio = "### Domanda: Mostrami l’indice del manuale\nRisposta: Ecco l’indice dettagliato del Manuale Utente DELTA:\n\n" + "\n".join(toc) + "\n\n"
+    esempio = (
+        f"{PROMPT_TOC_START}\n"
+        "### Domanda: Mostrami l’indice del manuale\n"
+        "Risposta: Ecco l’indice dettagliato del Manuale Utente DELTA:\n\n"
+        f"{toc_block}\n"
+        f"{PROMPT_TOC_END}\n\n"
+    )
     prompt = prompt[:idx] + esempio + prompt[idx:]
     PROMPT_FILE.write_text(prompt, encoding="utf-8")
 
