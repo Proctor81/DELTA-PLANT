@@ -10,6 +10,7 @@ on:
       - website/ai-training-sessions.html
       - website/ai-training-sessions.json
       - website/whitepaper.html
+      - website/google320aa352e550b66a.html
       - website/telegram/nasa-sar-locator.html
       - website/privacy.html
       - website/privacy-policy.html
@@ -51,6 +52,7 @@ jobs:
           cp website/ai-training-sessions.html site-dist/
           cp website/ai-training-sessions.json site-dist/
           cp website/whitepaper.html site-dist/
+          cp website/google320aa352e550b66a.html site-dist/
           cp website/telegram/nasa-sar-locator.html site-dist/telegram/
           cp website/privacy.html site-dist/
           cp website/privacy-policy.html site-dist/
