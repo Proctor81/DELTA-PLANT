@@ -69,3 +69,13 @@ memory/sessions/
 
 # Artifact locali generati fuori dal flusso repo
 artifact.html
+
+# Residui locali e workspace di supporto
+bot.log
+OTHERS/
+archive_data.json
+fix_future.py
+meteo_data.json
+precips.txt
+times.txt
+models/piper/
