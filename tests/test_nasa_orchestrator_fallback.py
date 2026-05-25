@@ -4,10 +4,23 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 
+from ai.expiring_artifact_store import ExpiringArtifactStore
 from nasa_delta_plant.orchestrator_node import NASADeltaPlantOrchestrator
 
 
-def test_orchestrator_falls_back_when_sentinel_pipeline_fails():
+def test_expiring_artifact_store_put_and_get():
+    store = ExpiringArtifactStore()
+
+    token = store.put(b"%PDF test", "application/pdf", "report.pdf")
+    artifact = store.get(token)
+
+    assert artifact is not None
+    assert artifact.data == b"%PDF test"
+    assert artifact.content_type == "application/pdf"
+    assert artifact.filename == "report.pdf"
+
+
+def test_orchestrator_returns_demo_hero_payload_for_area_analysis():
     orchestrator = cast(Any, NASADeltaPlantOrchestrator.__new__(NASADeltaPlantOrchestrator))
     orchestrator.settings = SimpleNamespace()
 
@@ -88,8 +101,8 @@ def test_orchestrator_falls_back_when_sentinel_pipeline_fails():
         )
     )
 
-    assert result["processing_mode"] == "fallback"
-    assert "compression" in result["warnings"][0]
-    assert result["field_state"]["raw_sar_summary"]["source"] == "climate_proxy_fallback"
-    assert result["field_state"]["crop_class"] == "Tomato_healthy"
-    assert result["pdf_tokens"]["farmer"] == "token:deltaplant_farmer_report.pdf"
+    assert result["processing_mode"] == "demo-hero-forced"
+    assert "DEMO HERO forzato" in result["warnings"][0]
+    assert result["field_state"]["raw_sar_summary"]["source"] == "Browser demo fallback"
+    assert result["diagnosis"]["probable_crop"] == "Tomato_healthy"
+    assert result["pdf_tokens"]["farmer"] == "demo-farmer-report"

@@ -416,7 +416,14 @@ API_CONFIG = {
     "host": "0.0.0.0",
     "port": 5000,
     "debug": False,
-    "enable_api": False,               # Abilitare manualmente
+    "enable_api": True,               # Abilitato per avvio bot
+}
+
+# Abilita il bot Telegram
+TELEGRAM_CONFIG = {
+    "enable_telegram": True,
+    "token_env": "TELEGRAM_BOT_TOKEN",  # Assicurarsi che la variabile sia impostata
+    "web_app_base_url": "https://deltaplant.ai",
 }
 
 # ─────────────────────────────────────────────

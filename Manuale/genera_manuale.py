@@ -182,6 +182,17 @@ AMBER_LIGHT= (255, 246, 212)
 
 
 class ManualePDF(FPDF):
+
+    def __init__(self):
+        super().__init__()
+        self._FONT = "Arial"
+        # Registra font Arial con supporto Unicode completo
+        self.add_font("Arial", style="",   fname=FONT_REGULAR)
+        self.add_font("Arial", style="B",  fname=FONT_BOLD)
+        self.add_font("Arial", style="I",  fname=FONT_ITALIC)
+        self.add_font("Arial", style="BI", fname=FONT_BOLDITALIC)
+        self.add_font("ACode", style="",   fname=FONT_REGULAR)  # fallback monospace
+
     def _warning_box(self, text: str):
         self._info_box("[!] ATTENZIONE", text, color=RED)
 
@@ -201,36 +212,6 @@ class ManualePDF(FPDF):
         self.multi_cell(190, 5.2, code, fill=True)
         self.set_text_color(*GRAY_DARK)
         self.ln(4)
-
-    def __init__(self):
-        super().__init__()
-        # Registra font Arial con supporto Unicode completo
-        self.add_font("Arial", style="",   fname=FONT_REGULAR)
-        self.add_font("Arial", style="B",  fname=FONT_BOLD)
-        self.add_font("Arial", style="I",  fname=FONT_ITALIC)
-        self.add_font("Arial", style="BI", fname=FONT_BOLDITALIC)
-        self.add_font("ACode", style="",   fname=FONT_REGULAR)  # fallback monospace
-        self._FONT = "Arial"
-
-    # ── Intestazione e piè di pagina ─────────────────────────
-
-    def header(self):
-        if self.page_no() == 1:
-            return  # copertina senza header
-        # Barra principale blu scura
-        self.set_fill_color(*BLUE_DARK)
-        self.rect(0, 0, 210, 11, "F")
-        # Striscia verde sottile
-        self.set_fill_color(*GREEN)
-        self.rect(0, 11, 210, 1.5, "F")
-        self.set_font(self._FONT, "B", 8)
-        self.set_text_color(*WHITE)
-        self.set_xy(10, 2)
-        self.cell(130, 7, "DELTA Plant \u2014 Manuale Utente", align="L")
-        self.set_xy(148, 2)
-        self.cell(52, 7, f"Rev. {datetime.now().strftime('%Y-%m-%d')}", align="R")
-        self.set_text_color(*GRAY_DARK)
-        self.ln(15)
 
     def footer(self):
         if self.page_no() == 1:
@@ -1171,9 +1152,10 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
 
     pdf._bullet([
         "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
-        "/export, /preflight, /academy, /license, /health, /batch",
+        "/export, /preflight, /academy, /license, /health, /batch, /nasa_sar",
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
+        "Modalita NASA-ISRO/SAR: pulsante inline 'Connettiti a NASA-ISRO/SAR' o comando /nasa_sar per avviare acquisizione GPS automatica via Mini App Telegram oppure invio manuale della posizione.",
         "Diagnosi spiegabile: il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico; l'overlay puo essere generato da EfficientFormer anche se la classificazione attiva resta sul backend generale.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
@@ -1257,6 +1239,41 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "l'operatore puo avviare diagnosi, leggere report e condividere risultati "
         "direttamente da smartphone o PC, con un flusso guidato e tracciabile."
     )
+    pdf._subsection("Flusso NASA-ISRO/SAR via Telegram")
+    pdf._body(
+        "Il flusso NASA-ISRO/SAR e disponibile direttamente dal menu principale di DELTAPLANO "
+        "e restituisce una risposta immediata al click del pulsante. Il bot porta poi l'utente "
+        "alla raccolta della posizione GPS e genera una dashboard sintetica con mappa, localita, "
+        "indicatori climatici e contesto di follow-up in chat."
+    )
+    pdf._kv_table([
+        ("Entry point",            "Pulsante inline 'Connettiti a NASA-ISRO/SAR' oppure comando /nasa_sar"),
+        ("Acquisizione GPS",       "Mini App Telegram 'Apri NASA-ISRO/SAR GPS' o bottone 'Invia GPS manualmente'"),
+        ("Area analizzata",        "Cerchio di 50 m centrato sul punto GPS condiviso dall'utente"),
+        ("Output restituiti",      "Snapshot mappa, report grafico NASA-ISRO/SAR, dashboard testuale e contesto per domande successive"),
+        ("Fallback operativi",     "Se la Web App non restituisce coordinate valide, il bot invita all'invio manuale della posizione"),
+        ("Operativita post-fix",   "Il click del menu produce subito l'istruzione iniziale; dopo aggiornamenti del bot e richiesto restart del servizio delta"),
+    ])
+    pdf._code_block(
+        "# Flusso operativo NASA-ISRO/SAR da Telegram\n"
+        "1. /menu\n"
+        "2. Tap su 'Connettiti a NASA-ISRO/SAR'\n"
+        "3. Il bot risponde con il prompt operativo e mostra due opzioni:\n"
+        "   - 'Apri NASA-ISRO/SAR GPS' (Mini App Telegram)\n"
+        "   - 'Invia GPS manualmente'\n"
+        "4. Dopo il GPS, DELTA invia:\n"
+        "   - mappa dell'area di interesse\n"
+        "   - report grafico NASA-ISRO/SAR\n"
+        "   - dashboard testuale con rischio settimanale e spiegazione\n"
+        "5. L'utente puo continuare con domande di approfondimento nella stessa chat",
+        label="FLUSSO NASA-ISRO/SAR TELEGRAM",
+    )
+    pdf._bullet([
+        "Se il client Telegram non supporta la Mini App o il consenso GPS viene negato, usare l'invio manuale della posizione.",
+        "Il bottone del menu e il comando /nasa_sar portano allo stesso flusso applicativo.",
+        "Dopo modifiche al bot Telegram, applicare un riavvio del servizio con 'sudo systemctl restart delta' per rendere visibili i nuovi comportamenti.",
+        "Per diagnostica rapida: 'journalctl -u delta -n 50 --no-pager' oppure 'journalctl -u delta -f'.",
+    ])
     pdf._subsection("Learning-by-Doing (upload + metadati)")
     lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
     pdf._body(
@@ -4197,6 +4214,16 @@ def main():
         "\nPer aggiornare il manuale dopo modifiche al codice:\n"
         "  python Manuale/genera_manuale.py"
     )
+
+    # Aggiorna knowledge base LLM e prompt few-shot
+    try:
+        import subprocess
+        subprocess.run([
+            "python3", str(ROOT / "llm" / "update_llm_kb_from_manual.py")
+        ], check=True)
+        print("✔ Knowledge base LLM e prompt few-shot aggiornati con l’indice del manuale.")
+    except Exception as e:
+        print(f"[WARN] Aggiornamento knowledge base LLM fallito: {e}")
 
 
 if __name__ == "__main__":

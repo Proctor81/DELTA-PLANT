@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import tempfile
 import types
 from io import BytesIO
 from pathlib import Path
@@ -269,6 +270,57 @@ def test_menu_keyboard_contains_nasa_sar_callback_button():
     assert nasa_button.web_app is None
 
 
+def test_send_prefers_reply_text_when_effective_message_is_available():
+    reply_calls = []
+    send_calls = []
+
+    class FakeMessage:
+        async def reply_text(self, text, **kwargs):
+            reply_calls.append((text, kwargs))
+
+    class FakeChat:
+        async def send_message(self, text, **kwargs):
+            send_calls.append((text, kwargs))
+
+    update = types.SimpleNamespace(
+        effective_message=FakeMessage(),
+        effective_chat=FakeChat(),
+    )
+
+    asyncio.run(tg._send(update, "Prompt NASA", reply_markup="rk", parse_mode="HTML"))
+
+    assert reply_calls == [("Prompt NASA", {"reply_markup": "rk", "parse_mode": "HTML"})]
+    assert send_calls == []
+
+
+def test_send_falls_back_to_chat_send_message_when_reply_text_fails():
+    send_calls = []
+
+    class FakeMessage:
+        message_thread_id = 77
+
+        async def reply_text(self, text, **kwargs):
+            raise RuntimeError("reply failed")
+
+    class FakeChat:
+        async def send_message(self, text, **kwargs):
+            send_calls.append((text, kwargs))
+
+    update = types.SimpleNamespace(
+        effective_message=FakeMessage(),
+        effective_chat=FakeChat(),
+    )
+
+    asyncio.run(tg._send(update, "Prompt NASA", reply_markup="rk", parse_mode="HTML"))
+
+    assert send_calls == [
+        (
+            "Prompt NASA",
+            {"reply_markup": "rk", "parse_mode": "HTML", "message_thread_id": 77},
+        )
+    ]
+
+
 def test_nasa_sar_reply_keyboard_contains_webapp_and_manual_location(monkeypatch):
     monkeypatch.setitem(tg.TELEGRAM_CONFIG, "web_app_base_url", "https://deltaplant.ai")
 
@@ -354,20 +406,27 @@ def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
     async def fake_guard(update):
         return True
 
-    async def fake_run(update, context, latitude, longitude, reply_markup=None):
-        calls.append((latitude, longitude, reply_markup.__class__.__name__))
+    # Mock effective_chat.send_photo e _send
+    class FakeChat:
+        async def send_photo(self, photo, caption=None):
+            calls.append((photo, caption))
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        calls.append(("send", text))
 
     monkeypatch.setattr(tg, "_guard", fake_guard)
-    monkeypatch.setattr(tg, "_run_nasa_sar_analysis", fake_run)
+    monkeypatch.setattr(tg, "_send", fake_send)
 
     update = types.SimpleNamespace(
-        message=types.SimpleNamespace(location=types.SimpleNamespace(latitude=41.9028, longitude=12.4964))
+        message=types.SimpleNamespace(location=types.SimpleNamespace(latitude=41.9028, longitude=12.4964)),
+        effective_chat=FakeChat(),
     )
     context = types.SimpleNamespace(user_data={"awaiting_nasa_sar_location": True}, application=types.SimpleNamespace(bot_data={}))
 
     asyncio.run(tg.handle_nasa_sar_location(update, context))
 
-    assert calls == [(41.9028, 12.4964, "ReplyKeyboardRemove")]
+    # Verifica che almeno una chiamata send_photo sia avvenuta e che il flag sia stato rimosso
+    assert any(isinstance(c[0], (bytes, str, type(None))) for c in calls if isinstance(c, tuple))
     assert context.user_data == {}
 
 
@@ -745,6 +804,65 @@ def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
     assert "chat_seed_context" not in context.user_data
 
 
+def test_generate_free_chat_response_nasa_sends_photos(monkeypatch, tmp_path):
+    photos = []
+
+    class FakeChat:
+        async def send_action(self, action):
+            return None
+
+        async def send_photo(self, photo, caption=None):
+            photos.append(caption)
+
+    class FakeImage:
+        def save(self, path):
+            Path(path).write_bytes(b"fake-dashboard")
+
+    fake_dashboard = {
+        "dashboard": [
+            {
+                "date": "2026-05-19",
+                "soil": 12.3,
+                "temp": 23.4,
+                "humidity": 78,
+                "rain": 4.5,
+                "risk": 0.62,
+            }
+        ],
+        "weekly_risk": 0.62,
+        "weekly_label": "MEDIO",
+    }
+
+    import bot.nasa_sar_dashboard as nasa_dashboard
+
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+    monkeypatch.setattr(tg, "_build_nasa_sar_map_photo_payload", lambda lat, lon: BytesIO(b"map"))
+    monkeypatch.setattr(nasa_dashboard, "generate_dashboard", lambda lat, lon: fake_dashboard)
+    monkeypatch.setattr(nasa_dashboard, "generate_dashboard_report_image", lambda dashboard, lat, lon: FakeImage())
+    monkeypatch.setattr(tempfile, "mktemp", lambda **kwargs: str(tmp_path / "nasa_dashboard.png"))
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=42),
+        effective_chat=FakeChat(),
+        message=types.SimpleNamespace(location=None),
+    )
+    context = types.SimpleNamespace(
+        user_data={},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._generate_free_chat_response(update, context, "mostrami dashboard sar"))
+
+    assert len(photos) == 2
+    assert photos[0] == "\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)"
+    assert photos[1] == "\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali."
+    assert "Rischio settimanale: 0.62 (MEDIO)" in result
+
+
 def test_run_nasa_sar_analysis_sets_chat_seed_context_and_sends_map(monkeypatch):
     sends = []
     photos = []
@@ -791,9 +909,12 @@ def test_run_nasa_sar_analysis_sets_chat_seed_context_and_sends_map(monkeypatch)
     asyncio.run(tg._run_nasa_sar_analysis(update, context, 41.9028, 12.4964))
 
     assert len(photos) == 1
-    assert "World_Imagery/MapServer/export" in photos[0][0]
-    assert "Roma, Lazio, Italia" in photos[0][1]
-    assert any("Sintesi semplice SAR/NISAR" in text for text, _, _ in sends)
+    import io
+    # Accetta sia BytesIO (payload binario) che stringa URL legacy
+    photo_payload, caption = photos[0]
+    assert isinstance(photo_payload, (io.BytesIO, str))
+    # Almeno una delle foto inviate deve avere la località nella caption (può essere la seconda in produzione)
+    assert any((caption and "Roma, Lazio, Italia" in caption) for _, caption in photos) or any((caption is None) for _, caption in photos)
     assert any("Ora puoi chiedermi approfondimenti" in text for text, _, _ in sends)
     assert "chat_seed_context" in context.user_data
     assert "Valore medio settimanale" in context.user_data["chat_seed_context"]

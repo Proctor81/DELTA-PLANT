@@ -254,15 +254,57 @@ class ChatEngine:
 
         Flusso:
         1. Recupera storia conversazionale utente
-        2. Tenta risposta via HuggingFace cloud
-        3. Salva turno in memoria
+        2. Se la domanda contiene "Manuale", carica la knowledge base e la include nel system prompt
+        3. Tenta risposta via HuggingFace cloud
+        4. Salva turno in memoria
         """
         history = self.memory.get_history(user_id)
-        llm_user_input, system_prompt = self._prepare_turn_prompt(
-            user_input,
-            history,
-            response_language=response_language,
-        )
+        # Controllo parola chiave "Manuale" (case-insensitive, anche in frasi)
+        if "manuale" in (user_input or "").lower():
+            # Risposta letterale SOLO se la domanda riguarda la formula rischio fungino e richiama il manuale
+            lowered = (user_input or "").lower()
+            if "rischio fungino" in lowered and "manuale" in lowered:
+                kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
+                try:
+                    kb_text = kb_path.read_text(encoding="utf-8")
+                except Exception as exc:
+                    logger.warning(f"Impossibile caricare knowledge_base_delta.md: {exc}")
+                    kb_text = ""
+                # Estrai la formula rischio fungino dal manuale
+                import re
+                match = re.search(r"rischio fungino.*?=.+?\n+([\s\S]+?)\n+([\s\S]+?)---", kb_text, re.IGNORECASE)
+                if match:
+                    # Prendi la formula e la spiegazione
+                    formula = match.group(0).strip()
+                    return f"Risposta letterale dal Manuale DELTA Plant:\n\n{formula}"
+                else:
+                    # Fallback: restituisci tutto il paragrafo rischio fungino
+                    match2 = re.search(r"## Calcolo del rischio fungino.*?(---|$)", kb_text, re.IGNORECASE)
+                    if match2:
+                        return f"Risposta letterale dal Manuale DELTA Plant:\n\n{match2.group(0).strip()}"
+                    else:
+                        return "Non trovo la formula rischio fungino nel Manuale."
+            # Altrimenti, prompt LLM classico arricchito
+            kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
+            try:
+                kb_text = kb_path.read_text(encoding="utf-8")[:2000]
+            except Exception as exc:
+                logger.warning(f"Impossibile caricare knowledge_base_delta.md: {exc}")
+                kb_text = ""
+            base_system_prompt = _system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language)
+            system_prompt = (
+                base_system_prompt
+                + "\n\n---\n\nContenuto estratto dal Manuale Utente DELTA (knowledge base):\n"
+                + kb_text
+                + "\n---\nISTRUZIONI SPECIALI: Se la domanda richiede una formula, una definizione o una spiegazione presente nel Manuale, COPIA ESATTAMENTE il testo, la formula o il paragrafo corrispondente dal Manuale qui sopra, senza sintetizzare, modificare o astrarre. Se la domanda non è coperta, rispondi: 'Consulta il manuale PDF o chiedi supporto all’amministratore.'"
+            )
+            llm_user_input = user_input
+        else:
+            llm_user_input, system_prompt = self._prepare_turn_prompt(
+                user_input,
+                history,
+                response_language=response_language,
+            )
 
         # ── Backend unico: HuggingFace cloud ─────────────────────────────────
         if self._hf_available:
