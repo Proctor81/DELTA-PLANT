@@ -14,6 +14,7 @@ from jose import JWTError, jwt
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from api.cookie_utils import cookie_policy_for_request
+from api.analytics_routes import router as analytics_router
 from api.cookie_routes import router as cookie_router
 from api.nisar_routes import router as nisar_router
 from api.privacy_routes import router as privacy_router
@@ -56,6 +57,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 app.state.orchestrator = orchestrator
+app.state.analytics_tracker = getattr(orchestrator, "website_analytics_tracker", None)
 app.state.limiter = limiter
 app.state.settings = settings
 
@@ -169,3 +171,4 @@ async def health(request: Request) -> dict[str, Any]:
 app.include_router(nisar_router)
 app.include_router(privacy_router)
 app.include_router(cookie_router)
+app.include_router(analytics_router)

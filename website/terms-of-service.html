@@ -89,5 +89,10 @@
       <p>DELTA Plant depends on external sources such as NASA POWER and Copernicus Data Space. Availability and correctness of those sources are outside the direct control of the website operator. To the maximum extent permitted by law, the service is provided on an as-available basis.</p>
     </section>
   </main>
+    <script type='module'>
+      import { initDeltaWebsiteAnalytics } from '/components/site-analytics.js';
+
+      initDeltaWebsiteAnalytics({ pageKind: 'terms-of-service' });
+    </script>
 </body>
 </html>

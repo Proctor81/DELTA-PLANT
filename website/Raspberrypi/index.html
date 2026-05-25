@@ -2149,7 +2149,7 @@
                   <label for="hero-google-coordinates" class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/62">Google coordinates or Maps URL</label>
                   <div class="hero-demo-input-row mt-3 sm:flex-row">
                     <input id="hero-google-coordinates" class="hero-demo-input" type="text" value="41.9028, 12.4964" placeholder="41.9028, 12.4964 or https://maps.google.com/..." />
-                    <button id="hero-demo-run" class="hero-demo-button" type="button">Run NASA/SAR dashboard</button>
+                    <button id="hero-demo-run" class="hero-demo-button" type="button" data-analytics-event="hero_dashboard_run" data-analytics-label="hero_dashboard_launch">Run NASA/SAR dashboard</button>
                   </div>
                   <div id="hero-demo-status" class="mt-3 text-sm text-slate-300/68">Paste a Google Maps coordinate pair or URL. DELTA will lock the same 50 m radius used by the bot, call the live NASA/SAR dashboard endpoint, and return the same 7-day breakdown used in Telegram.</div>
                 </div>
@@ -2769,8 +2769,8 @@
 
   <section id="privacy-banner" class="privacy-banner-shell hidden" aria-label="Privacy and cookie banner" aria-live="polite">
     <div class="section-kicker">Privacy & cookies</div>
-    <h2 class="mt-3 font-display text-2xl leading-tight text-white">Control optional media and stored preferences.</h2>
-    <p class="mt-3 text-sm leading-6 text-slate-300/76">DELTA Plant stores one local preference record to remember your choice. Optional third-party media is limited to the hero soundtrack. You can continue with essential-only browsing or open the Privacy Preference Center.</p>
+    <h2 class="mt-3 font-display text-2xl leading-tight text-white">Control first-party analytics, optional media and stored preferences.</h2>
+    <p class="mt-3 text-sm leading-6 text-slate-300/76">DELTA Plant can monitor anonymous page views, dashboard launches, outbound clicks and contact success events only after you enable analytics. Optional third-party media remains limited to the hero soundtrack.</p>
     <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-300/72">
       <a href="/privacy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Privacy Policy</a>
       <a href="/cookie-policy.html" class="text-cyan-100 underline decoration-cyan-300/35 underline-offset-4 hover:text-neonleaf">Cookie Policy</a>
@@ -2787,12 +2787,12 @@
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="section-kicker">Privacy Preference Center</div>
-          <h2 id="privacy-modal-title" class="mt-3 font-display text-3xl leading-tight text-white sm:text-4xl">Choose what DELTA Plant can load on this page.</h2>
+          <h2 id="privacy-modal-title" class="mt-3 font-display text-3xl leading-tight text-white sm:text-4xl">Choose which optional features DELTA Plant can activate on this page.</h2>
         </div>
         <button id="privacy-close-modal" type="button" class="privacy-button privacy-button-quiet">Close</button>
       </div>
 
-      <p id="privacy-modal-copy" class="mt-4 max-w-3xl text-sm leading-7 text-slate-300/76">The website itself stays browseable without marketing cookies. The only optional third-party request controlled here is the hero soundtrack media. Your choice is stored locally in this browser so the banner does not reappear on every visit.</p>
+      <p id="privacy-modal-copy" class="mt-4 max-w-3xl text-sm leading-7 text-slate-300/76">The website stays browseable without marketing cookies. The optional controls here cover DELTA Plant first-party visitor analytics and the Pixabay-hosted soundtrack. Analytics consent is synchronized with the DELTA backend and the soundtrack preference stays local to this browser.</p>
 
       <div class="mt-8">
         <div class="privacy-option">
@@ -2805,9 +2805,18 @@
 
         <div class="privacy-option">
           <div>
+            <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">First-party visitor analytics</div>
+            <p class="mt-2 text-sm leading-6 text-slate-300/72">Allows DELTA Plant to measure anonymous page views, session starts, dashboard launches, outbound documentation clicks, contact success events and engagement time inside the local admin monitor. No advertising pixels or raw IP storage are used.</p>
+            <p id="privacy-analytics-summary" class="mt-3 text-sm leading-6 text-slate-300/82"></p>
+          </div>
+          <button id="privacy-analytics-toggle" type="button" class="privacy-toggle" aria-pressed="false" aria-label="Toggle first-party analytics"></button>
+        </div>
+
+        <div class="privacy-option">
+          <div>
             <div class="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/74">Optional soundtrack media</div>
             <p class="mt-2 text-sm leading-6 text-slate-300/72">Allows the page to load the Pixabay-hosted hero soundtrack when you decide to play it. If disabled, no soundtrack media request is made.</p>
-            <p id="privacy-summary" class="mt-3 text-sm leading-6 text-slate-300/82"></p>
+            <p id="privacy-media-summary" class="mt-3 text-sm leading-6 text-slate-300/82"></p>
           </div>
           <button id="privacy-media-toggle" type="button" class="privacy-toggle" aria-pressed="false" aria-label="Toggle optional soundtrack media"></button>
         </div>
@@ -3341,15 +3350,18 @@
     const privacyModalEssential = document.getElementById('privacy-modal-essential');
     const privacySavePreferences = document.getElementById('privacy-save-preferences');
     const privacyCloseModal = document.getElementById('privacy-close-modal');
+    const privacyAnalyticsToggle = document.getElementById('privacy-analytics-toggle');
     const privacyMediaToggle = document.getElementById('privacy-media-toggle');
-    const privacySummary = document.getElementById('privacy-summary');
+    const privacyAnalyticsSummary = document.getElementById('privacy-analytics-summary');
+    const privacyMediaSummary = document.getElementById('privacy-media-summary');
 
     let privacyPreferences = null;
-    let draftPrivacyPreferences = { essential: true, media: false };
+    let draftPrivacyPreferences = { essential: true, analytics: false, media: false };
     let modalInvoker = null;
 
     const normalizePrivacyPreferences = (value) => ({
       essential: true,
+      analytics: Boolean(value && value.analytics),
       media: Boolean(value && value.media)
     });
 
@@ -3362,11 +3374,11 @@
 
         const parsedValue = JSON.parse(rawValue);
         if (parsedValue && typeof parsedValue === 'object') {
-          if (parsedValue.categories && typeof parsedValue.categories.media === 'boolean') {
+          if (parsedValue.categories && (typeof parsedValue.categories.media === 'boolean' || typeof parsedValue.categories.analytics === 'boolean')) {
             return normalizePrivacyPreferences(parsedValue.categories);
           }
 
-          if (typeof parsedValue.media === 'boolean') {
+          if (typeof parsedValue.media === 'boolean' || typeof parsedValue.analytics === 'boolean') {
             return normalizePrivacyPreferences(parsedValue);
           }
         }
@@ -3451,10 +3463,17 @@
     };
 
     const updatePrivacyModalState = () => {
+      const analyticsEnabled = Boolean(draftPrivacyPreferences.analytics);
+      privacyAnalyticsToggle.classList.toggle('is-active', analyticsEnabled);
+      privacyAnalyticsToggle.setAttribute('aria-pressed', String(analyticsEnabled));
+      privacyAnalyticsSummary.textContent = analyticsEnabled
+        ? 'Anonymous visitor analytics is enabled. DELTA can store first-party event data inside the local admin monitor.'
+        : 'First-party visitor analytics stays disabled. No page-view or click events are sent to the DELTA analytics endpoint.';
+
       const mediaEnabled = Boolean(draftPrivacyPreferences.media);
       privacyMediaToggle.classList.toggle('is-active', mediaEnabled);
       privacyMediaToggle.setAttribute('aria-pressed', String(mediaEnabled));
-      privacySummary.textContent = mediaEnabled
+      privacyMediaSummary.textContent = mediaEnabled
         ? 'Optional soundtrack media is allowed. The track can load only after you choose to play it.'
         : 'Only essential storage is enabled. Optional soundtrack media stays blocked until you allow it.';
     };
@@ -3490,7 +3509,7 @@
       updateAudioAvailability();
     };
 
-    const persistPrivacyPreferences = (nextPreferences) => {
+    const persistPrivacyPreferences = async (nextPreferences, source = 'landing_preference_center') => {
       privacyPreferences = normalizePrivacyPreferences(nextPreferences);
       draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences);
 
@@ -3507,15 +3526,23 @@
       showPrivacyManage(true);
       setPrivacyModalVisibility(false);
       applyPrivacyPreferences();
+
+      if (typeof window.deltaSyncWebsiteConsent === 'function') {
+        try {
+          await window.deltaSyncWebsiteConsent(privacyPreferences, source);
+        } catch (error) {
+          // Keep the local preference even if backend consent sync is temporarily unavailable.
+        }
+      }
     };
 
     const openPrivacyCenter = (invoker) => {
       modalInvoker = invoker instanceof HTMLElement ? invoker : document.activeElement;
-      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+      draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { analytics: false, media: false });
       updatePrivacyModalState();
       setPrivacyModalVisibility(true);
       window.requestAnimationFrame(() => {
-        privacyMediaToggle.focus();
+        privacyAnalyticsToggle.focus();
       });
     };
 
@@ -3535,16 +3562,16 @@
     setAudioPanel(false);
 
     privacyPreferences = readPrivacyPreferences();
-    draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { media: false });
+    draftPrivacyPreferences = normalizePrivacyPreferences(privacyPreferences || { analytics: false, media: false });
     syncPrivacyEntryMode();
     applyPrivacyPreferences();
 
     privacyAcceptAll.addEventListener('click', () => {
-      persistPrivacyPreferences({ media: true });
+      void persistPrivacyPreferences({ analytics: true, media: true }, 'landing_accept_all');
     });
 
     privacyEssentialOnly.addEventListener('click', () => {
-      persistPrivacyPreferences({ media: false });
+      void persistPrivacyPreferences({ analytics: false, media: false }, 'landing_essential_only');
     });
 
     privacyOpenCenter.addEventListener('click', () => {
@@ -3555,21 +3582,32 @@
       openPrivacyCenter(privacyManageButton);
     });
 
+    privacyAnalyticsToggle.addEventListener('click', () => {
+      draftPrivacyPreferences = normalizePrivacyPreferences({
+        analytics: !draftPrivacyPreferences.analytics,
+        media: draftPrivacyPreferences.media,
+      });
+      updatePrivacyModalState();
+    });
+
     privacyMediaToggle.addEventListener('click', () => {
-      draftPrivacyPreferences = normalizePrivacyPreferences({ media: !draftPrivacyPreferences.media });
+      draftPrivacyPreferences = normalizePrivacyPreferences({
+        analytics: draftPrivacyPreferences.analytics,
+        media: !draftPrivacyPreferences.media,
+      });
       updatePrivacyModalState();
     });
 
     privacyModalAccept.addEventListener('click', () => {
-      persistPrivacyPreferences({ media: true });
+      void persistPrivacyPreferences({ analytics: true, media: true }, 'landing_modal_accept_all');
     });
 
     privacyModalEssential.addEventListener('click', () => {
-      persistPrivacyPreferences({ media: false });
+      void persistPrivacyPreferences({ analytics: false, media: false }, 'landing_modal_essential_only');
     });
 
     privacySavePreferences.addEventListener('click', () => {
-      persistPrivacyPreferences(draftPrivacyPreferences);
+      void persistPrivacyPreferences(draftPrivacyPreferences, 'landing_save_preferences');
     });
 
     privacyCloseModal.addEventListener('click', () => {
@@ -3734,6 +3772,16 @@
 
           contactForm.reset();
           contactFormStatus.textContent = normalizedContactRelay.successMessage;
+          if (typeof window.deltaTrackWebsiteEvent === 'function') {
+            window.deltaTrackWebsiteEvent(
+              'contact_submit',
+              {
+                relay: 'web3forms',
+                topic: String(formData.get('topic') || '').slice(0, 80),
+              },
+              { eventLabel: 'contact_form_success' },
+            );
+          }
         } catch (error) {
           const message = error instanceof Error && error.message
             ? error.message
@@ -4072,7 +4120,7 @@
         combo.dispatchEvent(new Event('change', { bubbles: true }));
       };
 
-      const setActiveLanguage = async (lang, { persist = true } = {}) => {
+      const setActiveLanguage = async (lang, { persist = true, track = true } = {}) => {
         const normalized = normalizeLanguage(lang) || DELTA_TRANSLATION_CONFIG.sourceLanguage;
         languageSelects.forEach((selectEl) => {
           selectEl.value = normalized;
@@ -4082,6 +4130,13 @@
         }
         applyGoogleCookie(normalized);
         await setComboLanguage(normalized);
+        if (track && typeof window.deltaTrackWebsiteEvent === 'function') {
+          window.deltaTrackWebsiteEvent(
+            'language_change',
+            { language: normalized },
+            { eventLabel: normalized },
+          );
+        }
       };
 
       const initializeTranslator = () => {
@@ -4150,7 +4205,7 @@
         try {
           await initializeTranslator();
           if (translatorReady) {
-            await setActiveLanguage(initialLang, { persist: true });
+            await setActiveLanguage(initialLang, { persist: true, track: false });
           }
         } catch (error) {
           // Graceful fallback: keep switcher visible even if external script fails.
@@ -4161,12 +4216,20 @@
       languageSelects.forEach((selectEl) => {
         selectEl.addEventListener('change', async (event) => {
           const nextLanguage = normalizeLanguage(event.target.value) || DELTA_TRANSLATION_CONFIG.sourceLanguage;
-          await setActiveLanguage(nextLanguage, { persist: true });
+          await setActiveLanguage(nextLanguage, { persist: true, track: true });
         });
       });
 
       void bootTranslator();
     })();
+  </script>
+  <script type="module">
+    import { initDeltaWebsiteAnalytics } from '/components/site-analytics.js';
+
+    initDeltaWebsiteAnalytics({
+      pageKind: 'landing-home',
+      localPreferenceKey: 'delta-privacy-preferences',
+    });
   </script>
 </body>
 </html>

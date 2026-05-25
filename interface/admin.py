@@ -75,6 +75,7 @@ class AdminPanel:
             print(f"  {BOLD}[8]{RESET} Scientists Telegram (autorizzazioni)")
             print(f"  {BOLD}[9]{RESET} {YELLOW}Programmazione orario avvio/uscita{RESET} (cron)")
             print(f"  {BOLD}[10]{RESET} {CYAN}Statistiche inferenza DELTAPLANO_bot{RESET}")
+            print(f"  {BOLD}[11]{RESET} {CYAN}Monitor visitatori deltaplant.ai{RESET}")
             print(f"  {BOLD}[0]{RESET} Esci dal pannello")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -99,6 +100,8 @@ class AdminPanel:
                 self._schedule_manager()
             elif scelta == "10":
                 self._bot_inference_stats()
+            elif scelta == "11":
+                self._website_visitor_monitor()
             elif scelta == "0":
                 print(f"{DIM}Uscita dal pannello amministratore.{RESET}")
                 break
@@ -850,6 +853,119 @@ class AdminPanel:
                 f"{DIM}  La mappa viene aggiornata automaticamente in {map_path}\n"
                 f"  ad ogni interazione di un utente autorizzato sul bot Telegram.{RESET}"
             )
+
+    def _website_visitor_monitor(self):
+        from nasa_delta_plant.privacy.website_analytics import WebsiteAnalyticsTracker
+
+        storage_path = _ROOT / "data" / "analytics" / "website_events.sqlite"
+        tracker = WebsiteAnalyticsTracker(storage_path=storage_path)
+
+        while True:
+            self._header()
+            print(f"{BOLD}─── MONITOR VISITATORI DELTAPLANT.AI ───{RESET}")
+            print(f"{DIM}Storage locale: {storage_path}{RESET}\n")
+            print(f"  {BOLD}[1]{RESET} Panoramica ultime 24 ore")
+            print(f"  {BOLD}[2]{RESET} Panoramica ultimi 7 giorni")
+            print(f"  {BOLD}[3]{RESET} Panoramica ultimi 30 giorni")
+            print(f"  {BOLD}[4]{RESET} Eventi recenti ultimi 30 giorni")
+            print(f"  {BOLD}[5]{RESET} Esporta report JSON ultimi 30 giorni")
+            print(f"  {BOLD}[0]{RESET} Indietro")
+
+            scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
+
+            if scelta == "1":
+                self._print_website_analytics_summary(tracker, 1)
+            elif scelta == "2":
+                self._print_website_analytics_summary(tracker, 7)
+            elif scelta == "3":
+                self._print_website_analytics_summary(tracker, 30)
+            elif scelta == "4":
+                self._print_website_analytics_recent_events(tracker, 30)
+            elif scelta == "5":
+                self._export_website_analytics_report(tracker, 30)
+            elif scelta == "0":
+                return
+            else:
+                print(f"{YELLOW}⚠ Scelta non valida.{RESET}")
+
+            input(f"\n{DIM}Premi Invio per continuare...{RESET}")
+
+    def _print_website_analytics_summary(self, tracker, days: int):
+        report = tracker.build_report(days=days)
+        totals = report["totals"]
+
+        print(f"\n{BOLD}─── PANORAMICA VISITATORI ({days} giorni) ───{RESET}")
+        print(f"  Visitatori unici:      {CYAN}{totals['unique_visitors']}{RESET}")
+        print(f"  Sessioni uniche:       {CYAN}{totals['unique_sessions']}{RESET}")
+        print(f"  Eventi totali:         {CYAN}{totals['total_events']}{RESET}")
+        print(f"  Page view:             {CYAN}{totals['page_views']}{RESET}")
+        print(f"  Session start:         {CYAN}{totals['session_starts']}{RESET}")
+        print(f"  CTA click:             {CYAN}{totals['cta_clicks']}{RESET}")
+        print(f"  Click outbound:        {CYAN}{totals['outbound_clicks']}{RESET}")
+        print(f"  Run dashboard NASA:    {CYAN}{totals['hero_dashboard_runs']}{RESET}")
+        print(f"  Invii contact form:    {CYAN}{totals['contact_submissions']}{RESET}")
+        print(f"  Engagement medio:      {CYAN}{totals['avg_engagement_seconds']:.2f}s{RESET}")
+
+        if report.get("top_pages"):
+            print(f"\n{BOLD}Pagine più visitate:{RESET}")
+            for row in report["top_pages"][:5]:
+                print(f"  • {row['page_path']:<36} {row['count']:>5}")
+
+        if report.get("top_referrers"):
+            print(f"\n{BOLD}Referrer principali:{RESET}")
+            for row in report["top_referrers"][:5]:
+                print(f"  • {row['referrer_host']:<36} {row['count']:>5}")
+
+        if report.get("top_campaigns"):
+            print(f"\n{BOLD}Campagne UTM:{RESET}")
+            for row in report["top_campaigns"][:5]:
+                print(f"  • {row['utm_campaign']:<36} {row['count']:>5}")
+
+        if report.get("device_breakdown"):
+            print(f"\n{BOLD}Dispositivi:{RESET}")
+            for row in report["device_breakdown"][:5]:
+                print(f"  • {row['device_type']:<16} {row['count']:>5}")
+
+        if report.get("language_breakdown"):
+            print(f"\n{BOLD}Lingue:{RESET}")
+            for row in report["language_breakdown"][:5]:
+                print(f"  • {row['language']:<16} {row['count']:>5}")
+
+        if report.get("daily"):
+            print(f"\n{BOLD}Ultimi giorni:{RESET}")
+            for row in report["daily"][:7]:
+                print(f"  • {row['day']}  eventi={row['events']:<4}  visitatori={row['visitors']}")
+        else:
+            print(f"\n{DIM}Nessun evento analytics registrato nel periodo selezionato.{RESET}")
+
+    def _print_website_analytics_recent_events(self, tracker, days: int):
+        report = tracker.build_report(days=days, recent_limit=15)
+        recent = report.get("recent_events") or []
+
+        print(f"\n{BOLD}─── EVENTI RECENTI ({days} giorni) ───{RESET}")
+        if not recent:
+            print(f"{DIM}Nessun evento analytics registrato.{RESET}")
+            return
+
+        for event in recent:
+            label = f" [{event['event_label']}]" if event.get("event_label") else ""
+            referrer = f" ref={event['referrer_host']}" if event.get("referrer_host") else ""
+            engagement = (
+                f" engagement={event['engaged_seconds']:.2f}s"
+                if isinstance(event.get("engaged_seconds"), (int, float))
+                else ""
+            )
+            print(
+                f"  • {event['created_at']}  {CYAN}{event['event_type']}{RESET}{label}  "
+                f"{event['page_path']}{referrer}{engagement}"
+            )
+
+    def _export_website_analytics_report(self, tracker, days: int):
+        export_dir = _ROOT / "exports"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        destination = export_dir / f"website_analytics_{days}d_{timestamp}.json"
+        tracker.export_report(destination, days=days)
+        print(f"\n{GREEN}✔ Report analytics esportato: {destination}{RESET}")
 
     # ── Helper ─────────────────────────────────────────────────
 

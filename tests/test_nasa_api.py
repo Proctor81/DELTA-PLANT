@@ -95,6 +95,25 @@ class FakeConsentManager:
     def delete_user_data(self, user_token: str) -> bool:
         return self._store.pop(user_token, None) is not None
 
+    def hash_identifier(self, value: str) -> str:
+        return f"hash:{value}"
+
+
+class FakeWebsiteAnalyticsTracker:
+    def __init__(self) -> None:
+        self.events = []
+
+    def record_event(self, payload: dict, session_id: str | None = None) -> dict:
+        stored = {**payload, "session_id": session_id}
+        self.events.append(stored)
+        return {
+            "accepted": True,
+            "event_id": len(self.events),
+            "event_type": payload["event_type"],
+            "page_path": payload["page_path"],
+            "created_at": "2026-05-25T12:00:00+00:00",
+        }
+
 
 @dataclass
 class FakeStoredArtifact:
@@ -107,6 +126,7 @@ class FakeOrchestrator:
     def __init__(self) -> None:
         self.cookie_validator = FakeCookieValidator()
         self.consent_manager = FakeConsentManager()
+        self.website_analytics_tracker = FakeWebsiteAnalyticsTracker()
         self.analysis_calls = []
         self.crop_calls = []
         self.voice_calls = []
@@ -241,6 +261,7 @@ def nasa_client(monkeypatch):
     fake_orchestrator = FakeOrchestrator()
     monkeypatch.setattr(api_main, "orchestrator", fake_orchestrator)
     monkeypatch.setattr(api_main.app.state, "orchestrator", fake_orchestrator)
+    monkeypatch.setattr(api_main.app.state, "analytics_tracker", fake_orchestrator.website_analytics_tracker)
     with TestClient(api_main.app, base_url="http://localhost") as client:
         yield client, fake_orchestrator
 
@@ -422,6 +443,51 @@ def test_cookie_accept_export_delete_and_reject_flow(nasa_client):
     assert rejected_categories["maps"] is False
     assert rejected_categories["voice"] is False
     assert rejected_categories["llm"] is False
+
+
+def test_analytics_event_requires_consent_and_is_recorded(nasa_client):
+    client, fake_orchestrator = nasa_client
+    user_token = "dp_user_token_1234567890"
+    client.get("/api/health")
+
+    denied = client.post(
+        "/api/analytics/events",
+        json={
+            "user_token": user_token,
+            "event_type": "page_view",
+            "page_path": "/",
+            "page_title": "DELTA Plant",
+            "event_data": {"utm_source": "github"},
+        },
+    )
+    assert denied.status_code == 403
+
+    client.cookies.set(
+        "deltaplant_consent",
+        json.dumps({"necessary": True, "analytics": True, "maps": False, "voice": False, "llm": False}),
+    )
+
+    accepted = client.post(
+        "/api/analytics/events",
+        json={
+            "user_token": user_token,
+            "event_type": "cta_click",
+            "event_label": "hero_open_bot",
+            "page_path": "/?utm_source=github",
+            "page_title": "DELTA Plant",
+            "referrer": "https://github.com/proctor81/delta-plant",
+            "device_type": "desktop",
+            "language": "en-US",
+            "event_data": {"utm_source": "github", "cta": "open_bot"},
+        },
+    )
+
+    assert accepted.status_code == 202
+    payload = accepted.json()
+    assert payload["accepted"] is True
+    assert payload["event_type"] == "cta_click"
+    assert fake_orchestrator.website_analytics_tracker.events[-1]["event_label"] == "hero_open_bot"
+    assert fake_orchestrator.website_analytics_tracker.events[-1]["session_id"]
 
 
 def test_area_analysis_pdf_token_allows_positive_download_with_filename(nasa_client):

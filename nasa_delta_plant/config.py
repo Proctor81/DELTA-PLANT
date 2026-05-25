@@ -49,6 +49,10 @@ class Settings(BaseSettings):
         default=ROOT_DIR / "logs" / "privacy",
         alias="PRIVACY_LOG_DIR",
     )
+    website_analytics_storage_path: Path = Field(
+        default=ROOT_DIR / "data" / "analytics" / "website_events.sqlite",
+        alias="WEBSITE_ANALYTICS_STORAGE_PATH",
+    )
     cors_allow_origins: Annotated[
         list[str],
         NoDecode,
@@ -88,7 +92,13 @@ class Settings(BaseSettings):
             return [str(item).strip() for item in value if str(item).strip()]
         return [str(value).strip()]
 
-    @field_validator("pdf_temp_dir", "privacy_storage_path", "privacy_log_dir", mode="before")
+    @field_validator(
+        "pdf_temp_dir",
+        "privacy_storage_path",
+        "privacy_log_dir",
+        "website_analytics_storage_path",
+        mode="before",
+    )
     @classmethod
     def _normalize_pdf_dir(cls, value: object) -> Path:
         if isinstance(value, Path):
@@ -122,4 +132,5 @@ def get_settings() -> Settings:
     settings.pdf_temp_dir.mkdir(parents=True, exist_ok=True)
     settings.privacy_storage_path.parent.mkdir(parents=True, exist_ok=True)
     settings.privacy_log_dir.mkdir(parents=True, exist_ok=True)
+    settings.website_analytics_storage_path.parent.mkdir(parents=True, exist_ok=True)
     return settings

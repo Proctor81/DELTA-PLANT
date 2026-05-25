@@ -67,6 +67,32 @@ Scientific Paper
 Appendice Hardware — Assemblaggio e Schema elettrico
 Appendice Licenza — DELTA PLANT SOFTWARE LICENSE
 
+
+
+1. Introduzione
+Scientific Paper
+2. Hardware — Componenti e configurazione
+3. Hardware — Modello AI e visione
+4. Software — Installazione
+5. Software — Utilizzo del sistema
+6. Software — API REST e Telegram
+7. Database e persistenza
+8. Architettura software — Moduli
+9. Risoluzione problemi
+10. Aggiornamento del manuale
+11. DELTA Academy — Formazione operatore
+12. Analisi multi-organo — Foglia/Fiore/Frutto
+13. Oracolo Quantistico di Grover
+14b. Chat AI — HuggingFace LLM e «Chiedi a DELTA»
+15. Sicurezza e Pannello Amministratore
+16. Input immagini da cartella — No-Camera
+17. Installazione automatica Raspberry Pi 5
+18. MLOps — Addestramento e Miglioramento Continuo
+19. Modello Pre-addestrato — Download automatico
+20. GitHub Publisher — Pubblicazione automatica
+Appendice Hardware — Assemblaggio e Schema elettrico
+Appendice Licenza — DELTA PLANT SOFTWARE LICENSE
+
 ### Domanda: Mostrami l’indice del manuale
 Risposta: Ecco l’indice dettagliato del Manuale Utente DELTA:
 

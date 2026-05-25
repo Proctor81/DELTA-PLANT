@@ -4,7 +4,7 @@
   <meta charset='UTF-8' />
   <meta name='viewport' content='width=device-width, initial-scale=1.0' />
   <title>DELTA Plant | Cookie Policy</title>
-  <meta name='description' content='Cookie policy for DELTA Plant NASA Monitor, including necessary cookies, optional map consent, LLM consent, and voice consent.' />
+  <meta name='description' content='Cookie and storage policy for deltaplant.ai, including first-party analytics consent, anonymous visitor monitoring, language preferences, and optional soundtrack media.' />
   <link rel='canonical' href='https://deltaplant.ai/cookie-policy.html' />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -100,8 +100,13 @@
         <tbody>
           <tr>
             <td>Necessary</td>
-            <td>JWT session, CSRF token, security boundaries, rate-limiting context.</td>
+            <td>JWT session, CSRF token, consent state, anonymous browser token, security boundaries, and rate-limiting context.</td>
             <td>Always on</td>
+          </tr>
+          <tr>
+            <td>Analytics</td>
+            <td>Enables DELTA Plant first-party visitor monitoring for page views, dashboard launches, outbound clicks, contact success events, language changes, and engagement duration inside the local admin monitor.</td>
+            <td>Off</td>
           </tr>
           <tr>
             <td>Maps</td>
@@ -119,8 +124,13 @@
             <td>Off</td>
           </tr>
           <tr>
-            <td>Analytics</td>
-            <td>Reserved for future privacy-safe product telemetry if enabled by the user.</td>
+            <td>Functional language</td>
+            <td>Stores preferred language values and Google Translate helper state when multilingual rendering is used.</td>
+            <td>Off until used</td>
+          </tr>
+          <tr>
+            <td>Local media preference</td>
+            <td>Stores the home-page soundtrack preference locally so Pixabay audio is loaded only after opt-in.</td>
             <td>Off</td>
           </tr>
         </tbody>
@@ -132,7 +142,9 @@
       <ul>
         <li>The browser stores a public anonymous token so you can manage preferences without creating an account.</li>
         <li>The backend stores only a hashed form of that token inside an encrypted consent registry.</li>
-        <li>Changing consent updates both the UI cookie and the server-side encrypted record.</li>
+        <li>Changing consent updates both the UI cookie and the server-side encrypted record; server-side consent remains authoritative for optional features.</li>
+        <li>When analytics consent is enabled, the website may POST anonymous event data to the DELTA first-party endpoint and store it for up to 180 days in the local admin monitor.</li>
+        <li>The landing page stores its soundtrack preference in local browser storage and will not load Pixabay audio until that preference is enabled.</li>
       </ul>
       <div class='actions'>
         <button type='button' id='accept-all'>Accept all optional cookies</button>
@@ -140,12 +152,58 @@
       </div>
       <p id='cookie-status' aria-live='polite'></p>
     </section>
+
+    <section>
+      <h2>Observed Browser Storage</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Identifier</th>
+            <th>Type</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>deltaplant_session</td>
+            <td>Cookie</td>
+            <td>Anonymous JWT session issued by api.deltaplant.ai.</td>
+          </tr>
+          <tr>
+            <td>deltaplant_csrf</td>
+            <td>Cookie</td>
+            <td>CSRF protection token for privacy and cookie endpoints.</td>
+          </tr>
+          <tr>
+            <td>deltaplant_consent</td>
+            <td>Cookie</td>
+            <td>Client-side reflection of optional consent categories.</td>
+          </tr>
+          <tr>
+            <td>deltaplant_public_id</td>
+            <td>Cookie and localStorage</td>
+            <td>Anonymous public browser token used to manage consent and first-party analytics without an account.</td>
+          </tr>
+          <tr>
+            <td>delta-privacy-preferences</td>
+            <td>localStorage</td>
+            <td>Landing-page record for analytics and soundtrack preference state.</td>
+          </tr>
+          <tr>
+            <td>deltaPreferredLanguage and googtrans</td>
+            <td>Cookie and localStorage</td>
+            <td>Language preference and Google Translate helper state.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </main>
 
   <script type='module'>
     import { CookieManager } from '/components/cookie-manager.js';
     import { CookieBanner } from '/components/cookie-banner.js';
     import { PrivacyModal } from '/components/privacy-modal.js';
+    import { initDeltaWebsiteAnalytics } from '/components/site-analytics.js';
 
     const manager = new CookieManager();
     const modal = new PrivacyModal({ manager });
@@ -161,6 +219,8 @@
       await manager.rejectAll();
       status.textContent = 'Only necessary cookies remain active.';
     });
+
+    initDeltaWebsiteAnalytics({ pageKind: 'cookie-policy' });
   </script>
 </body>
 </html>

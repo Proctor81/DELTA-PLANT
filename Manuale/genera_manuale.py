@@ -974,6 +974,23 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Il report viene salvato in logs/deltaplano_inference_stats.txt."
     )
 
+    pdf._subsection("5.4d Pannello amministratore — monitor visitatori del sito")
+    pdf._body(
+        "Dal pannello amministratore la voce [11] 'Monitor visitatori deltaplant.ai' "
+        "mostra il traffico del sito pubblico in forma first-party e privacy-safe. "
+        "Gli eventi vengono registrati solo dopo consenso analytics esplicito e sono "
+        "salvati in locale nel database SQLite data/analytics/website_events.sqlite, "
+        "senza memorizzare identificativi personali in chiaro. Il monitor consente di "
+        "vedere panoramiche a 24 ore, 7 giorni e 30 giorni, pagine piu viste, referrer, "
+        "campagne UTM, dispositivi, lingue, eventi recenti ed export JSON del report."
+    )
+    pdf._bullet([
+        "Eventi raccolti con consenso: page view, session start, uscita pagina con engagement, click outbound, avvio dashboard NASA/SAR, submit riuscito del form contatti, cambio lingua e aggiornamenti consenso.",
+        "Storage locale: data/analytics/website_events.sqlite sul dispositivo che esegue l'API DELTA; nessun invio a piattaforme advertising o pixel terzi.",
+        "Autorita del consenso: l'endpoint /api/analytics/events accetta eventi solo se la categoria analytics risulta abilitata lato server nella registry cifrata del consenso.",
+        "Uso operativo: il monitor e pensato per il controllo interno dell'efficacia del sito e per verificare quali pagine o call-to-action generano piu interesse, senza pubblicare i dati raccolti.",
+    ])
+
     pdf._subsection("5.5 Output diagnosi — interpretazione")
     pdf._kv_table([
         ("Stato pianta",    "Classe fitosanitaria rilevata dal modello AI"),
@@ -3476,6 +3493,8 @@ def _add_security(pdf: ManualePDF):
         "  [7] Pubblica su GitHub     <- README, RELEASE, tag, push\n"
         "  [8] Scientists Telegram (autorizzazioni)\n"
         "  [9] Programmazione orario avvio/uscita (cron)\n"
+        "  [10] Statistiche inferenza DELTAPLANO_bot\n"
+        "  [11] Monitor visitatori deltaplant.ai\n"
         "  [0] Esci dal pannello",
         label="PANNELLO AMMINISTRATORE",
     )
@@ -3519,7 +3538,17 @@ def _add_security(pdf: ManualePDF):
          "Gli orari si inseriscono in formato 24h (HH:MM). "
          "Le entry vengono salvate nel crontab dell'utente con tag identificativi "
          "DELTA_SCHEDULE_START e DELTA_SCHEDULE_STOP, senza interferire con "
-         "altri job cron esistenti."),
+            "altri job cron esistenti."),
+           ("[10] Statistiche inferenza DELTAPLANO_bot",
+            "Produce un report per utente autorizzato sul traffico LLM del bot: "
+            "richieste, errori, modelli usati, ultimo accesso e istogramma ASCII. "
+            "Salva anche un report testuale in logs/deltaplano_inference_stats.txt."),
+           ("[11] Monitor visitatori deltaplant.ai",
+            "Apre il monitor analytics first-party del sito pubblico. Mostra visitatori "
+            "unici, sessioni, page view, CTA, referrer, lingue, dispositivi ed eventi "
+            "recenti a 24h/7g/30g, con possibilita di esportare un report JSON. I dati "
+            "sono raccolti solo dopo consenso analytics e restano nel database locale "
+            "data/analytics/website_events.sqlite."),
     ])
 
     pdf._subsection("15.4 Cambio Password")
@@ -3731,7 +3760,10 @@ def _add_github_publisher(pdf: ManualePDF):
         "rimangono esclusivamente in locale (dati operativi delle analisi). "
         "La protezione e implementata a doppio livello: il publisher non "
         "include dati operativi nei file generati, e il file .gitignore "
-        "impedisce strutturalmente che i dati locali vengano mai committati."
+        "impedisce strutturalmente che i dati locali vengano mai committati. "
+        "Dal 2026 questa separazione comprende anche il nuovo monitor visitatori "
+        "del sito deltaplant.ai: gli eventi analytics first-party, se autorizzati "
+        "dall'utente del sito, restano in locale e non vengono pubblicati su GitHub."
     )
     pdf._kv_table([
         ("Pubblicati su GitHub",
@@ -3740,7 +3772,8 @@ def _add_github_publisher(pdf: ManualePDF):
         ("Rimangono IN LOCALE",
          "Diagnosi effettuate, conteggi analisi, top classi rilevate, "
          "distribuzione livelli di rischio, timestamp diagnosi, "
-         "immagini acquisite, dati sensori raccolti."),
+         "immagini acquisite, dati sensori raccolti, eventi analytics first-party "
+         "del sito e report visitatori esportati dal monitor admin."),
         ("Visibili solo in [3] Anteprima",
          "Le statistiche del database sono consultabili a schermo nel terminale "
          "tramite l'opzione [3] Anteprima, ma non vengono mai scritte "
@@ -3771,6 +3804,9 @@ def _add_github_publisher(pdf: ManualePDF):
          "Sempre escluso dal repo per ragioni di sicurezza."),
         ("logs/",
          "File di log di sistema con timestamp e messaggi di runtime."),
+        ("data/analytics/",
+         "Database SQLite del monitor visitatori del sito (website_events.sqlite) "
+         "e relativi export JSON: analytics first-party solo locali, esclusi dal repository."),
         ("datasets/captures/",
          "Immagini acquisite dalla camera durante le sessioni di analisi."),
     ])

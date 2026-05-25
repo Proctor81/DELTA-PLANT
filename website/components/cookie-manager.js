@@ -36,9 +36,22 @@ export class CookieManager {
     };
   }
 
-  buildLocalConsentPayload(categories) {
-    const payload = { categories: this.normalizeConsent(categories), source: "local-demo" };
+  emitConsentUpdated(payload) {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("deltaplant:consent-updated", {
+      detail: {
+        categories: this.normalizeConsent(payload?.categories || payload || {}),
+        source: payload?.source || "local-demo",
+      },
+    }));
+  }
+
+  buildLocalConsentPayload(categories, source = "local-demo") {
+    const payload = { categories: this.normalizeConsent(categories), source };
     this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+    this.emitConsentUpdated(payload);
     return payload;
   }
 
@@ -114,7 +127,7 @@ export class CookieManager {
     return response;
   }
 
-  async saveConsent(categories) {
+  async saveConsent(categories, source = "api") {
     const user_token = this.getOrCreateUserToken();
     try {
       const normalized = this.normalizeConsent(categories);
@@ -123,14 +136,16 @@ export class CookieManager {
         body: JSON.stringify({ user_token, ...normalized }),
       });
       const payload = await response.json();
+      payload.source = source;
       this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      this.emitConsentUpdated(payload);
       return payload;
     } catch {
-      return this.buildLocalConsentPayload(categories);
+      return this.buildLocalConsentPayload(categories, source);
     }
   }
 
-  async acceptAll() {
+  async acceptAll(source = "accept-all") {
     const user_token = this.getOrCreateUserToken();
     try {
       const response = await this.request("/api/cookies/accept-all", {
@@ -138,14 +153,16 @@ export class CookieManager {
         body: JSON.stringify({ user_token }),
       });
       const payload = await response.json();
+      payload.source = source;
       this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      this.emitConsentUpdated(payload);
       return payload;
     } catch {
-      return this.buildLocalConsentPayload({ analytics: true, maps: true, voice: true, llm: true });
+      return this.buildLocalConsentPayload({ analytics: true, maps: true, voice: true, llm: true }, source);
     }
   }
 
-  async rejectAll() {
+  async rejectAll(source = "reject-all") {
     const user_token = this.getOrCreateUserToken();
     try {
       const response = await this.request("/api/cookies/reject-all", {
@@ -153,10 +170,12 @@ export class CookieManager {
         body: JSON.stringify({ user_token }),
       });
       const payload = await response.json();
+      payload.source = source;
       this.setCookie(this.consentCookie, JSON.stringify(payload.categories), 36 * 30 * 24 * 3600);
+      this.emitConsentUpdated(payload);
       return payload;
     } catch {
-      return this.buildLocalConsentPayload({ analytics: false, maps: false, voice: false, llm: false });
+      return this.buildLocalConsentPayload({ analytics: false, maps: false, voice: false, llm: false }, source);
     }
   }
 

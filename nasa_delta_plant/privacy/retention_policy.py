@@ -12,6 +12,7 @@ class RetentionPolicy:
     consent_retention_days: int = 36 * 30
     audit_retention_days: int = 30
     runtime_pdf_ttl_minutes: int = 60
+    analytics_retention_days: int = 180
 
     @staticmethod
     def now() -> datetime:
@@ -22,6 +23,9 @@ class RetentionPolicy:
 
     def audit_cutoff(self) -> datetime:
         return self.now() - timedelta(days=self.audit_retention_days)
+
+    def analytics_cutoff(self) -> datetime:
+        return self.now() - timedelta(days=self.analytics_retention_days)
 
     def pdf_expiry(self) -> datetime:
         return self.now() + timedelta(minutes=self.runtime_pdf_ttl_minutes)

@@ -3,10 +3,12 @@ from datetime import date, datetime, timedelta, timezone
 import numpy as np
 from types import SimpleNamespace
 from nasa_delta_plant.area_diagnosis import AreaDiagnosisService
+from nasa_delta_plant.config import get_settings
 from chat.chat_engine import ChatEngine
 from ai.voice_service import VoiceService
 from ai.expiring_artifact_store import ExpiringArtifactStore, StoredArtifact
 from nasa_delta_plant.area_diagnosis import FieldState
+from nasa_delta_plant.privacy import ConsentManager, CookieValidator, LLMUsageTracker, WebsiteAnalyticsTracker
 
 class _SyntheticTelegramContext:
     def __init__(self) -> None:
@@ -18,9 +20,17 @@ class _SyntheticTelegramContext:
 # Classe orchestrator compatibile con il bot Telegram
 class NASADeltaPlantOrchestrator:
     def __init__(self) -> None:
+        self.settings = get_settings()
         self.area_diagnosis = AreaDiagnosisService(chat_engine=ChatEngine())
         self.artifact_store = ExpiringArtifactStore()
         self.voice_service = VoiceService(chat_engine=self.area_diagnosis.chat_engine)
+        self.consent_manager = ConsentManager(settings=self.settings)
+        self.cookie_validator = CookieValidator(self.consent_manager)
+        self.llm_usage_tracker = LLMUsageTracker(self.consent_manager)
+        self.website_analytics_tracker = WebsiteAnalyticsTracker(
+            consent_manager=self.consent_manager,
+            settings=self.settings,
+        )
 
     async def analyze_area(
         self,

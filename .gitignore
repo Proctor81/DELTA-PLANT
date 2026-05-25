@@ -23,6 +23,7 @@ delta.pid
 
 # Dati operativi locali (privacy — non pubblicare)
 data/academy_progress.json
+data/analytics/
 exports/
 
 # Log
