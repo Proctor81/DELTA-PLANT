@@ -150,7 +150,7 @@ def test_build_welcome_voice_text_personalizes_first_name():
     assert "DELTAPLANO" in result
 
 
-def test_build_welcome_voice_text_ignores_english_override_on_start():
+def test_build_welcome_voice_text_uses_english_override_on_start():
     update = types.SimpleNamespace(
         effective_user=types.SimpleNamespace(first_name="Ryan", username="ryanplants"),
     )
@@ -158,8 +158,36 @@ def test_build_welcome_voice_text_ignores_english_override_on_start():
 
     result = tg._build_welcome_voice_text(update, context)
 
-    assert result.startswith("Ciao Ryan")
-    assert "Hello" not in result
+    assert result.startswith("Hello Ryan")
+    assert "Ciao" not in result
+
+
+def test_build_welcome_voice_caption_uses_english_override_on_start():
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(first_name="Ryan", username="ryanplants"),
+    )
+    context = types.SimpleNamespace(user_data={"voice_language_override": "en"})
+
+    result = tg._build_welcome_voice_caption(update, context)
+
+    assert result == "Welcome, Ryan."
+
+
+def test_maybe_send_voice_welcome_uses_english_copy_when_override_active(monkeypatch):
+    sends = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg._maybe_send_voice_welcome(update, context))
+
+    assert sends
+    assert sends[0].startswith("🎙️ Voice mode is available in free chat.")
 
 
 def test_send_personalized_welcome_voice_uses_tts_and_send_voice(monkeypatch):
@@ -225,6 +253,88 @@ def test_start_sends_intro_and_personalized_welcome_voice(monkeypatch):
     assert len(sends) == 1
     assert "Benvenuto in @DELTAPLANO_bot" in sends[0]
     assert welcome_calls == ["Luca"]
+
+
+def test_start_sends_english_intro_when_english_override_active(monkeypatch):
+    sends = []
+    welcome_calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    async def fake_welcome(update, context):
+        welcome_calls.append(tg._welcome_display_name(update))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_send_personalized_welcome_voice", fake_welcome)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=78, first_name="Ryan", username="ryanplants"),
+    )
+    context = types.SimpleNamespace(user_data={"voice_language_override": "en"})
+
+    result = asyncio.run(tg.start(update, context))
+
+    assert result is None
+    assert len(sends) == 1
+    assert "Welcome to @DELTAPLANO_bot" in sends[0]
+    assert "Benvenuto" not in sends[0]
+    assert welcome_calls == ["Ryan"]
+
+
+def test_voice_language_command_reports_status_in_english_when_override_active(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(args=[], user_data={"voice_language_override": "en"})
+
+    asyncio.run(tg.voice_language_command(update, context))
+
+    assert sends == [
+        "Current voice language: EN\nUse /voice_lang it, /voice_lang en or /voice_lang auto."
+    ]
+
+
+def test_chat_start_uses_english_intro_when_override_active(monkeypatch):
+    sends = []
+
+    class FakeEngine:
+        def get_status(self):
+            return {"hf_token_valid": True, "hf_active_model": "test-model"}
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup, parse_mode))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    result = asyncio.run(tg.chat_start(update, context))
+
+    assert result == tg.STATE_CHAT_WAITING
+    assert sends[0][0].startswith("🔵 *DELTA intelligent chat active*")
+    labels = [button.text for row in sends[0][1].inline_keyboard for button in row]
+    assert labels == ["🔴 End chat", "🗑 Reset conversation"]
+    assert sends[0][2] == "Markdown"
 
 
 def test_send_diagnosis_paginated_short_closes_with_smile(monkeypatch):
@@ -579,6 +689,88 @@ def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
     assert "chat_seed_context" not in context.user_data
 
 
+def test_menu_sends_english_prompt_when_override_active(monkeypatch):
+    calls = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        calls.append((text, reply_markup))
+
+    async def fake_guard(update):
+        return True
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    result = asyncio.run(tg.menu(object(), context))
+
+    assert result is None
+    assert calls[0][0] == "Main menu:"
+    labels = [button.text for row in calls[0][1].inline_keyboard for button in row]
+    assert "🔵 💬 Ask DELTA Plant" in labels
+    assert "🛰️ Connect to NASA-ISRO/SAR" in labels
+
+
+def test_report_uses_english_heading_when_override_active(monkeypatch):
+    sends = []
+
+    class FakeDatabase:
+        def get_recent(self, limit=5):
+            return [
+                {
+                    "id": 12,
+                    "timestamp": "2026-05-25T10:00:00",
+                    "ai_class": "Tomato_Early_blight",
+                    "overall_risk": "medium",
+                }
+            ]
+
+    class FakeAgent:
+        database = FakeDatabase()
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_get_agent", lambda context: FakeAgent())
+
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg.report(object(), context))
+
+    assert sends[0].startswith("Latest diagnoses:")
+    assert "risk medium" in sends[0]
+
+
+def test_sensors_uses_english_heading_when_override_active(monkeypatch):
+    sends = []
+
+    class FakeAgent:
+        def get_latest_sensor_data(self):
+            return {"temperature_c": 24.5, "humidity_pct": 78.0}
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_get_agent", lambda context: FakeAgent())
+
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg.sensors(object(), context))
+
+    assert sends[0].startswith("Sensor data:")
+
+
 def test_continue_diagnosis_message_sends_next_and_final_smile(monkeypatch):
     calls = []
 
@@ -709,6 +901,7 @@ def test_build_diagnosis_memory_turn_extracts_non_catalog_plant_name_from_descri
 def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean_turn(monkeypatch):
     sends = []
     remembered = []
+    response_languages = []
 
     async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
         sends.append((text, parse_mode))
@@ -720,8 +913,9 @@ def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean
         return None
 
     class FakeEngine:
-        def chat_internal(self, prompt):
+        def chat_internal(self, prompt, response_language="auto"):
             assert "UNICO messaggio finale" in prompt
+            response_languages.append(response_language)
             return "Diagnosi finale operativa"
 
         def remember_turn(self, user_id, user_input, response):
@@ -734,7 +928,11 @@ def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean
         "_reclassify_with_description",
         lambda engine, ai_class, user_description: asyncio.sleep(0, result=ai_class),
     )
-    monkeypatch.setattr(tg, "_sanitize_diagnosis_opinion", lambda opinion: opinion)
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
     monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
 
     update = types.SimpleNamespace(
@@ -771,6 +969,7 @@ def test_send_ai_diagnosis_opinion_uses_stateless_generation_and_remembers_clean
     )]
     assert remembered[0][0] == "77"
     assert remembered[0][2] == "Diagnosi finale operativa"
+    assert response_languages == [tg.VOICE_LANGUAGE_IT]
     assert "Sei un agronomo esperto" not in remembered[0][1]
     assert "Ho chiesto una diagnosi della pianta." in remembered[0][1]
     assert "Pianta: pomodoro." in remembered[0][1]
@@ -849,6 +1048,36 @@ def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
     assert "Sintesi SAR: rischio MEDIO su Roma." in prompts[0][1]
     assert "Domanda utente: Perche'?" in prompts[0][1]
     assert "chat_seed_context" not in context.user_data
+
+
+def test_generate_free_chat_response_passes_english_override_to_engine(monkeypatch):
+    prompts = []
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat(self, user_id, prompt, response_language=None):
+            prompts.append((user_id, prompt, response_language))
+            return "english reply"
+
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=7),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._generate_free_chat_response(update, context, "How are you?"))
+
+    assert result == "english reply"
+    assert prompts[0][0] == "7"
+    assert prompts[0][1] == "How are you?"
+    assert prompts[0][2] == tg.VOICE_LANGUAGE_EN
 
 
 def test_generate_free_chat_response_nasa_sends_photos(monkeypatch, tmp_path):
@@ -1022,6 +1251,148 @@ def test_menu_keyboard_includes_chat_button():
     assert "👨‍🔬 Ryan (EN)" in labels
 
 
+def test_menu_keyboard_uses_english_labels_when_override_active():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    keyboard = tg._menu_keyboard(context)
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+
+    assert "🔵 💬 Ask DELTA Plant" in labels
+    assert "🆕 Diagnose a Plant" in labels
+    assert "📄 License" in labels
+    assert "🛰️ Connect to NASA-ISRO/SAR" in labels
+
+
+def test_nasa_sar_reply_keyboard_uses_english_labels_when_override_active():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    keyboard = tg._nasa_sar_reply_keyboard(context)
+    labels = [button.text for row in keyboard.keyboard for button in row]
+
+    assert labels == ["🛰️ Open NASA-ISRO/SAR GPS", "📍 Send GPS manually"]
+
+
+def test_chat_exit_keyboard_uses_english_labels_when_override_active():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    keyboard = tg._chat_exit_keyboard(context)
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+
+    assert labels == ["🔴 End chat", "🗑 Reset conversation"]
+
+
+def test_mandatory_step_block_message_uses_english_when_override_active():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    result = tg.mandatory_step_block_message(context)
+
+    assert result.startswith("⏳ A guided diagnosis")
+
+
+def test_start_diagnosis_uses_english_prompt_when_override_active(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    result = asyncio.run(tg.start_diagnosis(update, context))
+
+    assert result == tg.STATE_DIAG_IMAGE_SOURCE
+    assert sends[0][0] == "Diagnosis: choose the image source."
+    labels = [button.text for row in sends[0][1].inline_keyboard for button in row]
+    assert labels == ["📷 Send photo", " Camera device"]
+
+
+def test_build_diagnosis_prompt_uses_english_when_requested(monkeypatch):
+    monkeypatch.setattr(tg, "_format_diagnosis_full", lambda record: "Detailed diagnosis report")
+
+    record = {
+        "diagnosis": {
+            "overall_risk": "medium",
+            "plant_status": "to monitor",
+            "explanation": "Leaf lesions detected",
+            "quantum_risk": {"quantum_risk_score": 0.42, "dominant_description": "humidity_spike"},
+        },
+        "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.91},
+        "recommendations": [{"category": "action", "action": "Improve airflow"}],
+        "sensor_snapshot": {},
+    }
+
+    prompt = tg._build_diagnosis_prompt(record, "Tomato leaves with brown spots", response_language=tg.VOICE_LANGUAGE_EN)
+
+    assert "in English" in prompt
+    assert "RAW DELTA DIAGNOSIS REPORT" in prompt
+    assert "Technical outcome" in prompt
+    assert "in italiano" not in prompt
+
+
+def test_sanitize_diagnosis_opinion_translates_known_labels_in_english_mode():
+    opinion = (
+        "**INTERVENTO URGENTE RICHIESTO**\n"
+        "Evento dominante: Malattia rilevata da visione AI."
+    )
+
+    sanitized = tg._sanitize_diagnosis_opinion(opinion, response_language=tg.VOICE_LANGUAGE_EN)
+
+    assert "URGENT ACTION REQUIRED" in sanitized
+    assert "Disease detected by AI vision" in sanitized
+    assert "INTERVENTO URGENTE RICHIESTO" not in sanitized
+    assert "Malattia rilevata da visione AI" not in sanitized
+
+
+def test_academy_menu_keyboard_uses_english_labels_when_override_active():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    keyboard = tg._academy_menu_keyboard(context)
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+
+    assert labels == [
+        "Guided tutorial",
+        "Sim: Identify disease",
+        "Sim: Assess risk",
+        "Sim: Choose action",
+        "Theory quiz",
+        "Progress",
+        "Lab MLOps",
+        "Exit",
+    ]
+
+
+def test_academy_start_uses_english_intro_and_keyboard(monkeypatch):
+    sends = []
+    saved = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup))
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_load_academy_progress", lambda: {"sessions": 0})
+    monkeypatch.setattr(tg, "_save_academy_progress", lambda progress: saved.append(progress.copy()))
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg.academy_start(update, context))
+
+    assert sends[0][0] == "DELTA Academy — choose a mode:"
+    labels = [button.text for row in sends[0][1].inline_keyboard for button in row]
+    assert labels[0] == "Guided tutorial"
+    assert saved[0]["sessions"] == 1
+
+
 def test_menu_callback_continues_when_query_answer_is_expired(monkeypatch):
     requested = []
 
@@ -1049,6 +1420,35 @@ def test_menu_callback_continues_when_query_answer_is_expired(monkeypatch):
     asyncio.run(tg.menu_callback(update, context))
 
     assert requested == [tg.VOICE_LANGUAGE_IT]
+
+
+def test_menu_callback_english_voice_button_sets_english_override(monkeypatch):
+    requested = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_set_voice_language(update, context, value):
+        requested.append(value)
+
+    class FakeQuery:
+        data = tg.CMD_VOICE_LANG_EN
+
+        async def answer(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_set_voice_language", fake_set_voice_language)
+
+    update = types.SimpleNamespace(
+        callback_query=FakeQuery(),
+        effective_user=types.SimpleNamespace(id=123),
+    )
+    context = types.SimpleNamespace()
+
+    asyncio.run(tg.menu_callback(update, context))
+
+    assert requested == [tg.VOICE_LANGUAGE_EN]
 
 
 def test_export_excel_uses_last_30_days_and_sends_document(monkeypatch, tmp_path):
@@ -1494,6 +1894,28 @@ def test_voice_mode_command_sets_override(monkeypatch):
     assert "Modalità voce disattivata" in sends[0]
 
 
+def test_voice_mode_command_reports_status_in_english_when_override_active(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace(message=types.SimpleNamespace(text="/voice"))
+    context = types.SimpleNamespace(args=[], user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg.voice_mode_command(update, context))
+
+    assert sends == [
+        "Current voice mode: AUTO\nUse /voice on, /voice off or /voice auto.\nFor language use /voice_lang it, /voice_lang en or /voice_lang auto."
+    ]
+
+
 def test_voice_language_command_sets_italian_override(monkeypatch):
     sends = []
 
@@ -1547,6 +1969,41 @@ def test_set_voice_language_helper_sets_italian_copy(monkeypatch):
 
     assert context.user_data["voice_language_override"] == tg.VOICE_LANGUAGE_IT
     assert "Lingua voce forzata su italiano" in sends[0]
+
+
+def test_set_voice_language_helper_sets_auto_copy_in_english_when_switching_from_english(monkeypatch):
+    sends = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+
+    update = types.SimpleNamespace()
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    asyncio.run(tg._set_voice_language(update, context, tg.VOICE_LANGUAGE_AUTO))
+
+    assert "voice_language_override" not in context.user_data
+    assert sends == [
+        "♻️ Automatic voice language enabled: DELTAPLANO will choose the Italian or English pack based on the reply."
+    ]
+
+
+def test_select_piper_voice_profile_honors_english_override():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    profile = tg._select_piper_voice_profile("Ciao a tutti", context=context)
+
+    assert profile == tg.VOICE_LANGUAGE_EN
+
+
+def test_select_piper_voice_profile_honors_italian_override_even_for_english_text():
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_IT})
+
+    profile = tg._select_piper_voice_profile("Hello, this is a test message for DELTA Plant.", context=context)
+
+    assert profile == tg.VOICE_LANGUAGE_IT
 
 
 def test_handle_voice_message_rejects_guided_diagnosis(monkeypatch):
@@ -1715,6 +2172,7 @@ def test_receive_followup_answer_finishes_after_max_questions(monkeypatch):
 def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(monkeypatch):
     sends = []
     remembered = []
+    response_languages = []
 
     async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
         sends.append((text, parse_mode))
@@ -1729,9 +2187,10 @@ def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(mon
         return None
 
     class FakeEngine:
-        def chat_internal(self, prompt):
+        def chat_internal(self, prompt, response_language="auto"):
             assert "Domande di approfondimento e risposte" in prompt
             assert "Temperatura" in prompt
+            response_languages.append(response_language)
             return "Valutazione conversazionale finale"
 
         def remember_turn(self, user_id, user_input, response):
@@ -1740,7 +2199,11 @@ def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(mon
     monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
     monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
     monkeypatch.setattr(tg, "_operator_says_healthy", fake_operator_says_healthy)
-    monkeypatch.setattr(tg, "_sanitize_diagnosis_opinion", lambda opinion: opinion)
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
     monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
 
     update = types.SimpleNamespace(
@@ -1765,6 +2228,7 @@ def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(mon
     assert sends == [
         ("🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>\n\nValutazione conversazionale finale", "HTML")
     ]
+    assert response_languages == [tg.VOICE_LANGUAGE_IT]
     assert remembered == [
         ("77", remembered[0][1], "Valutazione conversazionale finale")
     ]
@@ -1776,3 +2240,74 @@ def test_send_conversational_diagnosis_remembers_clean_turn_and_clears_state(mon
     assert "diag_qa_active" not in context.user_data
     assert "diag_image_path" not in context.user_data
     assert "sensor_index" not in context.user_data
+
+
+def test_send_ai_diagnosis_opinion_passes_english_language_to_chat_internal(monkeypatch):
+    sends = []
+    response_languages = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat_internal(self, prompt, response_language="auto"):
+            response_languages.append(response_language)
+            assert "SINGLE final message" in prompt
+            return "Final operational diagnosis"
+
+        def remember_turn(self, user_id, user_input, response):
+            return None
+
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(
+        tg,
+        "_reclassify_with_description",
+        lambda engine, ai_class, user_description: asyncio.sleep(0, result=ai_class),
+    )
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=88),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "voice_language_override": tg.VOICE_LANGUAGE_EN,
+            "diag_user_description": "Tomato leaves with white powdery patches",
+            "diag_image_path": "input_images/foglia.jpg",
+        }
+    )
+    record = {
+        "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.88},
+        "diagnosis": {
+            "plant_status": "Compromised",
+            "summary": "Probable fungal issue",
+            "overall_risk": "high",
+            "explanation": "Leaf analysis.",
+            "sensor_snapshot": {"temperature_c": 25.0},
+        },
+        "recommendations": [
+            {"category": "fungus", "priority": 1, "problem": "leaf lesions", "action": "targeted treatment"},
+        ],
+    }
+
+    result = asyncio.run(tg._send_ai_diagnosis_opinion(update, context, record))
+
+    assert result == tg.ConversationHandler.END
+    assert response_languages == [tg.VOICE_LANGUAGE_EN]
+    assert sends == [(
+        "🩺 <b>DELTA Plant DIAGNOSIS RESULT:</b>\n\nFinal operational diagnosis",
+        "HTML",
+    )]

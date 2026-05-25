@@ -13,11 +13,15 @@ def is_mandatory_guided_step_active(context):
             return True
     return False
 
-def mandatory_step_block_message():
-    return (
+def mandatory_step_block_message(context: Optional["ContextTypes.DEFAULT_TYPE"] = None):
+    return _ui_text(
+        context,
         "⏳ È in corso una diagnosi guidata o upload con step obbligatorio. "
         "Completa prima la diagnosi (es. scegli sensori o invia foto), poi puoi usare la chat libera o la modalità vocale. "
-        "Usa /annulla per interrompere la diagnosi."
+        "Usa /annulla per interrompere la diagnosi.",
+        "⏳ A guided diagnosis or upload with a required step is in progress. "
+        "Complete the diagnosis first, for example choose sensors or send a photo, then you can use free chat or voice mode. "
+        "Use /annulla to interrupt the diagnosis.",
     )
  
 # --- PATCH: reset stato guidato su ogni input e consenti sempre LLM ---
@@ -162,6 +166,11 @@ _DIAG_TRANSIENT_KEYS = (
     "diag_pending_closing",
 )
 
+_VOICE_GUIDED_DIAGNOSIS_REJECT = (
+    "❌ La modalità vocale non è supportata durante la diagnosi guidata di DELTA Plant.\n"
+    "Per favore usa messaggi di testo."
+)
+
 VOICE_MODE_AUTO = "auto"
 VOICE_MODE_ON = "on"
 VOICE_MODE_OFF = "off"
@@ -271,7 +280,7 @@ def _voice_caption(text: str) -> Optional[str]:
     return normalized[: max(limit - 1, 1)].rstrip() + "…"
 
 
-def _spoken_voice_text(text: str) -> str:
+def _spoken_voice_text(text: str, context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> str:
     cleaned = re.sub(r"https?://\S+", " link disponibile in chat ", text)
     cleaned = re.sub(r"<[^>]+>", " ", cleaned)
     cleaned = cleaned.replace("```", " ")
@@ -286,7 +295,11 @@ def _spoken_voice_text(text: str) -> str:
     cleaned = re.sub(r"([.!?]){2,}", r"\1", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,;:-")
     if not cleaned:
-        return "Non ho contenuti da leggere in questo momento."
+        return _ui_text(
+            context,
+            "Non ho contenuti da leggere in questo momento.",
+            "I do not have any content to read right now.",
+        )
     limit = int(TELEGRAM_CONFIG.get("voice_reply_max_chars", 900))
     if len(cleaned) <= limit:
         return cleaned
@@ -304,7 +317,11 @@ async def _maybe_send_voice_welcome(update: Update, context: "ContextTypes.DEFAU
     context.user_data["voice_welcome_sent"] = True
     await _send(
         update,
-        "🎙️ Modalità voce disponibile in chat libera. Di default la voce usa italiano (Cris). In automatico vale il mirroring testo→testo e vocale→vocale. Usa /voice on, /voice off o /voice auto per cambiare comportamento. Per forzare la lingua della voce usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+        _ui_text(
+            context,
+            "🎙️ Modalità voce disponibile in chat libera. Di default la voce usa italiano (Cris). In automatico vale il mirroring testo→testo e vocale→vocale. Usa /voice on, /voice off o /voice auto per cambiare comportamento. Per forzare la lingua della voce usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+            "🎙️ Voice mode is available in free chat. By default the voice uses Italian (Cris). In automatic mode text gets text replies and voice gets voice replies. Use /voice on, /voice off or /voice auto to change behavior. To force the voice language use /voice_lang it, /voice_lang en or /voice_lang auto.",
+        ),
     )
 
 
@@ -410,6 +427,18 @@ def _voice_language_mode(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) 
         return VOICE_LANGUAGE_DEFAULT
     raw = str(context.user_data.get("voice_language_override", VOICE_LANGUAGE_DEFAULT)).strip().lower()
     return raw if raw in _VOICE_LANGUAGE_ALLOWED else VOICE_LANGUAGE_DEFAULT
+
+
+def _ui_language(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> str:
+    return VOICE_LANGUAGE_EN if _voice_language_mode(context) == VOICE_LANGUAGE_EN else VOICE_LANGUAGE_IT
+
+
+def _ui_text(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    italian_text: str,
+    english_text: str,
+) -> str:
+    return english_text if _ui_language(context) == VOICE_LANGUAGE_EN else italian_text
 
 
 def _select_piper_voice_profile(
@@ -621,7 +650,7 @@ async def text_to_speech_warm_male(
     context: "ContextTypes.DEFAULT_TYPE",
     text: str,
 ) -> BytesIO:
-    spoken_text = _spoken_voice_text(text)
+    spoken_text = _spoken_voice_text(text, context=context)
     provider = _select_tts_provider()
     if provider == "piper":
         return await _tts_with_piper(context, spoken_text)
@@ -786,7 +815,11 @@ async def _generate_free_chat_response(
     except Exception as exc:
         logger.error("Errore chat LLM: %s", exc, exc_info=True)
         # Fallback: chat/voice sempre disponibili
-        response = "\U0001F916 Il sistema LLM non è momentaneamente disponibile. Puoi riprovare tra qualche secondo o continuare a usare le altre funzioni DELTA."
+        response = _ui_text(
+            context,
+            "\U0001F916 Il sistema LLM non è momentaneamente disponibile. Puoi riprovare tra qualche secondo o continuare a usare le altre funzioni DELTA.",
+            "\U0001F916 The LLM system is temporarily unavailable. You can try again in a few seconds or keep using the other DELTA functions.",
+        )
 
     logger.info("free_chat_response[%s]: %s", user_id, response[:120])
     return response
@@ -799,7 +832,7 @@ async def _respond_free_chat_output(
     *,
     input_mode: str,
 ) -> None:
-    reply_markup = _chat_exit_keyboard() if context.user_data.get("chat_mode_active") else None
+    reply_markup = _chat_exit_keyboard(context) if context.user_data.get("chat_mode_active") else None
 
     if _should_reply_with_voice(context, input_mode):
         try:
@@ -817,7 +850,14 @@ async def _respond_free_chat_output(
             return
         except Exception as exc:
             logger.warning("Fallback a testo per risposta vocale: %s", exc, exc_info=True)
-            await _send(update, "🎙️ Risposta vocale non disponibile in questo momento. Ti rispondo in testo.")
+            await _send(
+                update,
+                _ui_text(
+                    context,
+                    "🎙️ Risposta vocale non disponibile in questo momento. Ti rispondo in testo.",
+                    "🎙️ Voice reply is not available right now. I will answer in text.",
+                ),
+            )
 
     await _send_chat_paginated(
         update,
@@ -848,34 +888,68 @@ async def voice_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         current = _voice_reply_mode(context)
         await _send(
             update,
-            "Modalità voce attuale: "
-            f"{current.upper()}\n"
-            "Usa /voice on, /voice off o /voice auto.\n"
-            "Per la lingua usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+            _ui_text(
+                context,
+                "Modalità voce attuale: "
+                f"{current.upper()}\n"
+                "Usa /voice on, /voice off o /voice auto.\n"
+                "Per la lingua usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+                "Current voice mode: "
+                f"{current.upper()}\n"
+                "Use /voice on, /voice off or /voice auto.\n"
+                "For language use /voice_lang it, /voice_lang en or /voice_lang auto.",
+            ),
         )
         return
 
     if requested not in _VOICE_MODE_ALLOWED:
-        await _send(update, "Uso corretto: /voice on | /voice off | /voice auto")
+        await _send(update, _ui_text(context, "Uso corretto: /voice on | /voice off | /voice auto", "Usage: /voice on | /voice off | /voice auto"))
         return
 
     if requested == VOICE_MODE_AUTO:
         context.user_data.pop("voice_mode_override", None)
-        await _send(update, "♻️ Modalità voce automatica attiva: testo→testo, vocale→vocale in chat libera.")
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "♻️ Modalità voce automatica attiva: testo→testo, vocale→vocale in chat libera.",
+                "♻️ Automatic voice mode enabled: text→text, voice→voice in free chat.",
+            ),
+        )
         return
 
     context.user_data["voice_mode_override"] = requested
     if requested == VOICE_MODE_ON:
-        await _send(update, "🎙️ Modalità voce forzata attiva in chat libera: DELTAPLANO proverà a rispondere con un vocale anche ai messaggi testuali.")
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "🎙️ Modalità voce forzata attiva in chat libera: DELTAPLANO proverà a rispondere con un vocale anche ai messaggi testuali.",
+                "🎙️ Forced voice mode enabled in free chat: DELTAPLANO will try to answer with voice even to text messages.",
+            ),
+        )
         return
 
-    await _send(update, "🔇 Modalità voce disattivata: i vocali saranno trascritti ma la risposta tornerà in testo.")
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "🔇 Modalità voce disattivata: i vocali saranno trascritti ma la risposta tornerà in testo.",
+            "🔇 Voice mode disabled: voice messages will be transcribed but the reply will return as text.",
+        ),
+    )
 
 
 async def _set_voice_language(update: Update, context: ContextTypes.DEFAULT_TYPE, requested: str) -> None:
     if requested == VOICE_LANGUAGE_AUTO:
+        previous_ui_language = _ui_language(context)
         context.user_data.pop("voice_language_override", None)
-        await _send(update, "♻️ Lingua voce automatica attiva: DELTAPLANO sceglierà il pack italiano o inglese in base alla risposta.")
+        await _send(
+            update,
+            "♻️ Automatic voice language enabled: DELTAPLANO will choose the Italian or English pack based on the reply."
+            if previous_ui_language == VOICE_LANGUAGE_EN
+            else "♻️ Lingua voce automatica attiva: DELTAPLANO sceglierà il pack italiano o inglese in base alla risposta.",
+        )
         return
 
     context.user_data["voice_language_override"] = requested
@@ -899,16 +973,27 @@ async def voice_language_command(update: Update, context: ContextTypes.DEFAULT_T
     requested = context.args[0].strip().lower() if getattr(context, "args", None) else ""
     if not requested:
         current = _voice_language_mode(context)
-        await _send(
-            update,
-            "Lingua voce attuale: "
-            f"{current.upper()}\n"
-            "Usa /voice_lang it, /voice_lang en o /voice_lang auto.",
-        )
+        if current == VOICE_LANGUAGE_EN:
+            await _send(
+                update,
+                "Current voice language: "
+                f"{current.upper()}\n"
+                "Use /voice_lang it, /voice_lang en or /voice_lang auto.",
+            )
+        else:
+            await _send(
+                update,
+                "Lingua voce attuale: "
+                f"{current.upper()}\n"
+                "Usa /voice_lang it, /voice_lang en o /voice_lang auto.",
+            )
         return
 
     if requested not in _VOICE_LANGUAGE_ALLOWED:
-        await _send(update, "Uso corretto: /voice_lang it | /voice_lang en | /voice_lang auto")
+        if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+            await _send(update, "Usage: /voice_lang it | /voice_lang en | /voice_lang auto")
+        else:
+            await _send(update, "Uso corretto: /voice_lang it | /voice_lang en | /voice_lang auto")
         return
 
     await _set_voice_language(update, context, requested)
@@ -920,12 +1005,27 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not update.message or not update.message.voice:
         raise ApplicationHandlerStop
 
-
-    # PATCH: blocca LLM/voce solo se step obbligatorio attivo
-    if is_mandatory_guided_step_active(context):
-        await _send(update, mandatory_step_block_message())
+    if is_guided_diagnosis_mode(context):
+        await _send(
+            update,
+            _ui_text(
+                context,
+                _VOICE_GUIDED_DIAGNOSIS_REJECT,
+                "❌ Voice mode is not supported during the guided DELTA Plant diagnosis.\nPlease use text messages.",
+            ),
+        )
         raise ApplicationHandlerStop
-    reset_all_guided_states(context)
+
+    if not _is_voice_free_chat_context(context):
+        await _send(
+            update,
+            _ui_text(
+                context,
+                _VOICE_FREE_CHAT_ONLY_REJECT,
+                "🎙️ Voice mode is available only in free chat.\nUse text messages in this flow.",
+            ),
+        )
+        raise ApplicationHandlerStop
 
     await _maybe_send_voice_welcome(update, context)
 
@@ -934,11 +1034,25 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         transcript = await transcribe_audio(context, voice_bytes)
     except Exception as exc:
         logger.warning("Trascrizione vocale fallita: %s", exc, exc_info=True)
-        await _send(update, "Non riesco a trascrivere il messaggio vocale in questo momento. Puoi riprovare o scrivermi in testo?")
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non riesco a trascrivere il messaggio vocale in questo momento. Puoi riprovare o scrivermi in testo?",
+                "I can't transcribe the voice message right now. You can try again or write to me in text.",
+            ),
+        )
         raise ApplicationHandlerStop
 
     if not transcript.strip():
-        await _send(update, "Non sono riuscito a capire il messaggio vocale. Puoi ripetere?")
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non sono riuscito a capire il messaggio vocale. Puoi ripetere?",
+                "I couldn't understand the voice message. Can you repeat it?",
+            ),
+        )
         raise ApplicationHandlerStop
 
     await _handle_free_chat_turn(update, context, transcript, input_mode="voice")
@@ -962,11 +1076,11 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if not update.message or not update.message.text:
         logger.debug("free_chat_handler: messaggio vuoto o non testuale")
         return
-    # PATCH: blocca LLM/chat solo se step obbligatorio attivo
-    if is_mandatory_guided_step_active(context):
-        await _send(update, mandatory_step_block_message())
+    block_reason = _free_chat_block_reason(context)
+    if block_reason:
+        logger.info("free_chat_handler: flusso strutturato attivo (%s), invio feedback", block_reason)
+        await _send(update, _free_chat_block_message(block_reason))
         return
-    reset_all_guided_states(context)
     user_text = update.message.text.strip()
     user_id = str(update.effective_user.id) if update.effective_user else "0"
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
@@ -1111,17 +1225,18 @@ def _nasa_sar_webapp_url() -> str:
     return f"{base}/telegram/nasa-sar-locator.html"
 
 
-def _menu_keyboard() -> InlineKeyboardMarkup:
+def _menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> InlineKeyboardMarkup:
+    english_ui = _ui_language(context) == VOICE_LANGUAGE_EN
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🔵 💬 Chiedi a DELTA Plant", callback_data=CMD_CHAT),
+            InlineKeyboardButton("🔵 💬 Ask DELTA Plant" if english_ui else "🔵 💬 Chiedi a DELTA Plant", callback_data=CMD_CHAT),
         ],
         [
-            InlineKeyboardButton("🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
+            InlineKeyboardButton("🆕 Diagnose a Plant" if english_ui else "🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
         ],
         [
-            InlineKeyboardButton("🌡 Sensori", callback_data=CMD_SENSORS),
-            InlineKeyboardButton("📤 Report Excel", callback_data=CMD_EXPORT),
+            InlineKeyboardButton("🌡 Sensors" if english_ui else "🌡 Sensori", callback_data=CMD_SENSORS),
+            InlineKeyboardButton("📤 Excel Reports" if english_ui else "📤 Report Excel", callback_data=CMD_EXPORT),
         ],
         [
             InlineKeyboardButton("🧪 Preflight", callback_data=CMD_PREFLIGHT),
@@ -1129,10 +1244,10 @@ def _menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🎓 Academy", callback_data=CMD_ACADEMY),
-            InlineKeyboardButton("📄 Licenza", callback_data=CMD_LICENSE),
+            InlineKeyboardButton("📄 License" if english_ui else "📄 Licenza", callback_data=CMD_LICENSE),
         ],
         [
-            InlineKeyboardButton("🛰️ Connettiti a NASA-ISRO/SAR", callback_data=CMD_NASA_SAR),
+            InlineKeyboardButton("🛰️ Connect to NASA-ISRO/SAR" if english_ui else "🛰️ Connettiti a NASA-ISRO/SAR", callback_data=CMD_NASA_SAR),
         ],
         [
             InlineKeyboardButton("👩‍🔬 Cris (IT)", callback_data=CMD_VOICE_LANG_IT),
@@ -1230,6 +1345,12 @@ def _build_welcome_voice_text(
     context: Optional[ContextTypes.DEFAULT_TYPE] = None,
 ) -> str:
     display_name = _welcome_display_name(update)
+    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+        return (
+            f"Hello {display_name}, welcome to DELTAPLANO. "
+            "I am ready to help you with plant diagnostics, sensors, reports, and agronomic guidance. "
+            "Open the menu and tell me how I can help."
+        )
     return (
         f"Ciao {display_name}, benvenuto in DELTAPLANO. "
         "Sono pronto ad aiutarti con diagnosi delle piante, sensori, report e consigli agronomici. "
@@ -1242,6 +1363,8 @@ def _build_welcome_voice_caption(
     context: Optional[ContextTypes.DEFAULT_TYPE] = None,
 ) -> str:
     display_name = _welcome_display_name(update)
+    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+        return f"Welcome, {display_name}."
     return f"Benvenuto, {display_name}."
 
 
@@ -1306,7 +1429,11 @@ async def _send_diagnosis_paginated(
     e viene aggiunta una nota di sintesi.
     """
     MAX_DIAG_CHARS = 3500
-    closing = "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂"
+    closing = _ui_text(
+        context,
+        "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂",
+        "Can I help you with anything else? I am here for you 🙂",
+    )
 
     # Pulisci eventuale coda residua di vecchie versioni paginate
     context.user_data.pop("diag_pending_chunks", None)
@@ -1318,7 +1445,11 @@ async def _send_diagnosis_paginated(
         cutoff = text.rfind("\n", 0, MAX_DIAG_CHARS)
         if cutoff == -1:
             cutoff = MAX_DIAG_CHARS
-        text = text[:cutoff].rstrip() + "\n\n_(sintesi — testo completo disponibile su richiesta)_"
+        text = text[:cutoff].rstrip() + "\n\n" + _ui_text(
+            context,
+            "_(sintesi — testo completo disponibile su richiesta)_",
+            "_(summary — full text available on request)_",
+        )
 
     await _send(update, text, parse_mode=parse_mode)
     await _send(update, closing)
@@ -2100,15 +2231,19 @@ def _build_nasa_sar_scientific_interpretation(
     return "\n".join(lines)
 
 
-def _nasa_sar_reply_keyboard() -> ReplyKeyboardMarkup:
+def _nasa_sar_reply_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton("🛰️ Apri NASA-ISRO/SAR GPS", web_app=WebAppInfo(url=_nasa_sar_webapp_url()))],
-            [KeyboardButton("📍 Invia GPS manualmente", request_location=True)],
+            [KeyboardButton(_ui_text(context, "🛰️ Apri NASA-ISRO/SAR GPS", "🛰️ Open NASA-ISRO/SAR GPS"), web_app=WebAppInfo(url=_nasa_sar_webapp_url()))],
+            [KeyboardButton(_ui_text(context, "📍 Invia GPS manualmente", "📍 Send GPS manually"), request_location=True)],
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
-        input_field_placeholder="Apri il locator automatico oppure condividi manualmente la posizione.",
+        input_field_placeholder=_ui_text(
+            context,
+            "Apri il locator automatico oppure condividi manualmente la posizione.",
+            "Open the automatic locator or manually share your position.",
+        ),
     )
 
 
@@ -2382,8 +2517,12 @@ async def _run_nasa_sar_analysis(
     context.user_data["chat_seed_context"] = _build_nasa_sar_followup_context(result, interpretation)
     await _send(
         update,
-        "💬 Ora puoi chiedermi approfondimenti sulla diagnosi o altro. Usero' la sintesi SAR appena generata come contesto iniziale della prossima risposta.",
-        reply_markup=_menu_keyboard(),
+        _ui_text(
+            context,
+            "💬 Ora puoi chiedermi approfondimenti sulla diagnosi o altro. Usero' la sintesi SAR appena generata come contesto iniziale della prossima risposta.",
+            "💬 You can now ask me for deeper analysis about the diagnosis or anything else. I will use the SAR summary just generated as the initial context for the next reply.",
+        ),
+        reply_markup=_menu_keyboard(context),
     )
 
 
@@ -2391,11 +2530,18 @@ async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data["awaiting_nasa_sar_location"] = True
     await _send(
         update,
-        "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
-        "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
-        "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
-        "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard SAR con mappa, localita' e sintesi semplice basata su umidita' del suolo satellitare e meteo ufficiale Open-Meteo Archive.",
-        reply_markup=_nasa_sar_reply_keyboard(),
+        _ui_text(
+            context,
+            "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
+            "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
+            "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
+            "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard SAR con mappa, localita' e sintesi semplice basata su umidita' del suolo satellitare e meteo ufficiale Open-Meteo Archive.",
+            "🛰️ <b>NASA-ISRO/SAR ready</b>\n\n"
+            "Tap <b>Open NASA-ISRO/SAR GPS</b> to start the Telegram Mini App and detect your phone position automatically. "
+            "If your client does not support the automatic handoff, use <b>Send GPS manually</b>. "
+            "I will analyze a circular area of 50 meters and show you the SAR dashboard with map, locality, and a simple summary based on satellite soil moisture and official Open-Meteo Archive weather.",
+        ),
+        reply_markup=_nasa_sar_reply_keyboard(context),
         parse_mode="HTML",
     )
 
@@ -2415,13 +2561,28 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
     map_payload = _build_nasa_sar_map_photo_payload(lat, lon)
     if map_payload and chat:
         map_payload.seek(0)
-        await chat.send_photo(photo=map_payload, caption="\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)")
+        await chat.send_photo(
+            photo=map_payload,
+            caption=_ui_text(
+                context,
+                "\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)",
+                "\U0001F30E NASA-ISRO/SAR area of interest (50 m radius from the GPS point)",
+            ),
+        )
     # Dashboard dati e report grafico
     from bot.nasa_sar_dashboard import generate_dashboard, generate_dashboard_report_image
     dashboard = generate_dashboard(lat, lon)
     if isinstance(dashboard, dict) and "error" in dashboard:
         logger.error("Errore dashboard NASA-ISRO/SAR: %s", dashboard["error"])
-        await _send(update, f"❌ Errore dashboard NASA-ISRO/SAR: {dashboard['error']}", reply_markup=ReplyKeyboardRemove())
+        await _send(
+            update,
+            _ui_text(
+                context,
+                f"❌ Errore dashboard NASA-ISRO/SAR: {dashboard['error']}",
+                f"❌ NASA-ISRO/SAR dashboard error: {dashboard['error']}",
+            ),
+            reply_markup=ReplyKeyboardRemove(),
+        )
         return
     img = generate_dashboard_report_image(dashboard, lat, lon)
     import tempfile
@@ -2429,7 +2590,14 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
     img.save(img_path)
     if chat:
         with open(img_path, "rb") as f:
-            await chat.send_photo(photo=f, caption="\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali.")
+            await chat.send_photo(
+                photo=f,
+                caption=_ui_text(
+                    context,
+                    "\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali.",
+                    "\U0001F4CA NASA-ISRO/SAR graphic report: weekly risk and professional indicators.",
+                ),
+            )
     # Testo riepilogo
     lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n"]
     lines.append("Data | Soil | Temp | Humidity | Rain | Risk")
@@ -2458,7 +2626,11 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
     try:
         payload = json.loads(web_app_data.data)
     except Exception:
-        await _send(update, "Dati GPS automatici non validi ricevuti dalla Web App.", reply_markup=_menu_keyboard())
+        await _send(
+            update,
+            _ui_text(context, "Dati GPS automatici non validi ricevuti dalla Web App.", "Invalid automatic GPS data received from the Web App."),
+            reply_markup=_menu_keyboard(context),
+        )
         return
 
     if payload.get("type") != "nasa_sar_location":
@@ -2467,8 +2639,12 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
     if payload.get("status") == "error":
         await _send(
             update,
-            "La posizione automatica non è disponibile. Consenti l'accesso GPS sul telefono oppure usa /nasa_sar per l'invio manuale.",
-            reply_markup=_menu_keyboard(),
+            _ui_text(
+                context,
+                "La posizione automatica non è disponibile. Consenti l'accesso GPS sul telefono oppure usa /nasa_sar per l'invio manuale.",
+                "Automatic position is unavailable. Allow GPS access on the phone or use /nasa_sar for manual sending.",
+            ),
+            reply_markup=_menu_keyboard(context),
         )
         return
 
@@ -2476,7 +2652,11 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
         latitude = float(payload["latitude"])
         longitude = float(payload["longitude"])
     except (KeyError, TypeError, ValueError):
-        await _send(update, "Coordinate GPS automatiche non valide.", reply_markup=_menu_keyboard())
+        await _send(
+            update,
+            _ui_text(context, "Coordinate GPS automatiche non valide.", "Invalid automatic GPS coordinates."),
+            reply_markup=_menu_keyboard(context),
+        )
         return
 
     await _run_nasa_sar_analysis(update, context, latitude, longitude)
@@ -2612,11 +2792,11 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
 # CHAT INTELLIGENTE — "Chiedi a DELTA" (HuggingFace LLM via InferenceAPI)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _chat_exit_keyboard() -> InlineKeyboardMarkup:
+def _chat_exit_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> InlineKeyboardMarkup:
     """Tastiera con solo il pulsante di uscita dalla chat."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔴 Termina chat", callback_data=CHAT_EXIT)],
-        [InlineKeyboardButton("🗑 Reset conversazione", callback_data="CHAT_RESET")],
+        [InlineKeyboardButton(_ui_text(context, "🔴 Termina chat", "🔴 End chat"), callback_data=CHAT_EXIT)],
+        [InlineKeyboardButton(_ui_text(context, "🗑 Reset conversazione", "🗑 Reset conversation"), callback_data="CHAT_RESET")],
     ])
 
 
@@ -2646,22 +2826,33 @@ async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     model_name = status.get("hf_active_model", "N/D")
 
     if hf_ok:
-        intro = (
+        intro = _ui_text(
+            context,
             "🔵 *Chat intelligente DELTA attiva*\n\n"
             f"Modello: `{model_name}`\n\n"
             "Puoi chiedermi qualsiasi cosa su malattie delle piante, "
             "trattamenti, agronomia o interpretazione delle diagnosi.\n\n"
-            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare la chat._"
+            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare la chat._",
+            "🔵 *DELTA intelligent chat active*\n\n"
+            f"Model: `{model_name}`\n\n"
+            "You can ask me anything about plant diseases, "
+            "treatments, agronomy, or diagnosis interpretation.\n\n"
+            "_Write your message. Use_ /chiudi _to end the chat._",
         )
     else:
-        intro = (
+        intro = _ui_text(
+            context,
             "🟡 *Chat DELTA non disponibile*\n\n"
             "Il backend HuggingFace non è disponibile.\n"
             "Verifica `HF_API_TOKEN` e `HF_MODEL_NAME` in `.env`.\n\n"
-            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare._"
+            "_Scrivi il tuo messaggio. Usa_ /chiudi _per terminare._",
+            "🟡 *DELTA chat unavailable*\n\n"
+            "The HuggingFace backend is unavailable.\n"
+            "Check `HF_API_TOKEN` and `HF_MODEL_NAME` in `.env`.\n\n"
+            "_Write your message. Use_ /chiudi _to end the chat._",
         )
 
-    await _send(update, intro, reply_markup=_chat_exit_keyboard(), parse_mode="Markdown")
+    await _send(update, intro, reply_markup=_chat_exit_keyboard(context), parse_mode="Markdown")
     return STATE_CHAT_WAITING
 
 
@@ -2686,11 +2877,19 @@ async def chat_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return STATE_CHAT_WAITING
     query = update.callback_query
     if query:
-        await _answer_callback_query_safe(query, "Conversazione resettata ✓")
+        await _answer_callback_query_safe(query, _ui_text(context, "Conversazione resettata ✓", "Conversation reset ✓"))
     user_id = str(update.effective_user.id if update.effective_user else "0")
     engine = _get_chat_engine(context)
     engine.reset(user_id)
-    await _send(update, "🗑 Memoria conversazione azzerata. Scrivi il tuo prossimo messaggio.", reply_markup=_chat_exit_keyboard())
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "🗑 Memoria conversazione azzerata. Scrivi il tuo prossimo messaggio.",
+            "🗑 Conversation memory cleared. Write your next message.",
+        ),
+        reply_markup=_chat_exit_keyboard(context),
+    )
     return STATE_CHAT_WAITING
 
 
@@ -2701,8 +2900,16 @@ async def chat_exit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _clear_chat_state(context)
     query = update.callback_query
     if query:
-        await _answer_callback_query_safe(query, "Chat terminata")
-    await _send(update, "Chat terminata. Usa /menu per tornare al menu principale.", reply_markup=_menu_keyboard())
+        await _answer_callback_query_safe(query, _ui_text(context, "Chat terminata", "Chat closed"))
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "Chat terminata. Usa /menu per tornare al menu principale.",
+            "Chat closed. Use /menu to return to the main menu.",
+        ),
+        reply_markup=_menu_keyboard(context),
+    )
     return ConversationHandler.END
 
 
@@ -2723,13 +2930,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Telegram /start ricevuto da user_id=%s", update.effective_user.id if update.effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
-    intro = (
-        "Benvenuto in @DELTAPLANO_bot.\n"
-        "Qui puoi interagire con DELTA Plant da Telegram per avviare diagnosi, "
-        "consultare report e leggere i dati sensori.\n"
-        "Usa /menu per vedere le azioni disponibili."
-    )
-    await _send(update, intro, reply_markup=_menu_keyboard())
+    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
+        intro = (
+            "Welcome to @DELTAPLANO_bot.\n"
+            "Here you can interact with DELTA Plant from Telegram to start diagnoses, "
+            "review reports, and read sensor data.\n"
+            "Use /menu to view the available actions."
+        )
+    else:
+        intro = (
+            "Benvenuto in @DELTAPLANO_bot.\n"
+            "Qui puoi interagire con DELTA Plant da Telegram per avviare diagnosi, "
+            "consultare report e leggere i dati sensori.\n"
+            "Usa /menu per vedere le azioni disponibili."
+        )
+    await _send(update, intro, reply_markup=_menu_keyboard(context))
     await _send_personalized_welcome_voice(update, context)
     if was_chat_active:
         return ConversationHandler.END
@@ -2742,7 +2957,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Telegram /menu ricevuto da user_id=%s", effective_user.id if effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
     _clear_chat_state(context)
-    await _send(update, "Menu principale:", reply_markup=_menu_keyboard())
+    await _send(update, _ui_text(context, "Menu principale:", "Main menu:"), reply_markup=_menu_keyboard(context))
     if was_chat_active:
         return ConversationHandler.END
 
@@ -2756,27 +2971,30 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         resp = await _api_request("GET", "/diagnoses", params={"limit": 5})
         if resp is None:
-            await _send(update, "Errore sistema: API non raggiungibile.")
+            await _send(update, _ui_text(context, "Errore sistema: API non raggiungibile.", "System error: API unreachable."))
             return
         if resp.status_code != 200:
             logger.warning("API /diagnoses errore %s: %s", resp.status_code, resp.text[:200])
-            await _send(update, "Errore sistema.")
+            await _send(update, _ui_text(context, "Errore sistema.", "System error."))
             return
         try:
             records = resp.json()
         except ValueError:
-            await _send(update, "Risposta API non valida.")
+            await _send(update, _ui_text(context, "Risposta API non valida.", "Invalid API response."))
             return
     if not records:
-        await _send(update, "Nessuna diagnosi disponibile.")
+        await _send(update, _ui_text(context, "Nessuna diagnosi disponibile.", "No diagnoses available."))
         return
-    lines = ["Ultime diagnosi:"]
+    lines = [_ui_text(context, "Ultime diagnosi:", "Latest diagnoses:")]
     for rec in records:
         rec_id = rec.get("id", "N/D")
         ts = rec.get("timestamp", "N/D")
         cls = rec.get("ai_class", "N/D")
         risk = rec.get("overall_risk", "N/D")
-        lines.append(f"• #{rec_id} | {ts} | {cls} | rischio {risk}")
+        lines.append(
+            f"• #{rec_id} | {ts} | {cls} | "
+            f"{_ui_text(context, 'rischio', 'risk')} {risk}"
+        )
     await _send(update, "\n".join(lines))
 
 
@@ -2784,37 +3002,44 @@ async def detail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     if not context.args:
-        await _send(update, "Uso: /dettaglio <id>")
+        await _send(update, _ui_text(context, "Uso: /dettaglio <id>", "Usage: /dettaglio <id>"))
         return
     try:
         record_id = int(context.args[0])
     except ValueError:
-        await _send(update, "ID non valido.")
+        await _send(update, _ui_text(context, "ID non valido.", "Invalid ID."))
         return
     agent = _get_agent(context)
     if agent:
         record = agent.database.get_by_id(record_id)
         if record is None:
-            await _send(update, "Record non trovato.")
+            await _send(update, _ui_text(context, "Record non trovato.", "Record not found."))
             return
     else:
         resp = await _api_request("GET", f"/diagnoses/{record_id}")
         if resp is None:
-            await _send(update, "Errore sistema: API non raggiungibile.")
+            await _send(update, _ui_text(context, "Errore sistema: API non raggiungibile.", "System error: API unreachable."))
             return
         if resp.status_code != 200:
-            await _send(update, "Record non trovato.")
+            await _send(update, _ui_text(context, "Record non trovato.", "Record not found."))
             return
         try:
             record = resp.json()
         except ValueError:
-            await _send(update, "Risposta API non valida.")
+            await _send(update, _ui_text(context, "Risposta API non valida.", "Invalid API response."))
             return
     summary = record.get("summary", "N/D")
     cls = record.get("ai_class", "N/D")
     risk = record.get("overall_risk", "N/D")
     ts = record.get("timestamp", "N/D")
-    await _send(update, f"Dettaglio #{record_id}\nData: {ts}\nClasse: {cls}\nRischio: {risk}\n{summary}")
+    await _send(
+        update,
+        _ui_text(
+            context,
+            f"Dettaglio #{record_id}\nData: {ts}\nClasse: {cls}\nRischio: {risk}\n{summary}",
+            f"Detail #{record_id}\nDate: {ts}\nClass: {cls}\nRisk: {risk}\n{summary}",
+        ),
+    )
 
 
 async def sensors(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2826,17 +3051,17 @@ async def sensors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         resp = await _api_request("GET", "/sensors")
         if resp is None:
-            await _send(update, "Errore sistema: API non raggiungibile.")
+            await _send(update, _ui_text(context, "Errore sistema: API non raggiungibile.", "System error: API unreachable."))
             return
         if resp.status_code != 200:
-            await _send(update, "Errore sistema.")
+            await _send(update, _ui_text(context, "Errore sistema.", "System error."))
             return
         try:
             data = resp.json()
         except ValueError:
-            await _send(update, "Risposta API non valida.")
+            await _send(update, _ui_text(context, "Risposta API non valida.", "Invalid API response."))
             return
-    lines = ["Dati sensori:"]
+    lines = [_ui_text(context, "Dati sensori:", "Sensor data:")]
     for key in [
         "temperature_c", "humidity_pct", "pressure_hpa",
         "light_lux", "co2_ppm", "ph", "ec_ms_cm",
@@ -2862,15 +3087,15 @@ async def health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         resp = await _api_request("GET", "/health")
         if resp is None:
-            await _send(update, "Errore sistema: API non raggiungibile.")
+            await _send(update, _ui_text(context, "Errore sistema: API non raggiungibile.", "System error: API unreachable."))
             return
         if resp.status_code != 200:
-            await _send(update, "Errore sistema.")
+            await _send(update, _ui_text(context, "Errore sistema.", "System error."))
             return
         try:
             data = resp.json()
         except ValueError:
-            await _send(update, "Risposta API non valida.")
+            await _send(update, _ui_text(context, "Risposta API non valida.", "Invalid API response."))
             return
         await _send(update, f"Health: {data}")
 
@@ -3123,10 +3348,10 @@ async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["diagnosis_active"] = True
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📷 Invia foto", callback_data=DIAG_IMAGE_UPLOAD)],
-        [InlineKeyboardButton(" Camera locale", callback_data=DIAG_IMAGE_CAMERA)],
+        [InlineKeyboardButton(_ui_text(context, "📷 Invia foto", "📷 Send photo"), callback_data=DIAG_IMAGE_UPLOAD)],
+        [InlineKeyboardButton(_ui_text(context, " Camera locale", " Camera device"), callback_data=DIAG_IMAGE_CAMERA)],
     ])
-    await _send(update, "Diagnosi: scegli la fonte immagine.", reply_markup=keyboard)
+    await _send(update, _ui_text(context, "Diagnosi: scegli la fonte immagine.", "Diagnosis: choose the image source."), reply_markup=keyboard)
     return STATE_DIAG_IMAGE_SOURCE
 
 
@@ -3138,13 +3363,13 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
         return ConversationHandler.END
     await _answer_callback_query_safe(query)
     if query.data == DIAG_IMAGE_UPLOAD:
-        await _send(update, "Invia una foto (o un file immagine) per la diagnosi.")
+        await _send(update, _ui_text(context, "Invia una foto (o un file immagine) per la diagnosi.", "Send a photo, or an image file, for the diagnosis."))
         return STATE_DIAG_WAIT_PHOTO
     if query.data == DIAG_IMAGE_LAST:
         latest = _get_latest_input_image()
         if not latest:
             _clear_diagnosis_state(context)
-            await _send(update, "Nessuna immagine in input_images. Usa 'Invia foto'.")
+            await _send(update, _ui_text(context, "Nessuna immagine in input_images. Usa 'Invia foto'.", "No image found in input_images. Use 'Send photo'."))
             return ConversationHandler.END
         context.user_data["diag_image_path"] = str(latest)
         return await _ask_user_description(update, context)
@@ -3152,17 +3377,17 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
         agent = _get_agent(context)
         if not agent or agent.camera._backend is None:
             _clear_diagnosis_state(context)
-            await _send(update, "Camera locale non disponibile. Usa 'Invia foto'.")
+            await _send(update, _ui_text(context, "Camera locale non disponibile. Usa 'Invia foto'.", "Local camera unavailable. Use 'Send photo'."))
             return ConversationHandler.END
         context.user_data["diag_image_path"] = ""
         return await _ask_user_description(update, context)
     _clear_diagnosis_state(context)
-    await _send(update, "Scelta non valida.")
+    await _send(update, _ui_text(context, "Scelta non valida.", "Invalid choice."))
     return ConversationHandler.END
 
 
 async def diag_expect_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send(update, "Per favore invia una foto o un file immagine.")
+    await _send(update, _ui_text(context, "Per favore invia una foto o un file immagine.", "Please send a photo or an image file."))
     return STATE_DIAG_WAIT_PHOTO
 
 
@@ -3171,7 +3396,7 @@ async def receive_diag_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
     saved = await _download_telegram_image(update)
     if not saved:
-        await _send(update, "Immagine non valida.")
+        await _send(update, _ui_text(context, "Immagine non valida.", "Invalid image."))
         return STATE_DIAG_WAIT_PHOTO
     context.user_data["diag_image_path"] = str(saved)
     return await _ask_user_description(update, context)
@@ -3181,9 +3406,11 @@ async def _ask_user_description(update: Update, context: ContextTypes.DEFAULT_TY
     """Chiede all'utente il tipo di pianta e l'anomalia riscontrata."""
     await _send(
         update,
-        "Di che pianta si tratta? Descrivimi l'anomalia che hai riscontrato, "
-        "sarò ben lieto di aiutarti 😊\n\n"
-        "_Esempio: 'Pomodoro con macchie gialle sulle foglie e bordi secchi'_",
+        _ui_text(
+            context,
+            "Di che pianta si tratta? Descrivimi l'anomalia che hai riscontrato, sarò ben lieto di aiutarti 😊\n\n_Esempio: 'Pomodoro con macchie gialle sulle foglie e bordi secchi'_",
+            "What plant is it? Describe the anomaly you noticed and I will be glad to help 😊\n\n_Example: 'Tomato with yellow spots on the leaves and dry edges'_",
+        ),
         parse_mode="Markdown",
     )
     return STATE_DIAG_USER_DESCRIPTION
@@ -3194,23 +3421,23 @@ async def receive_user_description(update: Update, context: ContextTypes.DEFAULT
     if not await _guard(update):
         return ConversationHandler.END
     if not update.message or not update.message.text:
-        await _send(update, "Per favore descrivi la pianta e l'anomalia osservata.")
+        await _send(update, _ui_text(context, "Per favore descrivi la pianta e l'anomalia osservata.", "Please describe the plant and the anomaly you observed."))
         return STATE_DIAG_USER_DESCRIPTION
     description = update.message.text.strip()
     if len(description) < 3:
-        await _send(update, "Descrizione troppo breve. Aggiungi dettagli sulla pianta e sull'anomalia.")
+        await _send(update, _ui_text(context, "Descrizione troppo breve. Aggiungi dettagli sulla pianta e sull'anomalia.", "Description too short. Add more details about the plant and the anomaly."))
         return STATE_DIAG_USER_DESCRIPTION
     context.user_data["diag_user_description"] = description
-    await _send(update, "Grazie! Ora acquisisco i dati ambientali... 🌱")
+    await _send(update, _ui_text(context, "Grazie! Ora acquisisco i dati ambientali... 🌱", "Thanks! I am now acquiring environmental data... 🌱"))
     return await _ask_sensor_mode(update, context)
 
 
 async def _ask_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Usa sensori attuali", callback_data=DIAG_SENSOR_AUTO)],
-        [InlineKeyboardButton("Inserimento manuale", callback_data=DIAG_SENSOR_MANUAL)],
+        [InlineKeyboardButton(_ui_text(context, "Usa sensori attuali", "Use current sensors"), callback_data=DIAG_SENSOR_AUTO)],
+        [InlineKeyboardButton(_ui_text(context, "Inserimento manuale", "Manual entry"), callback_data=DIAG_SENSOR_MANUAL)],
     ])
-    await _send(update, "Come vuoi acquisire i dati sensore?", reply_markup=keyboard)
+    await _send(update, _ui_text(context, "Come vuoi acquisire i dati sensore?", "How do you want to acquire the sensor data?"), reply_markup=keyboard)
     return STATE_DIAG_SENSOR_MODE
 
 
@@ -3226,9 +3453,9 @@ async def choose_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if query.data == DIAG_SENSOR_MANUAL:
         context.user_data["sensor_data"] = {"source": "telegram_manual"}
         context.user_data["sensor_index"] = 0
-        await _send(update, f"Inserisci {SENSOR_FIELDS[0][1]} (digita x per saltare):")
+        await _send(update, _ui_text(context, f"Inserisci {SENSOR_FIELDS[0][1]} (digita x per saltare):", f"Enter {SENSOR_FIELDS[0][1]} (type x to skip):"))
         return STATE_DIAG_TEMP
-    await _send(update, "Scelta non valida.")
+    await _send(update, _ui_text(context, "Scelta non valida.", "Invalid choice."))
     _clear_diagnosis_state(context)
     return ConversationHandler.END
 
@@ -3247,13 +3474,13 @@ async def manual_sensor_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     if value_raw and not is_skip:
         parsed = _parse_float(value_raw)
         if parsed is None:
-            await _send(update, f"Valore non valido. Inserisci {label} (oppure digita x per saltare).")
+            await _send(update, _ui_text(context, f"Valore non valido. Inserisci {label} (oppure digita x per saltare).", f"Invalid value. Enter {label}, or type x to skip."))
             return STATE_DIAG_TEMP
         context.user_data["sensor_data"][key] = parsed
     idx += 1
     context.user_data["sensor_index"] = idx
     if idx < len(SENSOR_FIELDS):
-        await _send(update, f"Inserisci {SENSOR_FIELDS[idx][1]} (digita x per saltare):")
+        await _send(update, _ui_text(context, f"Inserisci {SENSOR_FIELDS[idx][1]} (digita x per saltare):", f"Enter {SENSOR_FIELDS[idx][1]} (type x to skip):"))
         return STATE_DIAG_TEMP
     sensor_data = context.user_data.get("sensor_data", {})
     return await _run_diagnosis(update, context, sensor_data)
@@ -3274,8 +3501,17 @@ _PHOTO_REQUEST_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+_ENGLISH_DIAGNOSIS_REPLACEMENTS = (
+    ("INTERVENTO URGENTE RICHIESTO", "URGENT ACTION REQUIRED"),
+    ("Intervento urgente richiesto", "Urgent action required"),
+    ("Malattia rilevata da visione AI", "Disease detected by AI vision"),
+)
 
-def _sanitize_diagnosis_opinion(opinion: str) -> str:
+
+def _sanitize_diagnosis_opinion(
+    opinion: str,
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
     """Riduce aperture metalinguistiche poco utili e rimuove richieste di foto."""
     text = (opinion or "").strip()
     if not text:
@@ -3307,6 +3543,10 @@ def _sanitize_diagnosis_opinion(opinion: str) -> str:
     if cleaned:
         text = " ".join(cleaned).strip()
 
+    if response_language == VOICE_LANGUAGE_EN:
+        for italian_text, english_text in _ENGLISH_DIAGNOSIS_REPLACEMENTS:
+            text = text.replace(italian_text, english_text)
+
     return text
 
 
@@ -3319,7 +3559,11 @@ def _strip_plantvillage_class_mentions(text: str) -> str:
     return cleaned
 
 
-def _build_diagnosis_prompt(record: Dict[str, Any], user_description: str = "") -> str:
+def _build_diagnosis_prompt(
+    record: Dict[str, Any],
+    user_description: str = "",
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
     """Costruisce il prompt per un unico messaggio AI di risultato diagnosi."""
     dx = record.get("diagnosis", {})
     ai = record.get("ai_result", {})
@@ -3349,6 +3593,52 @@ def _build_diagnosis_prompt(record: Dict[str, Any], user_description: str = "") 
         class_note = (
             f"\nNOTA: la classe PlantVillage originale ({ai_class}) è stata corretta "
             f"in '{corrected_class}' sulla base della descrizione dell'utente.\n"
+        )
+
+    if response_language == VOICE_LANGUAGE_EN:
+        anomaly_text = ", ".join(anomalies) if anomalies else "none"
+        class_note = ""
+        if corrected_class and corrected_class != ai_class:
+            class_note = (
+                f"\nNOTE: the original PlantVillage class ({ai_class}) was corrected "
+                f"to '{corrected_class}' based on the operator description.\n"
+            )
+        description_block = ""
+        description_constraints = ""
+        if user_description:
+            description_block = (
+                f"\nOPERATOR DESCRIPTION (primary source to prioritize):\n"
+                f"  \"{user_description}\"\n"
+            )
+            description_constraints = (
+                "- The operator description is the primary source: use the symptoms, affected part, and context described by the operator to personalize every block of the reply. Do not treat it as a marginal note.\n"
+                f"- In block 1 (Technical outcome), explicitly explain why the detected PlantVillage class is consistent, or only partially consistent, with '{user_description}'.\n"
+                "- If the description mentions specific symptoms, such as color, affected zone, or progression, cite them and connect them to the identified pathology.\n"
+            )
+
+        return (
+            "Transform the following report into a SINGLE final message for the user, in English, with a professional expert agronomist tone, detailed but clear.\n\n"
+            f"RAW DELTA DIAGNOSIS REPORT:\n{raw_report}\n"
+            f"{description_block}"
+            f"{class_note}\n"
+            "Mandatory constraints:\n"
+            "- Do not use metalinguistic phrasing, for example 'It seems you are asking'.\n"
+            "- Do not repeat the report title.\n"
+            "- If the raw report contains Italian fragments, translate them: the final user-facing answer must be fully in English, except for PlantVillage class names or fixed technical labels.\n"
+            "- Explicitly cite the confirmed PlantVillage class and explain why it is consistent with the operator description.\n"
+            "- Explicitly include the Grover Quantum Oracle risk analysis: explain in a simple operational way what it represents, namely a tool that amplifies the most significant plant-risk signals, with QRS from 0 meaning no risk to 1 meaning maximum risk, then report QRS, level, dominant event, and amplification.\n"
+            f"{description_constraints}"
+            "- Always analyze and comment on the environmental sensor data available in the report: connect temperature, humidity, pH, EC, CO₂, and light to the detected pathological condition.\n"
+            "- Structure the answer in 5 blocks: 1) Technical outcome, 2) Short differential diagnosis, 3) Immediate actions (0-24h), 4) Short-term actions (2-7 days), 5) Monitoring and prevention.\n"
+            "- Provide concrete and verifiable operational guidance.\n"
+            "- When appropriate, mention integrated pest-management and crop hygiene practices.\n"
+            "- Do not ask the user to send photos or take additional pictures: image acquisition is already complete.\n"
+            "- Keep a technical, professional tone without being verbose.\n"
+            "- Stay consistent with: "
+            f"class={corrected_class or ai_class}, confidence={ai_conf*100:.1f}%, "
+            f"status={status}, risk={risk}, "
+            f"QRS={qrs:.4f}, dominant_event={qdom}, anomalies={anomaly_text}, "
+            f"recommendations={rec_text if rec_text else 'none'}."
         )
 
     description_block = ""
@@ -3634,24 +3924,31 @@ async def _start_followup_questioning(
     if await _operator_says_healthy(engine, user_description):
         await _send(
             update,
-            "✅ <b>L'operatore descrive la pianta in buona salute.</b>\n"
-            "Non avvio il flusso diagnostico. Elaboro una valutazione di benessere... 🌿",
+            _ui_text(
+                context,
+                "✅ <b>L'operatore descrive la pianta in buona salute.</b>\nNon avvio il flusso diagnostico. Elaboro una valutazione di benessere... 🌿",
+                "✅ <b>The operator describes the plant as healthy.</b>\nI will not start the diagnostic flow. I am preparing a wellness assessment... 🌿",
+            ),
             parse_mode="HTML",
         )
         await _send_conversational_diagnosis(update, context)
         return ConversationHandler.END
 
     if mode == "class_mismatch":
-        intro = (
-            "⚠️ <b>Nessuna corrispondenza piena tra classe AI e quadro descritto.</b>\n"
-            "Procedo con analisi solo AI tramite interazione Operatore/AI.\n"
-            f"Ti farò al massimo {MAX_FOLLOWUP_QUESTIONS} domande di approfondimento. 🌿"
+        intro = _ui_text(
+            context,
+            "⚠️ <b>Nessuna corrispondenza piena tra classe AI e quadro descritto.</b>\nProcedo con analisi solo AI tramite interazione Operatore/AI.\n"
+            f"Ti farò al massimo {MAX_FOLLOWUP_QUESTIONS} domande di approfondimento. 🌿",
+            "⚠️ <b>No full match between the AI class and the described condition.</b>\nI will proceed with AI-only analysis through Operator/AI interaction.\n"
+            f"I will ask at most {MAX_FOLLOWUP_QUESTIONS} follow-up questions. 🌿",
         )
     else:
-        intro = (
-            "⚠️ <b>Pianta non riconosciuta nel database.</b>\n"
-            "Procederò comunque con una diagnosi basata sulla tua descrizione.\n"
-            f"Ti farò al massimo {MAX_FOLLOWUP_QUESTIONS} domande di approfondimento. 🌿"
+        intro = _ui_text(
+            context,
+            "⚠️ <b>Pianta non riconosciuta nel database.</b>\nProcederò comunque con una diagnosi basata sulla tua descrizione.\n"
+            f"Ti farò al massimo {MAX_FOLLOWUP_QUESTIONS} domande di approfondimento. 🌿",
+            "⚠️ <b>Plant not recognized in the database.</b>\nI will still proceed with a diagnosis based on your description.\n"
+            f"I will ask at most {MAX_FOLLOWUP_QUESTIONS} follow-up questions. 🌿",
         )
 
     await _send(update, intro, parse_mode="HTML")
@@ -3661,7 +3958,7 @@ async def _start_followup_questioning(
         engine, user_id, user_description, [], sensor_context=_sensor_ctx
     )
     if should_stop or not question:
-        await _send(update, "Ho già abbastanza informazioni. Elaboro la diagnosi... 🔬")
+        await _send(update, _ui_text(context, "Ho già abbastanza informazioni. Elaboro la diagnosi... 🔬", "I already have enough information. I am processing the diagnosis... 🔬"))
         await _send_conversational_diagnosis(update, context)
         return ConversationHandler.END
 
@@ -3670,7 +3967,11 @@ async def _start_followup_questioning(
     context.user_data["diag_qa_active"] = True
     await _send(
         update,
-        f"❓ <b>Domanda 1/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+        _ui_text(
+            context,
+            f"❓ <b>Domanda 1/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+            f"❓ <b>Question 1/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+        ),
         parse_mode="HTML",
     )
     return STATE_DIAG_FOLLOWUP
@@ -3685,7 +3986,7 @@ async def receive_followup_answer(update: Update, context: ContextTypes.DEFAULT_
 
     answer = (update.message.text or "").strip()
     if not answer:
-        await _send(update, "Non ho ricevuto una risposta. Riprova.")
+        await _send(update, _ui_text(context, "Non ho ricevuto una risposta. Riprova.", "I did not receive an answer. Try again."))
         return STATE_DIAG_FOLLOWUP
 
     qa_pairs = context.user_data.get("diag_followup_qa", [])
@@ -3697,12 +3998,12 @@ async def receive_followup_answer(update: Update, context: ContextTypes.DEFAULT_
 
     if count >= MAX_FOLLOWUP_QUESTIONS:
         context.user_data["diag_qa_active"] = False
-        await _send(update, "✅ Ho raccolto tutte le informazioni necessarie. Elaboro la diagnosi... 🔬")
+        await _send(update, _ui_text(context, "✅ Ho raccolto tutte le informazioni necessarie. Elaboro la diagnosi... 🔬", "✅ I collected all the necessary information. I am processing the diagnosis... 🔬"))
         await _send_conversational_diagnosis(update, context)
         return ConversationHandler.END
 
     # Conferma ricezione risposta e segnala che si sta elaborando la domanda successiva
-    await _send(update, f"📝 <i>Risposta {count} registrata.</i>", parse_mode="HTML")
+    await _send(update, _ui_text(context, f"📝 <i>Risposta {count} registrata.</i>", f"📝 <i>Answer {count} recorded.</i>"), parse_mode="HTML")
     try:
         await update.effective_chat.send_action("typing")
     except Exception:
@@ -3718,7 +4019,7 @@ async def receive_followup_answer(update: Update, context: ContextTypes.DEFAULT_
     )
     if should_stop or not question:
         context.user_data["diag_qa_active"] = False
-        await _send(update, "✅ Ho raccolto tutte le informazioni necessarie. Elaboro la diagnosi... 🔬")
+        await _send(update, _ui_text(context, "✅ Ho raccolto tutte le informazioni necessarie. Elaboro la diagnosi... 🔬", "✅ I collected all the necessary information. I am processing the diagnosis... 🔬"))
         await _send_conversational_diagnosis(update, context)
         return ConversationHandler.END
 
@@ -3727,7 +4028,11 @@ async def receive_followup_answer(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["diag_followup_last_question"] = question
     await _send(
         update,
-        f"❓ <b>Domanda {new_count}/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+        _ui_text(
+            context,
+            f"❓ <b>Domanda {new_count}/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+            f"❓ <b>Question {new_count}/{MAX_FOLLOWUP_QUESTIONS}:</b>\n{question}",
+        ),
         parse_mode="HTML",
     )
     return STATE_DIAG_FOLLOWUP
@@ -3753,19 +4058,39 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
 
     sensor_text = _format_sensor_text(sensor_data)
     operator_healthy = await _operator_says_healthy(engine, user_description)
+    english_ui = _ui_language(context) == VOICE_LANGUAGE_EN
 
     # Vincolo salute: se l'operatore ha dichiarato la pianta sana, il sistema
     # non deve formulare diagnosi di malattia ma una valutazione di benessere.
     health_constraint = (
-        "\n⚠️ VINCOLO CRITICO: l'operatore ha dichiarato esplicitamente la pianta in buona salute. "
-        "NON formulare diagnosi di malattie o patologie. "
-        "Produci una valutazione dello stato di salute: conferma il benessere osservato, "
-        "indica eventuali fattori di rischio ambientale da monitorare preventivamente "
-        "e suggerisci buone pratiche colturali per mantenere la pianta in salute."
+        "\n⚠️ CRITICAL CONSTRAINT: the operator explicitly declared the plant healthy. DO NOT formulate a disease or pathology diagnosis. Produce a health assessment: confirm the observed wellness, point out any environmental risk factors to monitor proactively, and suggest good agronomic practices to keep the plant healthy."
+        if operator_healthy and english_ui else
+        "\n⚠️ VINCOLO CRITICO: l'operatore ha dichiarato esplicitamente la pianta in buona salute. NON formulare diagnosi di malattie o patologie. Produci una valutazione dello stato di salute: conferma il benessere osservato, indica eventuali fattori di rischio ambientale da monitorare preventivamente e suggerisci buone pratiche colturali per mantenere la pianta in salute."
         if operator_healthy else ""
     )
 
-    if followup_mode == "class_mismatch":
+    if followup_mode == "class_mismatch" and english_ui:
+        prompt = (
+            "You are an expert agronomist. There is a mismatch between the initial AI class and the condition described by the operator.\n"
+            "You must produce an assessment ONLY through Operator/AI interaction, namely the description plus follow-up answers, without using PlantVillage classes in the final answer.\n"
+            f"Initial user description: '{user_description}'\n"
+            + (f"\nFollow-up questions and answers:{qa_text}" if qa_text else "")
+            + sensor_text
+            + health_constraint
+            + "\n\nProvide a professional assessment in English structured in 5 blocks:\n"
+            "1) General condition detected, health or pathology according to the operator description\n"
+            "2) Differential diagnosis or risk factors, only if the plant shows symptoms\n"
+            "3) Immediate actions, 0 to 24 hours\n"
+            "4) Short-term actions, 2 to 7 days\n"
+            "5) Monitoring and prevention\n"
+            "Mandatory constraints:\n"
+            "- Do not cite any PlantVillage class or equivalent class name.\n"
+            "- Do not mention classification labels, class codes, or similarity comparisons.\n"
+            "- Always respect the operator statement about the plant status.\n"
+            "- If environmental data are present, comment on them explicitly in the assessment.\n"
+            "- Indicate uncertainty when needed and recommend physical agronomic confirmation when appropriate."
+        )
+    elif followup_mode == "class_mismatch":
         prompt = (
             "Sei un agronomo esperto. C'è mismatch tra classe AI iniziale e quadro descritto dall'operatore.\n"
             "Devi produrre una valutazione SOLO tramite interazione Operatore/AI (descrizione + follow-up), senza usare classi PlantVillage.\n"
@@ -3785,6 +4110,23 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
             "- Rispetta sempre la dichiarazione dell'operatore sullo stato della pianta.\n"
             "- Se sono presenti dati ambientali, commentali esplicitamente nella valutazione.\n"
             "- Indica il grado di incertezza quando necessario e raccomanda conferma agronomica fisica se necessario."
+        )
+    elif english_ui:
+        prompt = (
+            "You are an expert agronomist. The AI model did not recognize the plant from the database.\n"
+            f"Initial user description: '{user_description}'\n"
+            + (f"\nFollow-up questions and answers:{qa_text}" if qa_text else "")
+            + sensor_text
+            + health_constraint
+            + "\n\nProvide a professional assessment in English structured in 5 blocks:\n"
+            "1) General condition detected, health or pathology according to the operator description\n"
+            "2) Differential diagnosis or risk factors, only if the plant shows symptoms\n"
+            "3) Immediate actions, 0 to 24 hours\n"
+            "4) Short-term actions, 2 to 7 days\n"
+            "5) Monitoring and prevention\n"
+            "- Always respect the operator statement about the plant status.\n"
+            "- If environmental data are present, comment on them explicitly and relate them to the described condition.\n"
+            "- Indicate uncertainty where needed and recommend confirmation by a physical agronomist when appropriate."
         )
     else:
         prompt = (
@@ -3806,17 +4148,17 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         )
 
     def _ask():
-        return engine.chat_internal(prompt)
+        return engine.chat_internal(prompt, response_language=_ui_language(context))
 
     try:
         opinion = await asyncio.to_thread(_ask)
     except Exception as exc:
         logger.warning("Errore diagnosi conversazionale: %s", exc)
         _clear_diagnosis_state(context)
-        await _send(update, "❌ Errore durante la diagnosi conversazionale.")
+        await _send(update, _ui_text(context, "❌ Errore durante la diagnosi conversazionale.", "❌ Error during the conversational diagnosis."))
         return
 
-    opinion = _sanitize_diagnosis_opinion(opinion)
+    opinion = _sanitize_diagnosis_opinion(opinion, response_language=_ui_language(context))
     if followup_mode == "class_mismatch":
         opinion = _strip_plantvillage_class_mentions(opinion)
 
@@ -3828,7 +4170,15 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
         sensor_data=sensor_data,
     )
 
-    title = "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>" if followup_mode == "class_mismatch" else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
+    title = (
+        "🩺 <b>INTERACTIVE DELTA Plant AI DIAGNOSIS:</b>"
+        if english_ui and followup_mode == "class_mismatch"
+        else "🩺 <b>DELTA Plant CONVERSATIONAL DIAGNOSIS:</b>"
+        if english_ui
+        else "🩺 <b>DIAGNOSI AI INTERATTIVA DELTA Plant:</b>"
+        if followup_mode == "class_mismatch"
+        else "🩺 <b>DIAGNOSI CONVERSAZIONALE DELTA Plant:</b>"
+    )
 
     try:
         await _send_diagnosis_paginated(
@@ -3866,8 +4216,16 @@ async def _send_diagnosis_visuals(
             logger.warning("Overlay explainability non trovato: %s", overlay_file)
         else:
             caption_lines = [
-                "Feedback CAM DELTA Plant: il cerchio e il target indicano dove il modello sta guardando.",
-                "Le aree piu calde della LayerCAM corrispondono alla regione che ha pesato maggiormente nella decisione.",
+                _ui_text(
+                    context,
+                    "Feedback CAM DELTA Plant: il cerchio e il target indicano dove il modello sta guardando.",
+                    "DELTA Plant CAM feedback: the circle and target show where the model is looking.",
+                ),
+                _ui_text(
+                    context,
+                    "Le aree piu calde della LayerCAM corrispondono alla regione che ha pesato maggiormente nella decisione.",
+                    "The hottest LayerCAM areas correspond to the region that weighed most in the decision.",
+                ),
             ]
             caption = "\n".join(caption_lines)
 
@@ -3885,7 +4243,11 @@ async def _send_diagnosis_visuals(
                 with original_path.open("rb") as photo_file:
                     await chat.send_photo(
                         photo=photo_file,
-                        caption="Foto originale acquisita per la diagnosi DELTA Plant (riferimento).",
+                        caption=_ui_text(
+                            context,
+                            "Foto originale acquisita per la diagnosi DELTA Plant (riferimento).",
+                            "Original photo acquired for the DELTA Plant diagnosis (reference).",
+                        ),
                     )
             except Exception as exc:
                 logger.warning("Invio foto originale Telegram fallito: %s", exc)
@@ -3933,10 +4295,10 @@ async def _send_ai_diagnosis_opinion(
             mode="class_mismatch",
         )
 
-    prompt = _build_diagnosis_prompt(record, user_description)
+    prompt = _build_diagnosis_prompt(record, user_description, response_language=_ui_language(context))
 
     def _ask():
-        return engine.chat_internal(prompt)
+        return engine.chat_internal(prompt, response_language=_ui_language(context))
 
     try:
         opinion = await asyncio.to_thread(_ask)
@@ -3945,7 +4307,7 @@ async def _send_ai_diagnosis_opinion(
         _clear_diagnosis_state(context)
         return ConversationHandler.END
 
-    opinion = _sanitize_diagnosis_opinion(opinion)
+    opinion = _sanitize_diagnosis_opinion(opinion, response_language=_ui_language(context))
     memory_request, memory_response = _build_diagnosis_memory_turn(
         user_description=user_description,
         opinion=opinion,
@@ -3958,7 +4320,7 @@ async def _send_ai_diagnosis_opinion(
         await _send_diagnosis_paginated(
             update,
             context,
-            f"🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n{opinion}",
+            f"{_ui_text(context, '🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>', '🩺 <b>DELTA Plant DIAGNOSIS RESULT:</b>')}\n\n{opinion}",
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
@@ -3982,7 +4344,7 @@ async def _run_diagnosis(
     agent = _get_agent(context)
     if not agent:
         _clear_diagnosis_state(context)
-        await _send(update, "Errore sistema: agent non disponibile.")
+        await _send(update, _ui_text(context, "Errore sistema: agent non disponibile.", "System error: agent unavailable."))
         return ConversationHandler.END
 
     image_path = context.user_data.get("diag_image_path")
@@ -3991,14 +4353,14 @@ async def _run_diagnosis(
         image = _load_image_from_path(Path(image_path))
         if image is None:
             _clear_diagnosis_state(context)
-            await _send(update, "Impossibile caricare l'immagine.")
+            await _send(update, _ui_text(context, "Impossibile caricare l'immagine.", "Unable to load the image."))
             return ConversationHandler.END
     try:
         record = await asyncio.to_thread(agent.run_diagnosis, sensor_data=sensor_data, image=image)
     except Exception as exc:
         logger.error("Errore diagnosi Telegram: %s", exc, exc_info=True)
         _clear_diagnosis_state(context)
-        await _send(update, "❌ Errore durante la diagnosi. La chat è nuovamente disponibile.")
+        await _send(update, _ui_text(context, "❌ Errore durante la diagnosi. La chat è nuovamente disponibile.", "❌ Error during the diagnosis. Chat is available again."))
         return ConversationHandler.END
 
     # Propaga sensor_snapshot a user_data per renderlo disponibile nei flussi conversazionali
@@ -4028,12 +4390,12 @@ async def start_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
     context.user_data["upload_active"] = True
-    await _send(update, "Invia una foto (o file immagine) da salvare in input_images.")
+    await _send(update, _ui_text(context, "Invia una foto, o un file immagine, da salvare in input_images.", "Send a photo, or an image file, to save into input_images."))
     return STATE_UPLOAD_WAIT_PHOTO
 
 
 async def upload_expect_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send(update, "Per favore invia una foto o un file immagine.")
+    await _send(update, _ui_text(context, "Per favore invia una foto o un file immagine.", "Please send a photo or an image file."))
     return STATE_UPLOAD_WAIT_PHOTO
 
 
@@ -4042,20 +4404,20 @@ async def receive_upload_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
     saved = await _download_telegram_image(update)
     if not saved:
-        await _send(update, "Immagine non valida.")
+        await _send(update, _ui_text(context, "Immagine non valida.", "Invalid image."))
         return STATE_UPLOAD_WAIT_PHOTO
     context.user_data.pop("upload_active", None)
-    await _send(update, f"Immagine salvata in input_images: {saved.name}")
+    await _send(update, _ui_text(context, f"Immagine salvata in input_images: {saved.name}", f"Image saved to input_images: {saved.name}"))
     return ConversationHandler.END
 
 
 async def handle_plant_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send(update, "Flusso etichettatura dismesso nella logica semplificata.")
+    await _send(update, _ui_text(context, "Flusso etichettatura dismesso nella logica semplificata.", "Labeling flow removed in the simplified logic."))
     return ConversationHandler.END
 
 
 async def handle_organ_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send(update, "Flusso etichettatura dismesso nella logica semplificata.")
+    await _send(update, _ui_text(context, "Flusso etichettatura dismesso nella logica semplificata.", "Labeling flow removed in the simplified logic."))
     return ConversationHandler.END
 
 
@@ -4073,15 +4435,15 @@ async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_
     saved = await _download_telegram_image(update)
     if not saved:
         _clear_diagnosis_state(context)
-        await _send(update, "Immagine non valida.")
+        await _send(update, _ui_text(context, "Immagine non valida.", "Invalid image."))
         return ConversationHandler.END
     context.user_data["diag_image_path"] = str(saved)
-    await _send(update, "📷 Foto ricevuta.")
+    await _send(update, _ui_text(context, "📷 Foto ricevuta.", "📷 Photo received."))
     return await _ask_user_description(update, context)
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send(update, "Flusso etichettatura dismesso nella logica semplificata.")
+    await _send(update, _ui_text(context, "Flusso etichettatura dismesso nella logica semplificata.", "Labeling flow removed in the simplified logic."))
     return ConversationHandler.END
 
 
@@ -4089,7 +4451,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
     context.user_data.clear()
-    await _send(update, "Operazione annullata.")
+    await _send(update, _ui_text(context, "Operazione annullata.", "Operation cancelled."))
     return ConversationHandler.END
 
 
@@ -4097,7 +4459,7 @@ async def timeout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update is None:
         return ConversationHandler.END
-    await _send(update, "Sessione scaduta. Usa /nuovo per ricominciare.")
+    await _send(update, _ui_text(context, "Sessione scaduta. Usa /nuovo per ricominciare.", "Session expired. Use /nuovo to start again."))
     return ConversationHandler.END
 
 
@@ -4236,13 +4598,13 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         exporter = ExcelExporter()
         owns_database = True
 
-    await _send(update, "📤 Report Excel in preparazione: finestra mobile ultimi 30 giorni.")
+    await _send(update, _ui_text(context, "📤 Report Excel in preparazione: finestra mobile ultimi 30 giorni.", "📤 Excel report in preparation: rolling 30-day window."))
 
     try:
         await asyncio.to_thread(database.prune_older_than_days, 30)
         records_db = await asyncio.to_thread(database.get_records_since_days, 30)
         if not records_db:
-            await _send(update, "Nessun dato disponibile negli ultimi 30 giorni.")
+            await _send(update, _ui_text(context, "Nessun dato disponibile negli ultimi 30 giorni.", "No data available in the last 30 days."))
             return
 
         def _convert_records():
@@ -4283,11 +4645,11 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         converted = await asyncio.to_thread(_convert_records)
         ok = await asyncio.to_thread(exporter.export_all, converted)
         if not ok:
-            await _send(update, "Errore durante l'esportazione Excel.")
+            await _send(update, _ui_text(context, "Errore durante l'esportazione Excel.", "Error during Excel export."))
             return
         from data.excel_export import EXPORT_PATH
         if not EXPORT_PATH.exists():
-            await _send(update, "File Excel non trovato.")
+            await _send(update, _ui_text(context, "File Excel non trovato.", "Excel file not found."))
             return
         with open(EXPORT_PATH, "rb") as f:
             await update.effective_chat.send_document(document=f, filename=EXPORT_PATH.name)
@@ -4300,7 +4662,7 @@ async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     from ai.preflight_validator import validate_model_artifacts
-    await _send(update, "Preflight AI in corso...")
+    await _send(update, _ui_text(context, "Preflight AI in corso...", "AI preflight in progress..."))
 
     def _run():
         return validate_model_artifacts(
@@ -4315,14 +4677,20 @@ async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report = await asyncio.to_thread(_run)
     except Exception as exc:
         logger.error("Preflight AI fallito: %s", exc, exc_info=True)
-        await _send(update, f"Preflight AI fallito: {exc}")
+        await _send(update, _ui_text(context, f"Preflight AI fallito: {exc}", f"AI preflight failed: {exc}"))
         return
-    msg = (
+    msg = _ui_text(
+        context,
         "Preflight OK ✅\n"
         f"Classe: {report['predicted_class']}\n"
         f"Confidenza: {report['confidence'] * 100:.2f}%\n"
         f"Input shape: {report['input_shape']}\n"
-        f"Output shape: {report['output_shape']}"
+        f"Output shape: {report['output_shape']}",
+        "Preflight OK ✅\n"
+        f"Class: {report['predicted_class']}\n"
+        f"Confidence: {report['confidence'] * 100:.2f}%\n"
+        f"Input shape: {report['input_shape']}\n"
+        f"Output shape: {report['output_shape']}",
     )
     await _send(update, msg)
 
@@ -4331,7 +4699,7 @@ async def license_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     license_path = Path(__file__).resolve().parent.parent / "LICENSE"
-    text = license_path.read_text(encoding="utf-8") if license_path.exists() else "Licenza non trovata."
+    text = license_path.read_text(encoding="utf-8") if license_path.exists() else _ui_text(context, "Licenza non trovata.", "License not found.")
     await _send_long(update, text)
 
 
@@ -4369,16 +4737,16 @@ def _save_academy_progress(progress: dict):
     )
 
 
-def _academy_menu_keyboard() -> InlineKeyboardMarkup:
+def _academy_menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Tutorial guidato", callback_data="ACAD_TUT_START")],
-        [InlineKeyboardButton("Sim: Identifica malattia", callback_data="ACAD_SIM_DIAG")],
-        [InlineKeyboardButton("Sim: Valuta rischio", callback_data="ACAD_SIM_RISK")],
-        [InlineKeyboardButton("Sim: Scegli intervento", callback_data="ACAD_SIM_ACTION")],
-        [InlineKeyboardButton("Quiz teorico", callback_data="ACAD_QUIZ")],
-        [InlineKeyboardButton("Progresso", callback_data="ACAD_PROGRESS")],
+        [InlineKeyboardButton(_ui_text(context, "Tutorial guidato", "Guided tutorial"), callback_data="ACAD_TUT_START")],
+        [InlineKeyboardButton(_ui_text(context, "Sim: Identifica malattia", "Sim: Identify disease"), callback_data="ACAD_SIM_DIAG")],
+        [InlineKeyboardButton(_ui_text(context, "Sim: Valuta rischio", "Sim: Assess risk"), callback_data="ACAD_SIM_RISK")],
+        [InlineKeyboardButton(_ui_text(context, "Sim: Scegli intervento", "Sim: Choose action"), callback_data="ACAD_SIM_ACTION")],
+        [InlineKeyboardButton(_ui_text(context, "Quiz teorico", "Theory quiz"), callback_data="ACAD_QUIZ")],
+        [InlineKeyboardButton(_ui_text(context, "Progresso", "Progress"), callback_data="ACAD_PROGRESS")],
         [InlineKeyboardButton("Lab MLOps", callback_data="ACAD_LAB")],
-        [InlineKeyboardButton("Esci", callback_data="ACAD_EXIT")],
+        [InlineKeyboardButton(_ui_text(context, "Esci", "Exit"), callback_data="ACAD_EXIT")],
     ])
 
 
@@ -4388,7 +4756,7 @@ async def academy_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     progress = _load_academy_progress()
     progress["sessions"] += 1
     _save_academy_progress(progress)
-    await _send(update, "DELTA Academy — scegli una modalità:", reply_markup=_academy_menu_keyboard())
+    await _send(update, _ui_text(context, "DELTA Academy — scegli una modalità:", "DELTA Academy — choose a mode:"), reply_markup=_academy_menu_keyboard(context))
 
 
 async def academy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4425,7 +4793,7 @@ async def academy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _academy_lab(update, context)
         return
     if data == "ACAD_EXIT":
-        await _send(update, "Uscita da DELTA Academy.")
+        await _send(update, _ui_text(context, "Uscita da DELTA Academy.", "Exited DELTA Academy."))
         return
 
     if data.startswith("ACAD_SIMDIAG_"):
@@ -4450,19 +4818,28 @@ TUTORIAL_STEPS = [
     ("PASSO 5 — Parametri", "Temperatura, umidità, luce, CO₂, pH, EC: restano la base per la diagnosi."),
 ]
 
+TUTORIAL_STEPS_EN = [
+    ("STEP 1 — Startup", "DELTA starts the AI model and sensor threads; if hardware is missing it uses simulated mode."),
+    ("STEP 2 — Menu", "From the menu you can start diagnosis, sensors, reports, Excel export, and Academy."),
+    ("STEP 3 — Diagnosis", "Send a photo or use input_images, then DELTA analyzes image plus sensors."),
+    ("STEP 4 — Risk", "Levels: none, low, medium, high, critical. Low confidence requires review."),
+    ("STEP 5 — Parameters", "Temperature, humidity, light, CO₂, pH, and EC remain the basis for diagnosis."),
+]
+
 
 async def _academy_send_tutorial_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
     idx = int(context.user_data.get("academy_tutorial_idx", 0))
-    if idx >= len(TUTORIAL_STEPS):
+    steps = TUTORIAL_STEPS_EN if _ui_language(context) == VOICE_LANGUAGE_EN else TUTORIAL_STEPS
+    if idx >= len(steps):
         progress = _load_academy_progress()
         progress["total_score"] += 10
         _save_academy_progress(progress)
-        await _send(update, "Tutorial completato ✅ (+10 punti)", reply_markup=_academy_menu_keyboard())
+        await _send(update, _ui_text(context, "Tutorial completato ✅ (+10 punti)", "Tutorial completed ✅ (+10 points)"), reply_markup=_academy_menu_keyboard(context))
         return
-    title, content = TUTORIAL_STEPS[idx]
+    title, content = steps[idx]
     context.user_data["academy_tutorial_idx"] = idx + 1
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Avanti", callback_data="ACAD_TUT_NEXT")],
+        [InlineKeyboardButton(_ui_text(context, "Avanti", "Next"), callback_data="ACAD_TUT_NEXT")],
     ])
     await _send(update, f"{title}\n{content}", reply_markup=keyboard)
 
@@ -4480,7 +4857,7 @@ async def _academy_sim_diag(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"{scenario['titolo']}\n"
         f"{scenario['contesto']}\n\n"
-        f"Sintomi: {scenario['sintomi_visivi']}\n"
+        f"{_ui_text(context, 'Sintomi', 'Symptoms')}: {scenario['sintomi_visivi']}\n"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(opt, callback_data=f"ACAD_SIMDIAG_{i}")]
@@ -4493,7 +4870,7 @@ async def _academy_sim_diag_answer(update: Update, context: ContextTypes.DEFAULT
     scenario = context.user_data.get("academy_scenario")
     options = context.user_data.get("academy_options", [])
     if not scenario:
-        await _send(update, "Scenario non disponibile.")
+        await _send(update, _ui_text(context, "Scenario non disponibile.", "Scenario unavailable."))
         return
     idx = int(data.split("_")[-1])
     chosen = options[idx] if idx < len(options) else None
@@ -4502,11 +4879,11 @@ async def _academy_sim_diag_answer(update: Update, context: ContextTypes.DEFAULT
     if chosen == scenario["ai_class"]:
         progress["sim_correct"] += 1
         progress["total_score"] += 15
-        msg = f"Corretto ✅ +15 punti\nDiagnosi: {scenario['diagnosi']}"
+        msg = _ui_text(context, f"Corretto ✅ +15 punti\nDiagnosi: {scenario['diagnosi']}", f"Correct ✅ +15 points\nDiagnosis: {scenario['diagnosi']}")
     else:
-        msg = f"Errato. Corretta: {scenario['ai_class']}\nDiagnosi: {scenario['diagnosi']}"
+        msg = _ui_text(context, f"Errato. Corretta: {scenario['ai_class']}\nDiagnosi: {scenario['diagnosi']}", f"Incorrect. Correct answer: {scenario['ai_class']}\nDiagnosis: {scenario['diagnosi']}")
     _save_academy_progress(progress)
-    await _send_long(update, msg, reply_markup=_academy_menu_keyboard())
+    await _send_long(update, msg, reply_markup=_academy_menu_keyboard(context))
 
 
 async def _academy_sim_risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4521,8 +4898,8 @@ async def _academy_sim_risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"{scenario['titolo']}\n"
         f"{scenario['contesto']}\n\n"
-        f"Sintomi: {scenario['sintomi_visivi']}\n"
-        f"Quale rischio assegneresti?"
+        f"{_ui_text(context, 'Sintomi', 'Symptoms')}: {scenario['sintomi_visivi']}\n"
+        f"{_ui_text(context, 'Quale rischio assegneresti?', 'Which risk level would you assign?')}"
     )
     await _send_long(update, text, reply_markup=keyboard)
 
@@ -4531,7 +4908,7 @@ async def _academy_sim_risk_answer(update: Update, context: ContextTypes.DEFAULT
     scenario = context.user_data.get("academy_scenario")
     levels = ["nessuno", "basso", "medio", "alto", "critico"]
     if not scenario:
-        await _send(update, "Scenario non disponibile.")
+        await _send(update, _ui_text(context, "Scenario non disponibile.", "Scenario unavailable."))
         return
     idx = int(data.split("_")[-1])
     chosen = levels[idx] if idx < len(levels) else None
@@ -4541,11 +4918,11 @@ async def _academy_sim_risk_answer(update: Update, context: ContextTypes.DEFAULT
     if chosen == correct:
         progress["sim_correct"] += 1
         progress["total_score"] += 15
-        msg = f"Corretto ✅ +15 punti\nRischio: {correct.upper()}\n{scenario['diagnosi']}"
+        msg = _ui_text(context, f"Corretto ✅ +15 punti\nRischio: {correct.upper()}\n{scenario['diagnosi']}", f"Correct ✅ +15 points\nRisk: {correct.upper()}\n{scenario['diagnosi']}")
     else:
-        msg = f"Errato. Corretto: {correct.upper()}\n{scenario['diagnosi']}"
+        msg = _ui_text(context, f"Errato. Corretto: {correct.upper()}\n{scenario['diagnosi']}", f"Incorrect. Correct answer: {correct.upper()}\n{scenario['diagnosi']}")
     _save_academy_progress(progress)
-    await _send_long(update, msg, reply_markup=_academy_menu_keyboard())
+    await _send_long(update, msg, reply_markup=_academy_menu_keyboard(context))
 
 
 async def _academy_sim_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4568,7 +4945,7 @@ async def _academy_sim_action(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton(opt, callback_data=f"ACAD_SIMACT_{i}")]
         for i, opt in enumerate(options)
     ])
-    await _send_long(update, "Seleziona 2 azioni corrette:", reply_markup=keyboard)
+    await _send_long(update, _ui_text(context, "Seleziona 2 azioni corrette:", "Select 2 correct actions:"), reply_markup=keyboard)
 
 
 async def _academy_sim_action_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str):
@@ -4576,19 +4953,19 @@ async def _academy_sim_action_answer(update: Update, context: ContextTypes.DEFAU
     options = context.user_data.get("academy_action_options", [])
     choices = context.user_data.get("academy_action_choices", [])
     if not scenario:
-        await _send(update, "Scenario non disponibile.")
+        await _send(update, _ui_text(context, "Scenario non disponibile.", "Scenario unavailable."))
         return
     idx = int(data.split("_")[-1])
     if idx >= len(options):
-        await _send(update, "Scelta non valida.")
+        await _send(update, _ui_text(context, "Scelta non valida.", "Invalid choice."))
         return
     if idx in choices:
-        await _send(update, "Scelta già selezionata.")
+        await _send(update, _ui_text(context, "Scelta già selezionata.", "Choice already selected."))
         return
     choices.append(idx)
     context.user_data["academy_action_choices"] = choices
     if len(choices) < 2:
-        await _send(update, "Seleziona un'altra azione.")
+        await _send(update, _ui_text(context, "Seleziona un'altra azione.", "Select another action."))
         return
     selected = [options[i] for i in choices]
     correct = set(scenario["raccomandazioni_corrette"][:2])
@@ -4597,14 +4974,14 @@ async def _academy_sim_action_answer(update: Update, context: ContextTypes.DEFAU
     if set(selected) == correct:
         progress["sim_correct"] += 1
         progress["total_score"] += 20
-        msg = "Perfetto ✅ +20 punti"
+        msg = _ui_text(context, "Perfetto ✅ +20 punti", "Perfect ✅ +20 points")
     elif len(correct.intersection(selected)) == 1:
         progress["total_score"] += 5
-        msg = "Una risposta corretta su due (+5 punti)"
+        msg = _ui_text(context, "Una risposta corretta su due (+5 punti)", "One correct answer out of two (+5 points)")
     else:
-        msg = "Nessuna azione corretta."
+        msg = _ui_text(context, "Nessuna azione corretta.", "No correct action.")
     _save_academy_progress(progress)
-    await _send_long(update, msg, reply_markup=_academy_menu_keyboard())
+    await _send_long(update, msg, reply_markup=_academy_menu_keyboard(context))
 
 
 async def _academy_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4621,7 +4998,7 @@ async def _academy_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _academy_quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str):
     question = context.user_data.get("academy_quiz")
     if not question:
-        await _send(update, "Quiz non disponibile.")
+        await _send(update, _ui_text(context, "Quiz non disponibile.", "Quiz unavailable."))
         return
     idx = int(data.split("_")[-1])
     progress = _load_academy_progress()
@@ -4629,24 +5006,30 @@ async def _academy_quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYP
     if idx == question["corretta"]:
         progress["quiz_correct"] += 1
         progress["total_score"] += 10
-        msg = f"Corretto ✅ +10 punti\n{question['spiegazione']}"
+        msg = _ui_text(context, f"Corretto ✅ +10 punti\n{question['spiegazione']}", f"Correct ✅ +10 points\n{question['spiegazione']}")
     else:
         correct = question["opzioni"][question["corretta"]]
-        msg = f"Errato. Risposta corretta: {correct}\n{question['spiegazione']}"
+        msg = _ui_text(context, f"Errato. Risposta corretta: {correct}\n{question['spiegazione']}", f"Incorrect. Correct answer: {correct}\n{question['spiegazione']}")
     _save_academy_progress(progress)
-    await _send_long(update, msg, reply_markup=_academy_menu_keyboard())
+    await _send_long(update, msg, reply_markup=_academy_menu_keyboard(context))
 
 
 async def _academy_progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
     progress = _load_academy_progress()
-    msg = (
+    msg = _ui_text(
+        context,
         f"Punteggio totale: {progress['total_score']}\n"
         f"Sessioni: {progress['sessions']}\n"
         f"Quiz: {progress['quiz_correct']}/{progress['quiz_total']}\n"
         f"Simulazioni: {progress['sim_correct']}/{progress['sim_total']}\n"
-        f"Lab MLOps completato: {'Sì' if progress['training_lab_completed'] else 'No'}"
+        f"Lab MLOps completato: {'Sì' if progress['training_lab_completed'] else 'No'}",
+        f"Total score: {progress['total_score']}\n"
+        f"Sessions: {progress['sessions']}\n"
+        f"Quiz: {progress['quiz_correct']}/{progress['quiz_total']}\n"
+        f"Simulations: {progress['sim_correct']}/{progress['sim_total']}\n"
+        f"Lab MLOps completed: {'Yes' if progress['training_lab_completed'] else 'No'}",
     )
-    await _send(update, msg, reply_markup=_academy_menu_keyboard())
+    await _send(update, msg, reply_markup=_academy_menu_keyboard(context))
 
 
 async def _academy_lab(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4657,9 +5040,12 @@ async def _academy_lab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _save_academy_progress(progress)
     await _send_long(
         update,
-        "Lab MLOps completato ✅ (+10 punti)\n"
-        "Checklist: dataset -> training -> conversione -> preflight -> deploy.",
-        reply_markup=_academy_menu_keyboard(),
+        _ui_text(
+            context,
+            "Lab MLOps completato ✅ (+10 punti)\nChecklist: dataset -> training -> conversione -> preflight -> deploy.",
+            "Lab MLOps completed ✅ (+10 points)\nChecklist: dataset -> training -> conversion -> preflight -> deploy.",
+        ),
+        reply_markup=_academy_menu_keyboard(context),
     )
 
 

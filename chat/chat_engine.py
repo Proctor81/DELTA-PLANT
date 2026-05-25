@@ -325,7 +325,7 @@ class ChatEngine:
         )
         return anchored_user_input, anchored_system_prompt
 
-    def chat_internal(self, prompt: str) -> str:
+    def chat_internal(self, prompt: str, response_language: str = "auto") -> str:
         """
         Chiamata stateless all'LLM: nessuna memoria letta o scritta.
         Usata per chiamate interne (generazione domande, classificazioni binarie)
@@ -338,7 +338,7 @@ class ChatEngine:
             response, _ = self._hf_llm.chat(
                 user_message=prompt,
                 history=[],
-                system_prompt=DELTA_SYSTEM_PROMPT,
+                system_prompt=_system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language),
             )
             return response or ""
         except Exception as exc:
