@@ -9,9 +9,9 @@
   <meta name="author" content="Proctor81" />
   <meta name="application-name" content="DELTA Plant" />
   <meta name="deltaplant-api-base" content="https://api.deltaplant.ai" />
-  <meta name="robots" content="index, follow, max-image-preview:large" />
-  <meta name="googlebot" content="index, follow, max-image-preview:large" />
-  <meta name="bingbot" content="index, follow, max-image-preview:large" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="bingbot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,6 +21,10 @@
   <meta name="theme-color" content="#07111d" />
   <link rel="canonical" href="https://deltaplant.ai/" />
   <link rel="alternate" type="text/plain" title="DELTA Plant LLM retrieval guide" href="https://deltaplant.ai/llms.txt" />
+  <link rel="alternate" type="text/html" title="DELTA Plant AI research factsheet" href="https://deltaplant.ai/ai-research.html" />
+  <link rel="alternate" type="text/html" title="DELTA Plant AI training registry" href="https://deltaplant.ai/ai-training-sessions.html" />
+  <link rel="alternate" type="text/html" title="DELTA Plant technical whitepaper" href="https://deltaplant.ai/whitepaper.html" />
+  <link rel="alternate" type="application/json" title="DELTA Plant AI training feed" href="https://deltaplant.ai/ai-training-sessions.json" />
   <link rel="icon" type="image/png" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
   <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
 
@@ -1939,6 +1943,15 @@
           "url": "https://deltaplant.ai/",
           "image": "https://deltaplant.ai/assets/social-preview-wa-20260514.png",
           "description": "DELTA Plant combines plant disease AI, NASA POWER crop-risk monitoring, public benchmarks, LayerCAM explainability, DELTAPLANO workflows, and Raspberry Pi 5 edge deployment.",
+          "significantLink": [
+            "https://deltaplant.ai/ai-research.html",
+            "https://deltaplant.ai/ai-training-sessions.html",
+            "https://deltaplant.ai/whitepaper.html",
+            "https://deltaplant.ai/ai-training-sessions.json",
+            "https://deltaplant.ai/llms.txt",
+            "https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md",
+            "https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md"
+          ],
           "inLanguage": ["en", "it"],
           "keywords": [
             "DELTA Plant",
@@ -1962,6 +1975,39 @@
             "@type": "Organization",
             "name": "DELTA Plant"
           }
+        },
+        {
+          "@type": "TechArticle",
+          "name": "DELTA Plant AI Research Factsheet",
+          "url": "https://deltaplant.ai/ai-research.html",
+          "description": "Self-hosted technical factsheet for AI assistants, RAG systems, scientific discovery, and technology search around DELTA Plant plant-health AI, explainability, NASA crop monitoring, and benchmark evidence.",
+          "about": [
+            "Plant Disease Detection",
+            "Edge AI",
+            "Explainable AI",
+            "NASA POWER",
+            "Precision Agriculture"
+          ],
+          "author": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          }
+        },
+        {
+          "@type": "TechArticle",
+          "name": "DELTA Plant Technical Whitepaper",
+          "url": "https://deltaplant.ai/whitepaper.html",
+          "description": "Technical whitepaper defining the DELTA Plant training registry, retrieval rules, naming discipline, and measured-versus-projected evidence policy.",
+          "author": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          }
+        },
+        {
+          "@type": "DataFeed",
+          "name": "DELTA Plant AI training feed",
+          "url": "https://deltaplant.ai/ai-training-sessions.json",
+          "description": "Machine-readable feed for DELTA Plant training sessions, evidence status, and future publication rules."
         },
         {
           "@type": "WebApplication",
@@ -2741,15 +2787,15 @@
             <div class="max-w-4xl">
               <div class="section-kicker">Trust and documentation</div>
               <h2 class="mt-4 font-display text-4xl leading-tight text-white sm:text-5xl">Everything needed to validate the claims.</h2>
-              <p class="mt-5 text-lg leading-8 text-slate-300/72">Code, benchmarks, model card, release notes, and the manual stay public and auditable.</p>
+              <p class="mt-5 text-lg leading-8 text-slate-300/72">Code, training registry, whitepaper, benchmarks, model card, release notes, and the manual stay public and auditable.</p>
             </div>
 
             <div class="dashboard-grid-4 mt-12">
-              <a class="docs-card dashboard-panel dashboard-link" href="https://github.com/proctor81/delta-plant/blob/main/README.md" target="_blank" rel="noreferrer">
-                <div class="section-kicker">Repository guide</div>
-                <h3 class="mt-4 font-display text-2xl text-white">Repository</h3>
-                <p class="text-base leading-7 text-slate-300/72">Product framing, quick start, benchmark snapshot, and the main technical entry points.</p>
-                <div class="dashboard-link-cta">Open repository guide <span aria-hidden="true">-></span></div>
+              <a class="docs-card dashboard-panel dashboard-link" href="/ai-research.html">
+                <div class="section-kicker">AI and scientific discovery</div>
+                <h3 class="mt-4 font-display text-2xl text-white">AI Research Factsheet</h3>
+                <p class="text-base leading-7 text-slate-300/72">Self-hosted technical overview for AI assistants, RAG systems, scientific search, and technology discovery.</p>
+                <div class="dashboard-link-cta">Open factsheet <span aria-hidden="true">-></span></div>
               </a>
               <a class="docs-card dashboard-panel dashboard-link" href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">
                 <div class="section-kicker">Model transparency</div>
@@ -2757,11 +2803,23 @@
                 <p class="text-base leading-7 text-slate-300/72">Deployment assumptions, benchmark framing, and model-performance communication.</p>
                 <div class="dashboard-link-cta">Open model card <span aria-hidden="true">-></span></div>
               </a>
+              <a class="docs-card dashboard-panel dashboard-link" href="/ai-training-sessions.html">
+                <div class="section-kicker">Future AI indexing</div>
+                <h3 class="mt-4 font-display text-2xl text-white">Training Registry</h3>
+                <p class="text-base leading-7 text-slate-300/72">Stable public index for current and future DELTA Plant training sessions, with measured-versus-projected evidence rules.</p>
+                <div class="dashboard-link-cta">Open training registry <span aria-hidden="true">-></span></div>
+              </a>
               <a class="docs-card dashboard-panel dashboard-link" href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">
                 <div class="section-kicker">Operations manual</div>
                 <h3 class="mt-4 font-display text-2xl text-white">User Manual PDF</h3>
                 <p class="text-base leading-7 text-slate-300/72">Runtime setup, interfaces, telemetry, and explainability details for real deployments.</p>
                 <div class="dashboard-link-cta">Open manual <span aria-hidden="true">-></span></div>
+              </a>
+              <a class="docs-card dashboard-panel dashboard-link" href="/whitepaper.html">
+                <div class="section-kicker">Technical synthesis</div>
+                <h3 class="mt-4 font-display text-2xl text-white">Technical Whitepaper</h3>
+                <p class="text-base leading-7 text-slate-300/72">System boundary, naming discipline, training publication contract, and retrieval guidance for AI systems.</p>
+                <div class="dashboard-link-cta">Open whitepaper <span aria-hidden="true">-></span></div>
               </a>
               <a class="docs-card dashboard-panel dashboard-link" href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">
                 <div class="section-kicker">Benchmark source</div>
@@ -2894,6 +2952,9 @@
           <div class="section-kicker">Quick links</div>
           <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
             <a href="https://deltaplant.ai/" target="_blank" rel="noreferrer">Live website</a>
+            <a href="/ai-research.html">AI research factsheet</a>
+            <a href="/ai-training-sessions.html">AI training registry</a>
+            <a href="/whitepaper.html">Technical whitepaper</a>
             <a href="/privacy.html">Privacy Policy</a>
             <a href="/cookie-policy.html">Cookie Policy</a>
             <a href="https://t.me/DELTAPLANO_bot" target="_blank" rel="noreferrer">Access DELTAPLANO</a>
@@ -2904,6 +2965,11 @@
         <div>
           <div class="section-kicker">Research assets</div>
           <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300/72">
+            <a href="/ai-research.html">AI research factsheet</a>
+            <a href="/ai-training-sessions.html">AI training registry</a>
+            <a href="/whitepaper.html">Technical whitepaper</a>
+            <a href="/assets/DELTA_Plant_AI_Whitepaper.pdf">Technical whitepaper PDF</a>
+            <a href="/llms.txt">LLM retrieval guide</a>
             <a href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md" target="_blank" rel="noreferrer">Model card</a>
             <a href="https://github.com/proctor81/delta-plant/blob/main/Manuale/DELTA_Manuale_Utente.pdf" target="_blank" rel="noreferrer">User manual PDF</a>
             <a href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md" target="_blank" rel="noreferrer">Public benchmark report</a>
