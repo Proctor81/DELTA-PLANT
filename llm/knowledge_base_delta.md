@@ -28,14 +28,19 @@
 ## Uso Software
 - Avvio: comando `delta` o `python main.py`.
 - Menu CLI: diagnosi, dati sensori, export Excel, Academy, pannello admin, chat libera.
-- Export Excel: file aggiornato incrementale, tutte le diagnosi e parametri.
+- Export Excel: il report esporta la finestra mobile degli ultimi 30 giorni e rimuove automaticamente i record più vecchi.
 - Pipeline X: flusso MLOps per training, export, benchmark, dissemination, manuale.
 
 ## Telegram Bot
 - Diagnosi guidata: invio foto, descrizione, sensori, inferenza, raccomandazioni.
 - Chat libera: domande su stato, raccomandazioni, troubleshooting.
-- Export Excel e storico diagnosi direttamente in chat.
+- Export Excel e storico diagnosi direttamente in chat, limitati agli ultimi 30 giorni.
 - Academy, preflight AI, dati sensori via Telegram.
+
+## Chat AI e Manuale
+- L'operatore puo fare domande operative sul Manuale DELTA Plant senza dover scrivere per forza la parola "manuale".
+- Il motore LLM usa la knowledge base del manuale per rispondere su installazione, menu, export Excel, Telegram bot, NASA-ISRO/SAR, preflight, API e troubleshooting.
+- Se la domanda richiede una formula o una definizione presente nel manuale, la risposta deve riportare il testo tecnico corrispondente in modo fedele.
 
 ## Database
 - SQLite, tabella `diagnoses` con tutti i parametri.
@@ -45,36 +50,37 @@
 - Sensori non rilevati: controlla collegamenti, I2C, driver.
 - Camera non funziona: verifica cavo, abilitazione, test con libcamera.
 - AI non disponibile: controlla venv, dipendenze, versione ai-edge-litert.
-- Export Excel: installa openpyxl.
+- Export Excel: installa openpyxl e verifica che esistano diagnosi registrate negli ultimi 30 giorni.
 - Database corrotto: ripristina da backup, verifica integrità.
 - Bot Telegram non risponde: verifica servizio, token, rete.
 - LLM non risponde: verifica token HuggingFace, connettività, variabili .env.
 
 ## Calcolo del rischio fungino (modalità NASA-ISRO/SAR)
-La formula utilizzata da DELTA per il calcolo del rischio fungino nella modalità NASA-ISRO/SAR è la seguente:
+La formula attualmente implementata in DELTA per il rischio fungino giornaliero è:
 
 ```
-rischio_fungino = (temperatura * 0.1 + umidità * 0.2 + precipitazioni * 0.5 + rischio_precedente) / 10.0
+humidity_factor = clamp((umidita_relativa - 60) / 40, 0, 1)
+temp_factor = clamp((temperatura_media_c - 12) / 18, 0, 1)
+rain_factor = clamp(precipitazioni_mm / 14, 0, 1)
+persistenza = rischio_precedente * 0.05
+
+rischio_fungino = clamp(
+	0.40 * humidity_factor
+	+ 0.35 * temp_factor
+	+ 0.25 * rain_factor
+	+ persistenza,
+	0,
+	1,
+)
 ```
 
 Dove:
-- **temperatura**: temperatura media giornaliera (°C)
-- **umidità**: umidità relativa media giornaliera (%)
-- **precipitazioni**: precipitazioni totali giornaliere (mm)
-- **rischio_precedente**: valore di rischio del giorno precedente (tra 0 e 1)
+- **humidity_factor** misura quanto l'umidita supera la soglia di 60% ed e normalizzato nel range 0..1.
+- **temp_factor** cresce da 0 a 1 tra 12 C e 30 C.
+- **rain_factor** normalizza la pioggia giornaliera considerando saturazione a 14 mm.
+- **persistenza** conserva il 5% del rischio del giorno precedente.
 
-Il risultato viene normalizzato tra 0 e 1. Se il valore calcolato supera 1 viene riportato a 1, se è inferiore a 0 viene portato a 0.
-
-**Esempio pratico:**
-Se temperatura = 22°C, umidità = 70%, precipitazioni = 2 mm, rischio_precedente = 0.3:
-
-```
-rischio_fungino = (22 * 0.1 + 70 * 0.2 + 2 * 0.5 + 0.3) / 10.0
-			   = (2.2 + 14 + 1 + 0.3) / 10.0
-			   = 17.5 / 10.0 = 1.75 → normalizzato a 1.0
-```
-
-Questa formula è implementata nella pipeline NASA DeltaPlant e viene usata per tutte le risposte LLM relative al rischio fungino.
+Il dashboard settimanale riporta la media aritmetica degli ultimi 7 valori giornalieri e la traduce in etichetta BASSO, MEDIO o ALTO.
 
 ---
 ## Esempi di Domande e Prompt Few-Shot
@@ -88,7 +94,7 @@ Risposta: "Il Quantum Risk Score (QRS) è un indice tra 0 e 1 calcolato dall'Ora
 Risposta: "Esegui il comando: python Manuale/genera_manuale.py. Il manuale PDF verrà rigenerato automaticamente con le ultime modifiche."
 
 ### Domanda: "Come si esportano i dati in Excel?"
-Risposta: "Dal menu CLI o dal bot Telegram, seleziona 'Report Excel'. Verrà generato/aggiornato il file exports/delta_diagnoses.xlsx con tutte le diagnosi."
+Risposta: "Dal menu CLI o dal bot Telegram, seleziona 'Report Excel'. Verrà generato/aggiornato il file exports/delta_diagnoses.xlsx con le diagnosi degli ultimi 30 giorni; i record più vecchi vengono eliminati automaticamente."
 
 ### Domanda: "Cosa fare se il bot Telegram non risponde?"
 Risposta: "Verifica che il servizio sia attivo (systemctl is-active delta), che il token Telegram sia corretto nel file .env e che la rete sia disponibile. Consulta la sezione troubleshooting del manuale."

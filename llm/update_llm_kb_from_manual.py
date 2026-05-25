@@ -46,11 +46,12 @@ def aggiorna_kb(toc):
 def aggiorna_prompt(toc):
     prompt = PROMPT_FILE.read_text(encoding="utf-8")
     # Rimuovi vecchio esempio indice
-    prompt = re.sub(r"### Domanda: Mostrami l’indice del manuale[\s\S]+?\n(?=###|---|Utilizza)", "", prompt, flags=re.MULTILINE)
+    prompt = re.sub(r"### Domanda: Mostrami l['’]indice del manuale[\s\S]+?(?=\n###|\n---|$)", "", prompt, flags=re.MULTILINE)
     # Inserisci nuovo esempio prima di ---
     idx = prompt.find('---')
     if idx == -1:
-        idx = len(prompt)
+        prompt = prompt.rstrip() + "\n\n---\n"
+        idx = prompt.find('---')
     esempio = "### Domanda: Mostrami l’indice del manuale\nRisposta: Ecco l’indice dettagliato del Manuale Utente DELTA:\n\n" + "\n".join(toc) + "\n\n"
     prompt = prompt[:idx] + esempio + prompt[idx:]
     PROMPT_FILE.write_text(prompt, encoding="utf-8")

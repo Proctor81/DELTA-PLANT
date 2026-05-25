@@ -62,6 +62,53 @@ DIAGNOSIS_FOLLOWUP_REFERENTS = (
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 _ITALIAN_RESPONSE_RULE = "Rispondi SEMPRE in italiano, anche se la domanda è in un'altra lingua."
 _ENGLISH_RESPONSE_RULE = "Respond ALWAYS in English, even if the question is in another language."
+_MANUAL_REQUEST_PATTERNS = (
+    "come si",
+    "come faccio",
+    "come posso",
+    "cosa significa",
+    "cosa fare",
+    "mostra",
+    "mostrami",
+    "spiega",
+    "elenca",
+    "dove",
+    "quale",
+)
+_MANUAL_OPERATION_KEYWORDS = (
+    "manuale",
+    "manual",
+    "excel",
+    "report",
+    "telegram",
+    "academy",
+    "preflight",
+    "nasa",
+    "sar",
+    "dashboard",
+    "install",
+    "installazione",
+    "avvio",
+    "avvia",
+    "comando",
+    "comandi",
+    "menu",
+    "api",
+    "database",
+    "backup",
+    "troubleshooting",
+    "errore",
+    "servizio",
+    "systemctl",
+    "camera",
+    "layercam",
+    "quantum risk score",
+    "qrs",
+    "huggingface",
+    "llm",
+    "voce",
+    "piper",
+)
 
 
 def _load_project_env_if_needed() -> None:
@@ -89,6 +136,56 @@ def _system_prompt_for_language(base_prompt: str, response_language: str = "auto
             return base_prompt.replace(_ITALIAN_RESPONSE_RULE, _ENGLISH_RESPONSE_RULE)
         return base_prompt + "\n\n" + _ENGLISH_RESPONSE_RULE
     return base_prompt
+
+
+def _load_manual_knowledge_base(limit_chars: int | None = 2000) -> str:
+    kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
+    try:
+        kb_text = kb_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Impossibile caricare knowledge_base_delta.md: %s", exc)
+        return ""
+
+    if limit_chars is None:
+        return kb_text
+    return kb_text[:limit_chars]
+
+
+def _extract_manual_fungal_formula_text() -> str:
+    kb_text = _load_manual_knowledge_base(limit_chars=None)
+    if not kb_text:
+        return ""
+
+    match = re.search(
+        r"## Calcolo del rischio fungino.*?(?=\n## |\n---|$)",
+        kb_text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    return match.group(0).strip() if match else ""
+
+
+def _looks_like_manual_formula_request(user_input: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (user_input or "").strip().lower())
+    if "rischio fungino" not in normalized:
+        return False
+    return any(keyword in normalized for keyword in ("manuale", "manual", "formula", "nasa", "sar", "dashboard"))
+
+
+def _looks_like_manual_question(user_input: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (user_input or "").strip().lower())
+    if not normalized:
+        return False
+
+    if "manuale" in normalized or "manual " in normalized:
+        return True
+
+    if _looks_like_manual_formula_request(normalized):
+        return True
+
+    if not any(keyword in normalized for keyword in _MANUAL_OPERATION_KEYWORDS):
+        return False
+
+    return any(pattern in normalized for pattern in _MANUAL_REQUEST_PATTERNS)
 
 
 class ChatEngine:
@@ -254,43 +351,19 @@ class ChatEngine:
 
         Flusso:
         1. Recupera storia conversazionale utente
-        2. Se la domanda contiene "Manuale", carica la knowledge base e la include nel system prompt
+        2. Se la domanda riguarda il Manuale o il funzionamento operativo di DELTA, carica la knowledge base e la include nel system prompt
         3. Tenta risposta via HuggingFace cloud
         4. Salva turno in memoria
         """
         history = self.memory.get_history(user_id)
-        # Controllo parola chiave "Manuale" (case-insensitive, anche in frasi)
-        if "manuale" in (user_input or "").lower():
-            # Risposta letterale SOLO se la domanda riguarda la formula rischio fungino e richiama il manuale
-            lowered = (user_input or "").lower()
-            if "rischio fungino" in lowered and "manuale" in lowered:
-                kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
-                try:
-                    kb_text = kb_path.read_text(encoding="utf-8")
-                except Exception as exc:
-                    logger.warning(f"Impossibile caricare knowledge_base_delta.md: {exc}")
-                    kb_text = ""
-                # Estrai la formula rischio fungino dal manuale
-                import re
-                match = re.search(r"rischio fungino.*?=.+?\n+([\s\S]+?)\n+([\s\S]+?)---", kb_text, re.IGNORECASE)
-                if match:
-                    # Prendi la formula e la spiegazione
-                    formula = match.group(0).strip()
+        if _looks_like_manual_question(user_input):
+            if _looks_like_manual_formula_request(user_input):
+                formula = _extract_manual_fungal_formula_text()
+                if formula:
                     return f"Risposta letterale dal Manuale DELTA Plant:\n\n{formula}"
-                else:
-                    # Fallback: restituisci tutto il paragrafo rischio fungino
-                    match2 = re.search(r"## Calcolo del rischio fungino.*?(---|$)", kb_text, re.IGNORECASE)
-                    if match2:
-                        return f"Risposta letterale dal Manuale DELTA Plant:\n\n{match2.group(0).strip()}"
-                    else:
-                        return "Non trovo la formula rischio fungino nel Manuale."
-            # Altrimenti, prompt LLM classico arricchito
-            kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
-            try:
-                kb_text = kb_path.read_text(encoding="utf-8")[:2000]
-            except Exception as exc:
-                logger.warning(f"Impossibile caricare knowledge_base_delta.md: {exc}")
-                kb_text = ""
+                return "Non trovo la formula rischio fungino nel Manuale."
+
+            kb_text = _load_manual_knowledge_base(limit_chars=2500)
             base_system_prompt = _system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language)
             system_prompt = (
                 base_system_prompt

@@ -142,3 +142,32 @@ def test_chat_compacts_large_history_before_calling_hf():
     assert sum(len(item["content"]) for item in serialized_history) <= chat_engine.MAX_HISTORY_TOTAL_CHARS
     assert all(len(item["content"]) <= chat_engine.MAX_HISTORY_MESSAGE_CHARS for item in serialized_history)
     assert serialized_history[-1]["content"].startswith("risposta diagnostica 7")
+
+
+def test_chat_uses_manual_kb_for_operational_question_without_manual_keyword(monkeypatch):
+    engine = _build_engine([])
+
+    monkeypatch.setattr(chat_engine, "_load_manual_knowledge_base", lambda limit_chars=2000: "KB manuale export excel")
+
+    response = engine.chat("77", "come si esportano i dati in excel?")
+
+    assert response == "Risposta di follow-up"
+    call = engine._hf_llm.calls[0]
+    assert "Contenuto estratto dal Manuale Utente DELTA" in call["system_prompt"]
+    assert "KB manuale export excel" in call["system_prompt"]
+    assert call["user_message"] == "come si esportano i dati in excel?"
+
+
+def test_chat_returns_manual_formula_without_manual_keyword(monkeypatch):
+    engine = _build_engine([])
+
+    monkeypatch.setattr(
+        chat_engine,
+        "_extract_manual_fungal_formula_text",
+        lambda: "## Calcolo del rischio fungino\nFormula aggiornata.",
+    )
+
+    response = engine.chat("77", "qual e la formula del rischio fungino nasa sar?")
+
+    assert response == "Risposta letterale dal Manuale DELTA Plant:\n\n## Calcolo del rischio fungino\nFormula aggiornata."
+    assert engine._hf_llm.calls == []

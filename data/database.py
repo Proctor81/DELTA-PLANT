@@ -7,13 +7,15 @@ Schema normalizzato con timestamp ISO 8601 e dati JSON strutturati.
 import json
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from core.config import DATABASE_CONFIG
 
 logger = logging.getLogger("delta.data.database")
+
+DEFAULT_RETENTION_DAYS = 30
 
 # Schema DDL
 CREATE_DIAGNOSES_TABLE = """
@@ -143,6 +145,7 @@ class Database:
             cursor = self._conn.execute(sql, row)
         record_id = cursor.lastrowid
         logger.debug("Record salvato nel DB con ID %d.", record_id)
+        self.prune_older_than_days(DATABASE_CONFIG.get("retention_days", DEFAULT_RETENTION_DAYS))
         self._cleanup_old_records()
         return record_id
 
@@ -154,6 +157,18 @@ class Database:
         """Restituisce gli ultimi N record di diagnosi."""
         sql = "SELECT * FROM diagnoses ORDER BY id DESC LIMIT ?"
         cursor = self._conn.execute(sql, (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_records_since_days(
+        self,
+        days: int = DEFAULT_RETENTION_DAYS,
+        *,
+        now: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Restituisce i record compresi nella finestra mobile degli ultimi N giorni."""
+        cutoff = (now or datetime.utcnow()) - timedelta(days=max(int(days), 1))
+        sql = "SELECT * FROM diagnoses WHERE timestamp >= ? ORDER BY timestamp DESC, id DESC"
+        cursor = self._conn.execute(sql, (cutoff.isoformat(),))
         return [dict(row) for row in cursor.fetchall()]
 
     def get_by_id(self, record_id: int) -> Optional[Dict[str, Any]]:
@@ -183,6 +198,24 @@ class Database:
             )
             self._conn.commit()
             logger.info("Pulizia DB: rimossi %d record vecchi.", excess)
+
+    def prune_older_than_days(
+        self,
+        days: int = DEFAULT_RETENTION_DAYS,
+        *,
+        now: Optional[datetime] = None,
+    ) -> int:
+        """Cancella i record più vecchi della finestra mobile richiesta."""
+        cutoff = (now or datetime.utcnow()) - timedelta(days=max(int(days), 1))
+        with self._conn:
+            cursor = self._conn.execute(
+                "DELETE FROM diagnoses WHERE timestamp < ?",
+                (cutoff.isoformat(),),
+            )
+        deleted = int(cursor.rowcount or 0)
+        if deleted:
+            logger.info("Pulizia DB retention: rimossi %d record oltre %d giorni.", deleted, days)
+        return deleted
 
     # ─────────────────────────────────────────────
     # CHIUSURA

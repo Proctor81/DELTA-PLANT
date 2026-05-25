@@ -751,9 +751,9 @@ async def _generate_free_chat_response(
             return f"Errore dashboard NASA-ISRO/SAR: {exc}"
 
 
-    engine = _get_chat_engine(context)
     response_language = _voice_language_mode(context)
     chat_seed_context = str(context.user_data.pop("chat_seed_context", "") or "").strip()
+    engine = _get_chat_engine(context)
 
     # --- PATCH: reset contesto LLM se nuova pianta menzionata ---
     def extract_plant_name(text):
@@ -769,8 +769,19 @@ async def _generate_free_chat_response(
 
     # Solo se non è stato già gestito un return (es. dashboard NASA), prosegui con LLM
     try:
+        composed_prompt = user_text
+        if chat_seed_context:
+            composed_prompt = f"{chat_seed_context}\n\nDomanda utente: {user_text}"
+
         def _ask():
-            return engine.chat_internal(user_text if not chat_seed_context else f"{chat_seed_context}\n\n{user_text}")
+            chat_method = getattr(engine, "chat", None)
+            if callable(chat_method):
+                return chat_method(
+                    user_id,
+                    composed_prompt,
+                    response_language=response_language,
+                )
+            return engine.chat_internal(composed_prompt)
         response = await asyncio.to_thread(_ask)
     except Exception as exc:
         logger.error("Errore chat LLM: %s", exc, exc_info=True)
@@ -868,8 +879,17 @@ async def _set_voice_language(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     context.user_data["voice_language_override"] = requested
-    label = "italiano" if requested == VOICE_LANGUAGE_IT else "inglese"
-    await _send(update, f"🗣️ Lingua voce forzata su {label}. In chat libera adeguerò anche le risposte testuali a questa lingua, oltre a usare sempre il pack Piper corrispondente, finché non imposti /voice_lang auto.")
+    if requested == VOICE_LANGUAGE_EN:
+        await _send(
+            update,
+            "🗣️ English mode enabled. In free chat DELTAPLANO will now write in English and always use the Ryan voice pack until you switch back with /voice_lang it or /voice_lang auto.",
+        )
+        return
+
+    await _send(
+        update,
+        "🗣️ Lingua voce forzata su italiano. In chat libera DELTAPLANO scriverà in italiano e userà sempre il pack voce Cris finché non imposti /voice_lang en o /voice_lang auto.",
+    )
 
 
 async def voice_language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1210,12 +1230,6 @@ def _build_welcome_voice_text(
     context: Optional[ContextTypes.DEFAULT_TYPE] = None,
 ) -> str:
     display_name = _welcome_display_name(update)
-    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
-        return (
-            f"Hello {display_name}, welcome to DELTAPLANO. "
-            "I am ready to help you with plant diagnosis, sensors, reports, and agronomic guidance. "
-            "Open the menu and tell me how I can help you."
-        )
     return (
         f"Ciao {display_name}, benvenuto in DELTAPLANO. "
         "Sono pronto ad aiutarti con diagnosi delle piante, sensori, report e consigli agronomici. "
@@ -1228,8 +1242,6 @@ def _build_welcome_voice_caption(
     context: Optional[ContextTypes.DEFAULT_TYPE] = None,
 ) -> str:
     display_name = _welcome_display_name(update)
-    if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
-        return f"Welcome, {display_name}."
     return f"Benvenuto, {display_name}."
 
 
@@ -4211,77 +4223,77 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     agent = _get_agent(context)
-    if not agent:
-        await _send(update, "Errore sistema: agent non disponibile.")
-        return
-    from datetime import datetime
-    import pytz
-    tz = pytz.timezone("Europe/Rome")
-    today = datetime.now(tz).strftime("%Y-%m-%d")
-    # Recupera tutte le diagnosi della giornata corrente
-    all_today = [r for r in agent.database.get_recent(limit=10000) if r.get("timestamp", "").startswith(today)]
-    # Ordina per id decrescente (più recenti prima)
-    all_today_sorted = sorted(all_today, key=lambda r: r["id"], reverse=True)
-    # Prendi solo le ultime 10
-    last10 = all_today_sorted[:10]
-    # Cancella tutte le altre della giornata
-    ids_to_keep = set(r["id"] for r in last10)
-    ids_to_delete = [r["id"] for r in all_today_sorted if r["id"] not in ids_to_keep]
-    if ids_to_delete:
-        placeholders = ",".join(str(i) for i in ids_to_delete)
-        agent.database._conn.execute(f"DELETE FROM diagnoses WHERE id IN ({placeholders})")
-        agent.database._conn.commit()
-    records_db = last10
-    if not records_db:
-        await _send(update, "Nessun dato da esportare oggi.")
-        return
+    owns_database = False
 
-    def _convert_records():
-        converted = []
-        import json as _json
-        for r in records_db:
-            converted.append({
-                "timestamp": r.get("timestamp"),
-                "sensor_data": {"source": r.get("sensor_source")},
-                "ai_result": {
-                    "class": r.get("ai_class"),
-                    "confidence": r.get("ai_confidence", 0) / 100,
-                    "simulated": bool(r.get("ai_simulated")),
-                    "top3": _json.loads(r.get("ai_top3_json") or "[]"),
-                },
-                "diagnosis": {
-                    "plant_status": r.get("plant_status"),
-                    "overall_risk": r.get("overall_risk"),
-                    "needs_human_review": bool(r.get("needs_review")),
-                    "summary": r.get("summary"),
-                    "explanation": r.get("explanation"),
-                    "activated_rules": _json.loads(r.get("activated_rules") or "[]"),
-                    "sensor_snapshot": {
-                        "temperature_c": r.get("temperature_c"),
-                        "humidity_pct":  r.get("humidity_pct"),
-                        "pressure_hpa":  r.get("pressure_hpa"),
-                        "light_lux":     r.get("light_lux"),
-                        "co2_ppm":       r.get("co2_ppm"),
-                        "ph":            r.get("ph"),
-                        "ec_ms_cm":      r.get("ec_ms_cm"),
-                        "source":        r.get("sensor_source"),
+    if agent:
+        database = agent.database
+        exporter = agent.exporter
+    else:
+        from data.database import Database
+        from data.excel_export import ExcelExporter
+
+        database = Database()
+        exporter = ExcelExporter()
+        owns_database = True
+
+    await _send(update, "📤 Report Excel in preparazione: finestra mobile ultimi 30 giorni.")
+
+    try:
+        await asyncio.to_thread(database.prune_older_than_days, 30)
+        records_db = await asyncio.to_thread(database.get_records_since_days, 30)
+        if not records_db:
+            await _send(update, "Nessun dato disponibile negli ultimi 30 giorni.")
+            return
+
+        def _convert_records():
+            converted = []
+            import json as _json
+            for r in records_db:
+                converted.append({
+                    "timestamp": r.get("timestamp"),
+                    "sensor_data": {"source": r.get("sensor_source")},
+                    "ai_result": {
+                        "class": r.get("ai_class"),
+                        "confidence": r.get("ai_confidence", 0),
+                        "simulated": bool(r.get("ai_simulated")),
+                        "top3": _json.loads(r.get("ai_top3_json") or "[]"),
                     },
-                },
-                "recommendations": _json.loads(r.get("recommendations") or "[]"),
-            })
-        return converted
+                    "diagnosis": {
+                        "plant_status": r.get("plant_status"),
+                        "overall_risk": r.get("overall_risk"),
+                        "needs_human_review": bool(r.get("needs_review")),
+                        "summary": r.get("summary"),
+                        "explanation": r.get("explanation"),
+                        "activated_rules": _json.loads(r.get("activated_rules") or "[]"),
+                        "sensor_snapshot": {
+                            "temperature_c": r.get("temperature_c"),
+                            "humidity_pct":  r.get("humidity_pct"),
+                            "pressure_hpa":  r.get("pressure_hpa"),
+                            "light_lux":     r.get("light_lux"),
+                            "co2_ppm":       r.get("co2_ppm"),
+                            "ph":            r.get("ph"),
+                            "ec_ms_cm":      r.get("ec_ms_cm"),
+                            "source":        r.get("sensor_source"),
+                        },
+                    },
+                    "recommendations": _json.loads(r.get("recommendations") or "[]"),
+                })
+            return converted
 
-    converted = await asyncio.to_thread(_convert_records)
-    ok = await asyncio.to_thread(agent.exporter.export_all, converted)
-    if not ok:
-        await _send(update, "Errore durante l'esportazione Excel.")
-        return
-    from data.excel_export import EXPORT_PATH
-    if not EXPORT_PATH.exists():
-        await _send(update, "File Excel non trovato.")
-        return
-    with open(EXPORT_PATH, "rb") as f:
-        await update.effective_chat.send_document(document=f, filename=EXPORT_PATH.name)
+        converted = await asyncio.to_thread(_convert_records)
+        ok = await asyncio.to_thread(exporter.export_all, converted)
+        if not ok:
+            await _send(update, "Errore durante l'esportazione Excel.")
+            return
+        from data.excel_export import EXPORT_PATH
+        if not EXPORT_PATH.exists():
+            await _send(update, "File Excel non trovato.")
+            return
+        with open(EXPORT_PATH, "rb") as f:
+            await update.effective_chat.send_document(document=f, filename=EXPORT_PATH.name)
+    finally:
+        if owns_database:
+            database.close()
 
 
 async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):

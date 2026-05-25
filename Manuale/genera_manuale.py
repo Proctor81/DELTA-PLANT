@@ -1035,9 +1035,10 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("5.7 Export Excel")
     pdf._body(
-        "L'export Excel viene aggiornato in modo incrementale: ogni nuova diagnosi "
-        "viene aggiunta in fondo al file. Le colonne includono tutti i parametri "
-        "ambientali, i risultati AI e le raccomandazioni."
+        "L'export Excel genera il file operativo con una finestra mobile degli ultimi 30 giorni. "
+        "Ogni nuova diagnosi viene inclusa nel report e i record piu vecchi di 30 giorni "
+        "vengono rimossi automaticamente dal database prima dell'esportazione. Le colonne "
+        "includono tutti i parametri ambientali, i risultati AI e le raccomandazioni."
     )
     ec = cfg.get("EXPORTS_DIR", "exports/")
     pdf._code_block(
@@ -1155,6 +1156,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "/export, /preflight, /academy, /license, /health, /batch, /nasa_sar",
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
+        "Lingua operativa: il messaggio /start e sempre presentato in italiano; la selezione Ryan (EN) o Cris (IT) pilota invece sia la voce TTS sia la lingua delle risposte in chat libera.",
         "Modalita NASA-ISRO/SAR: pulsante inline 'Connettiti a NASA-ISRO/SAR' o comando /nasa_sar per avviare acquisizione GPS automatica via Mini App Telegram oppure invio manuale della posizione.",
         "Diagnosi spiegabile: il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico; l'overlay puo essere generato da EfficientFormer anche se la classificazione attiva resta sul backend generale.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
@@ -1272,7 +1274,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._bullet([
         "La riga iniziale del report usa sempre il giorno piu recente disponibile nella finestra di 7 giorni, quindi i valori mostrati in apertura corrispondono al giorno corrente della serie e non al primo giorno storico della tabella.",
         "La sezione 'Daily breakdown' e ordinata dal giorno piu recente al piu vecchio e usa colonne compatte (Data, Soil%, TempC, RH%, Rain, Risk%) per restare leggibile anche dallo schermo di uno smartphone.",
-        "Il rischio fungino giornaliero e calcolato con la formula: 40% umidita relativa normalizzata + 35% temperatura centrata su 20 C + 25% pioggia giornaliera + 5% persistenza del rischio del giorno precedente, con clipping nel range 0..1.",
+        "Il rischio fungino giornaliero usa la stessa formula del modulo operativo: humidity_factor = clamp((RH - 60) / 40, 0, 1), temp_factor = clamp((T - 12) / 18, 0, 1), rain_factor = clamp(pioggia_mm / 14, 0, 1), persistenza = rischio_precedente * 0.05, quindi score = clamp(0.40 * humidity_factor + 0.35 * temp_factor + 0.25 * rain_factor + persistenza, 0, 1).",
         "Il rischio fungino settimanale riportato nel dashboard e la media aritmetica dei 7 valori giornalieri; l'etichetta verbale e classificata in BASSO, MEDIO o ALTO sulla stessa logica usata dalla landing Raspberry Pi.",
         "Se NASA POWER restituisce valori mancanti o sentinella (-999) sugli ultimissimi giorni, DELTA mantiene l'ultimo proxy di umidita del suolo valido allineato alle date meteo invece di generare una settimana sintetica tutta uguale.",
     ])
@@ -1321,7 +1323,8 @@ def _add_database(pdf: ManualePDF, cfg: dict):
     pdf._body(
         "DELTA utilizza un database SQLite per archiviare tutte le diagnosi. "
         f"Il file è posizionato in: {dc.get('db_path', 'delta.db')}\n"
-        f"Record massimi prima della pulizia automatica: {dc.get('max_records', 10000)}"
+        f"Record massimi prima della pulizia automatica: {dc.get('max_records', 10000)}\n"
+        "Retention temporale operativa: il sistema mantiene nel report e nel database solo gli ultimi 30 giorni di diagnosi."
     )
     pdf._body("Tabella principale: diagnoses")
     pdf._kv_table([
@@ -4047,11 +4050,17 @@ def _add_hf_llm_chat(pdf: ManualePDF):
         ("Fallback finale",        "Messaggio di errore controllato (nessun backend disponibile)"),
         ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
         ("Motore di chat",         "chat/chat_engine.py — ChatEngine"),
+        ("Contesto manuale",       "knowledge_base_delta.md caricata automaticamente per domande operative su manuale, Excel, Telegram, NASA/SAR, API e troubleshooting"),
         ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o 🗑 Reset)"),
         ("System prompt",         "Esperto agronomico italiano: diagnosi piante, sensori DELTA, consigli"),
         ("Token HuggingFace",     "DELTA_HF_TOKEN nel file .env — verificato all'avvio"),
         ("Validazione token",     "HfApi.whoami() — log: 'Token HF valido — utente: <username>'"),
     ])
+    pdf._body(
+        "Il motore LLM puo rispondere anche a domande operative sul Manuale DELTA Plant senza che l'utente debba scrivere esplicitamente la parola 'manuale'. "
+        "Esempi tipici: export Excel, comandi Telegram, NASA-ISRO/SAR, preflight, API, troubleshooting e indice del manuale. "
+        "Quando la risposta richiede una formula o una definizione presenti nella knowledge base, DELTA restituisce il testo tecnico coerente con il manuale corrente."
+    )
 
     pdf._subsection("14b.2 Configurazione token HuggingFace")
     pdf._body(
