@@ -501,6 +501,41 @@ def test_format_nasa_sar_dashboard_includes_locality_and_sar_source():
     assert "2026-05-17T10:00:00+00:00" in text
 
 
+def test_format_nasa_sar_dashboard_uses_latest_day_and_compact_daily_breakdown():
+    text = tg._format_nasa_sar_dashboard(
+        {
+            "dashboard": {
+                "dashboard": [
+                    {
+                        "date": "2026-05-19",
+                        "soil": 31.4,
+                        "temp": 21.2,
+                        "humidity": 72.0,
+                        "rain": 3.4,
+                        "risk": 0.41,
+                    },
+                    {
+                        "date": "2026-05-25",
+                        "soil": 28.8,
+                        "temp": 24.5,
+                        "humidity": 41.0,
+                        "rain": 0.0,
+                        "risk": 0.24,
+                    },
+                ],
+                "weekly_risk": 0.325,
+                "weekly_label": "MEDIO",
+            }
+        }
+    )
+
+    assert "📅 Oggi 2026-05-25" in text
+    assert "Data  Soil% TempC RH% Rain Risk%" in text
+    assert "25/05" in text
+    assert "19/05" in text
+    assert text.index("25/05") < text.index("19/05")
+
+
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
     calls = []
 

@@ -1244,13 +1244,14 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Il flusso NASA-ISRO/SAR e disponibile direttamente dal menu principale di DELTAPLANO "
         "e restituisce una risposta immediata al click del pulsante. Il bot porta poi l'utente "
         "alla raccolta della posizione GPS e genera una dashboard sintetica con mappa, localita, "
-        "indicatori climatici e contesto di follow-up in chat."
+        "indicatori climatici live, tabella giornaliera compatta e contesto di follow-up in chat."
     )
     pdf._kv_table([
         ("Entry point",            "Pulsante inline 'Connettiti a NASA-ISRO/SAR' oppure comando /nasa_sar"),
         ("Acquisizione GPS",       "Mini App Telegram 'Apri NASA-ISRO/SAR GPS' o bottone 'Invia GPS manualmente'"),
         ("Area analizzata",        "Cerchio di 50 m centrato sul punto GPS condiviso dall'utente"),
-        ("Output restituiti",      "Snapshot mappa, report grafico NASA-ISRO/SAR, dashboard testuale e contesto per domande successive"),
+        ("Output restituiti",      "Snapshot mappa, report grafico NASA-ISRO/SAR, dashboard testuale live e contesto per domande successive"),
+        ("Fonti dati operative",   "Open-Meteo Archive per temperatura/umidita/pioggia giornaliere e NASA POWER (GWETROOT/GWETTOP) per proxy umidita del suolo"),
         ("Fallback operativi",     "Se la Web App non restituisce coordinate valide, il bot invita all'invio manuale della posizione"),
         ("Operativita post-fix",   "Il click del menu produce subito l'istruzione iniziale; dopo aggiornamenti del bot e richiesto restart del servizio delta"),
     ])
@@ -1264,14 +1265,22 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "4. Dopo il GPS, DELTA invia:\n"
         "   - mappa dell'area di interesse\n"
         "   - report grafico NASA-ISRO/SAR\n"
-        "   - dashboard testuale con rischio settimanale e spiegazione\n"
+        "   - dashboard testuale live con riga iniziale 'Oggi', Daily breakdown giornaliero e rischio settimanale\n"
         "5. L'utente puo continuare con domande di approfondimento nella stessa chat",
         label="FLUSSO NASA-ISRO/SAR TELEGRAM",
     )
     pdf._bullet([
+        "La riga iniziale del report usa sempre il giorno piu recente disponibile nella finestra di 7 giorni, quindi i valori mostrati in apertura corrispondono al giorno corrente della serie e non al primo giorno storico della tabella.",
+        "La sezione 'Daily breakdown' e ordinata dal giorno piu recente al piu vecchio e usa colonne compatte (Data, Soil%, TempC, RH%, Rain, Risk%) per restare leggibile anche dallo schermo di uno smartphone.",
+        "Il rischio fungino giornaliero e calcolato con la formula: 40% umidita relativa normalizzata + 35% temperatura centrata su 20 C + 25% pioggia giornaliera + 5% persistenza del rischio del giorno precedente, con clipping nel range 0..1.",
+        "Il rischio fungino settimanale riportato nel dashboard e la media aritmetica dei 7 valori giornalieri; l'etichetta verbale e classificata in BASSO, MEDIO o ALTO sulla stessa logica usata dalla landing Raspberry Pi.",
+        "Se NASA POWER restituisce valori mancanti o sentinella (-999) sugli ultimissimi giorni, DELTA mantiene l'ultimo proxy di umidita del suolo valido allineato alle date meteo invece di generare una settimana sintetica tutta uguale.",
+    ])
+    pdf._bullet([
         "Se il client Telegram non supporta la Mini App o il consenso GPS viene negato, usare l'invio manuale della posizione.",
         "Il bottone del menu e il comando /nasa_sar portano allo stesso flusso applicativo.",
         "Dopo modifiche al bot Telegram, applicare un riavvio del servizio con 'sudo systemctl restart delta' per rendere visibili i nuovi comportamenti.",
+        "Se il restart non sostituisce il PID del processo oppure va in timeout, verificare 'systemctl status delta' e forzare un ciclo pulito con 'sudo systemctl kill -s SIGKILL delta && sudo systemctl start delta'.",
         "Per diagnostica rapida: 'journalctl -u delta -n 50 --no-pager' oppure 'journalctl -u delta -f'.",
     ])
     pdf._subsection("Learning-by-Doing (upload + metadati)")

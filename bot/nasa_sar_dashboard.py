@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+from datetime import date as date_type
 
 from PIL import Image, ImageDraw
 import numpy as np
@@ -112,23 +113,94 @@ def get_satellite_image_with_marker(lat: float, lon: float, radius_m: int = 50, 
         logging.warning("NASA/SAR map fallback: download mappa satellite fallito (%s), uso placeholder locale", exc)
         return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
 import datetime
-from typing import Dict, Any, List
-import requests
+from typing import Dict, Any, List, Optional
 from nasa_delta_plant.utils.power_client import compute_fungal_risk_score
 
+
+NASA_SOIL_PARAMETERS = ("GWETROOT", "GWETTOP")
+
+
+def _normalize_power_soil_value(raw_value: Any) -> Optional[float]:
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+    if value <= -900.0:
+        return None
+    if 0.0 <= value <= 1.0:
+        return round(value * 100.0, 3)
+    return round(value, 3)
+
+
+def _power_day_to_iso(raw_day: Any) -> str:
+    text = str(raw_day or "").strip()
+    if len(text) == 8 and text.isdigit():
+        return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+    return text
+
+
+def _fill_missing_values(values: List[Optional[float]], fallback: float = 50.0) -> List[float]:
+    if not values:
+        return []
+
+    filled = list(values)
+    last_seen: Optional[float] = None
+    for index, value in enumerate(filled):
+        if value is None:
+            if last_seen is not None:
+                filled[index] = last_seen
+            continue
+        last_seen = value
+
+    next_seen: Optional[float] = None
+    for index in range(len(filled) - 1, -1, -1):
+        value = filled[index]
+        if value is None:
+            if next_seen is not None:
+                filled[index] = next_seen
+            continue
+        next_seen = value
+
+    return [round(float(value if value is not None else fallback), 3) for value in filled]
+
+
+def _align_soil_values(dates: List[str], soil_series: List[Dict[str, Any]]) -> List[float]:
+    soil_by_date = {
+        str(item.get("date") or ""): _normalize_power_soil_value(item.get("soil"))
+        for item in soil_series
+        if item.get("date")
+    }
+    ordered = [soil_by_date.get(day) for day in dates]
+    valid = [value for value in ordered if value is not None]
+    fallback = round(sum(valid) / len(valid), 3) if valid else 50.0
+    return _fill_missing_values(ordered, fallback=fallback)
+
 def fetch_nasa_soil(lat: float, lon: float, start: datetime.date, end: datetime.date) -> List[float]:
-    """Restituisce una lista di valori Soil (NASA POWER API, daily, mm)."""
+    """Restituisce una serie giornaliera di soil moisture proxy da NASA POWER."""
     # NASA POWER API: https://power.larc.nasa.gov/api/temporal/daily/point
     url = (
-        f"https://power.larc.nasa.gov/api/temporal/daily/point?parameters=SOILWATER_10CM&community=AG&longitude={lon}&latitude={lat}&start={start.strftime('%Y%m%d')}&end={end.strftime('%Y%m%d')}&format=JSON"
+        f"https://power.larc.nasa.gov/api/temporal/daily/point?parameters={','.join(NASA_SOIL_PARAMETERS)}&community=AG&longitude={lon}&latitude={lat}&start={start.strftime('%Y%m%d')}&end={end.strftime('%Y%m%d')}&format=JSON"
     )
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        vals = data["properties"]["parameter"]["SOILWATER_10CM"]
-        # Ordina per data crescente
-        return [vals[k] for k in sorted(vals.keys())]
+        parameters = ((data or {}).get("properties") or {}).get("parameter") or {}
+        root_values = parameters.get("GWETROOT", {}) or {}
+        top_values = parameters.get("GWETTOP", {}) or {}
+        days = sorted(set(root_values.keys()) | set(top_values.keys()))
+        soil_series: List[Dict[str, Any]] = []
+        for raw_day in days:
+            root_value = _normalize_power_soil_value(root_values.get(raw_day))
+            top_value = _normalize_power_soil_value(top_values.get(raw_day))
+            samples = [value for value in (root_value, top_value) if value is not None]
+            soil_series.append(
+                {
+                    "date": _power_day_to_iso(raw_day),
+                    "soil": round(sum(samples) / len(samples), 3) if samples else None,
+                }
+            )
+        return soil_series
     except Exception as exc:
         import logging
         logging.error(f"[NASA_SOIL_FETCH_ERROR] {exc}")
@@ -149,77 +221,101 @@ def fetch_openmeteo_weather(lat: float, lon: float, start: datetime.date, end: d
             temp = (data["temperature_2m_max"][i] + data["temperature_2m_min"][i]) / 2.0
             humidity = (data["relative_humidity_2m_max"][i] + data["relative_humidity_2m_min"][i]) / 2.0
             rain = data["precipitation_sum"][i]
-            result.append({"temp": temp, "humidity": humidity, "rain": rain})
+            result.append(
+                {
+                    "date": data["time"][i],
+                    "temp": round(temp, 3),
+                    "humidity": round(humidity, 3),
+                    "rain": round(float(rain), 3),
+                }
+            )
         return result
     except Exception as exc:
         import logging
         logging.error(f"[OPENMETEO_FETCH_ERROR] {exc}")
         raise RuntimeError(f"Errore fetch Open-Meteo: {exc}")
 
-def risk_label(score: float) -> str:
-    # HERO DEMO: HIGH, MEDIUM, LOW
-    if score >= 0.74:
-        return "HIGH"
-    elif score >= 0.52:
-        return "MEDIUM"
-    else:
-        return "LOW"
+def risk_label(average_risk: float, peak_risk: float, high_risk_days: int) -> str:
+    if peak_risk >= 0.86 or high_risk_days >= 4 or average_risk >= 0.74:
+        return "ALTO"
+    if peak_risk >= 0.66 or high_risk_days >= 2 or average_risk >= 0.52:
+        return "MEDIO"
+    return "BASSO"
 
-def generate_dashboard(lat: float, lon: float) -> Dict[str, Any]:
+def generate_dashboard(
+    lat: float,
+    lon: float,
+    start: Optional[date_type] = None,
+    end: Optional[date_type] = None,
+) -> Dict[str, Any]:
     import logging
     try:
         today = datetime.date.today()
-        days = [(today - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
-        end = today
-        start = days[0]
+        end = end or today
+        start = start or (end - datetime.timedelta(days=6))
+        days = [(start + datetime.timedelta(days=i)) for i in range(((end - start).days) + 1)]
+        warnings: List[str] = []
+
         try:
-            soil_vals = fetch_nasa_soil(lat, lon, start, end)
+            soil_series = fetch_nasa_soil(lat, lon, start, end)
         except Exception as exc:
             logging.error(f"[DASHBOARD_GENERATION_ERROR] Errore fetch_nasa_soil: {exc}")
-            soil_vals = [50.0] * 7
+            warnings.append(str(exc))
+            soil_series = []
         try:
             weather_vals = fetch_openmeteo_weather(lat, lon, start, end)
         except Exception as exc:
             logging.error(f"[DASHBOARD_GENERATION_ERROR] Errore fetch_openmeteo_weather: {exc}")
-            weather_vals = [{"temp": 22.0, "humidity": 60.0, "rain": 2.0}] * 7
-        # Fallback se dati incompleti
-        if len(soil_vals) < 7:
-            soil_vals = (list(soil_vals) + [50.0] * 7)[:7]
-        if len(weather_vals) < 7:
-            weather_vals = (list(weather_vals) + [{"temp": 22.0, "humidity": 60.0, "rain": 2.0}] * 7)[:7]
+            warnings.append(str(exc))
+            weather_vals = []
+
+        if not weather_vals:
+            raise RuntimeError("Open-Meteo non ha restituito dati giornalieri utili")
+
+        weather_vals = sorted(weather_vals, key=lambda item: str(item.get("date") or ""))
+        weather_dates = [str(item.get("date") or "") for item in weather_vals]
+        soil_vals = _align_soil_values(weather_dates, soil_series)
+
         daily = []
         prev_risk = 0.0
-        for i in range(7):
-            soil = soil_vals[i]
+        for i, weather_day in enumerate(weather_vals):
+            soil = soil_vals[i] if i < len(soil_vals) else 50.0
             temp = weather_vals[i]["temp"]
             humidity = weather_vals[i]["humidity"]
             rain = weather_vals[i]["rain"]
             risk = compute_fungal_risk_score(temp, humidity, rain, prev_risk)
             prev_risk = risk
             daily.append({
-                "date": days[i].isoformat(),
-                "soil": soil,
-                "temp": temp,
-                "humidity": humidity,
-                "rain": rain,
+                "date": str(weather_day.get("date") or days[i].isoformat()),
+                "soil": round(float(soil), 3),
+                "temp": round(float(temp), 3),
+                "humidity": round(float(humidity), 3),
+                "rain": round(float(rain), 3),
                 "risk": round(risk, 3)
             })
         values = [d["risk"] for d in daily]
-        average_risk = sum(values) / 7.0
+        average_risk = sum(values) / len(values)
         peak_risk = max(values)
         high_risk_days = sum(1 for v in values if v >= 0.75)
-        # HERO DEMO: classificazione
-        if peak_risk >= 0.86 or high_risk_days >= 4 or average_risk >= 0.74:
-            weekly_label = "HIGH"
-        elif peak_risk >= 0.66 or high_risk_days >= 2 or average_risk >= 0.52:
-            weekly_label = "MEDIUM"
-        else:
-            weekly_label = "LOW"
-        return {
+        weekly_label = risk_label(average_risk, peak_risk, high_risk_days)
+
+        dashboard = {
             "dashboard": daily,
             "weekly_risk": round(average_risk, 3),
-            "weekly_label": weekly_label
+            "weekly_label": weekly_label,
+            "summary": {
+                "sar_soil_moisture_percent": round(float(daily[-1]["soil"]), 3) if daily else 0.0,
+                "sar_source": "NASA POWER GWETROOT/GWETTOP soil proxy",
+                "sar_product_name": None,
+                "sar_acquired_at": daily[-1]["date"] if daily else None,
+                "weather_window_start": daily[0]["date"] if daily else start.isoformat(),
+                "weather_window_end": daily[-1]["date"] if daily else end.isoformat(),
+                "weather_source": "Open-Meteo Archive",
+            },
         }
+        if warnings:
+            dashboard["warnings"] = warnings
+        return dashboard
     except Exception as exc:
         logging.error(f"[DASHBOARD_GENERATION_ERROR] {exc}")
         # Fallback di emergenza: dati statici

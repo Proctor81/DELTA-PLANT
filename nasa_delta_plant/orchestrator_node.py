@@ -60,12 +60,33 @@ class NASADeltaPlantOrchestrator:
     ) -> dict[str, Any]:
         import logging
         logger = logging.getLogger("deltaplano.demo_hero")
-        """
-        Dashboard NASA-ISRO/SAR: usa SEMPRE la logica DEMO HERO fallback per garantire allineamento assoluto con il sito.
-        """
-        from ai.demo_hero_fallback import build_demo_analysis_payload
+        from bot.nasa_sar_dashboard import generate_dashboard
         from datetime import datetime, timedelta
-        # Genera la payload demo
+
+        center = geo_data.get("center", {}) or {}
+        latitude = float(center.get("lat", center.get("latitude", 0.0)) or 0.0)
+        longitude = float(center.get("lng", center.get("lon", center.get("longitude", 0.0))) or 0.0)
+
+        try:
+            start = datetime.strptime(date_range["start"], "%Y-%m-%d").date()
+            end = datetime.strptime(date_range["end"], "%Y-%m-%d").date()
+        except Exception:
+            end = datetime.utcnow().date()
+            start = end - timedelta(days=6)
+
+        try:
+            dashboard = generate_dashboard(latitude, longitude, start=start, end=end)
+            logger.warning(f"[DEBUG] LIVE NASA/OPEN-METEO dashboard: {dashboard}")
+            return {
+                "mode": "live-weather-openmeteo-nasa",
+                "geo_summary": self.area_diagnosis.validate_geo_area(geo_data),
+                "dashboard": dashboard,
+            }
+        except Exception as exc:
+            logger.error("[DEBUG] analyze_nasa_only live dashboard fallita, uso fallback demo: %s", exc, exc_info=True)
+
+        from ai.demo_hero_fallback import build_demo_analysis_payload
+
         payload = build_demo_analysis_payload(
             geo_data=geo_data,
             date_start=date_range["start"],
@@ -74,19 +95,15 @@ class NASADeltaPlantOrchestrator:
             consent={"llm": False},
         )
         logger.warning(f"[DEBUG] DEMO HERO payload: {payload}")
-        # Costruisci la tabella 7 giorni DEMO HERO
-        try:
-            start = datetime.strptime(date_range["start"], "%Y-%m-%d")
-        except Exception:
-            start = datetime.utcnow() - timedelta(days=6)
         daily = []
         soil = payload["field_state"]["sar_features"]["soil_moisture_percent"]
         temp = 22.0 + ((geo_data.get("center", {}).get("lat", 0) % 7) - 3)
         humidity = 60.0 + ((geo_data.get("center", {}).get("lng", 0) % 11) - 5)
         rain = 2.0 + ((geo_data.get("center", {}).get("lat", 0) + geo_data.get("center", {}).get("lng", 0)) % 3)
         risk = payload["field_state"]["sar_features"]["disease_risk_composite"] / 100.0
+        fallback_start = start
         for i in range(7):
-            day = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+            day = (fallback_start + timedelta(days=i)).strftime("%Y-%m-%d")
             daily.append({
                 "date": day,
                 "soil": soil,
@@ -95,7 +112,6 @@ class NASADeltaPlantOrchestrator:
                 "rain": rain,
                 "risk": risk,
             })
-        # Etichetta rischio settimanale
         if risk >= 0.8:
             weekly_label = "ALTO"
         elif risk >= 0.6:

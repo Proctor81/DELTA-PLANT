@@ -106,3 +106,47 @@ def test_orchestrator_returns_demo_hero_payload_for_area_analysis():
     assert result["field_state"]["raw_sar_summary"]["source"] == "Browser demo fallback"
     assert result["diagnosis"]["probable_crop"] == "Tomato_healthy"
     assert result["pdf_tokens"]["farmer"] == "demo-farmer-report"
+
+
+def test_analyze_nasa_only_prefers_live_dashboard(monkeypatch):
+    orchestrator = cast(Any, NASADeltaPlantOrchestrator.__new__(NASADeltaPlantOrchestrator))
+    orchestrator.area_diagnosis = SimpleNamespace(
+        validate_geo_area=lambda geo_data: {
+            "centroid": {"lat": 41.9028, "lon": 12.4964},
+            "radius_m": 50,
+        }
+    )
+
+    monkeypatch.setattr(
+        "bot.nasa_sar_dashboard.generate_dashboard",
+        lambda lat, lon, start=None, end=None: {
+            "dashboard": [
+                {
+                    "date": "2026-05-25",
+                    "soil": 28.8,
+                    "temp": 24.5,
+                    "humidity": 41.0,
+                    "rain": 0.0,
+                    "risk": 0.24,
+                }
+            ],
+            "weekly_risk": 0.24,
+            "weekly_label": "BASSO",
+            "summary": {
+                "sar_soil_moisture_percent": 28.8,
+                "weather_window_start": "2026-05-19",
+                "weather_window_end": "2026-05-25",
+            },
+        },
+    )
+
+    result = asyncio.run(
+        orchestrator.analyze_nasa_only(
+            geo_data={"type": "circle", "center": {"lat": 41.9028, "lng": 12.4964}, "radius": 50},
+            date_range={"start": "2026-05-19", "end": "2026-05-25"},
+        )
+    )
+
+    assert result["mode"] == "live-weather-openmeteo-nasa"
+    assert result["dashboard"]["dashboard"][0]["date"] == "2026-05-25"
+    assert result["dashboard"]["weekly_label"] == "BASSO"

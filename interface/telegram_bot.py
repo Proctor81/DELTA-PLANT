@@ -2140,26 +2140,35 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
         except Exception:
             return '--'
 
-    # Header e metriche principali (primo giorno)
-    d0 = daily[0] if daily else {}
+    def compact_date(raw_date: Any) -> str:
+        text = str(raw_date or "--").strip()
+        if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+            return f"{text[8:10]}/{text[5:7]}"
+        return text[:5] or "--"
+
     def get_biomass(d):
         # Usa sempre 'biomass_index' se presente, altrimenti fallback
         return d.get('biomass_index', d.get('biomass', None))
 
-    # Nuova tabella human-friendly con emoji e colonne allineate
-    header = "|   📅 Date   | 🌱 Soil | 🌡️ Temp | 💧 Humid | 🌧️ Rain | 🦠 Risk |"
-    sep    = "|------------|--------|---------|----------|---------|--------|"
-    # Ordina le date dalla più recente alla più antica
     def parse_date(d):
         try:
             return d.get('date') or ''
         except Exception:
             return ''
     daily_sorted = sorted(daily[:7], key=parse_date, reverse=True)
+    d0 = daily_sorted[0] if daily_sorted else {}
+
+    header = "Data  Soil% TempC RH% Rain Risk%"
+    sep = "----- ----- ----- --- ---- -----"
     rows = []
     for d in daily_sorted:
         rows.append(
-            f"| {d.get('date','--'):>10} | {safe(d.get('soil'), '{:6.1f}')} | {safe(d.get('temp'), '{:7.1f}')} | {safe(d.get('humidity'), '{:8.1f}')} | {safe(d.get('rain'), '{:7.1f}')} | {safe((d.get('risk', 0.0))*100, '{:6.2f}')} |"
+            f"{compact_date(d.get('date')):>5} "
+            f"{safe(d.get('soil'), '{:5.1f}')} "
+            f"{safe(d.get('temp'), '{:5.1f}')} "
+            f"{safe(d.get('humidity'), '{:3.0f}')} "
+            f"{safe(d.get('rain'), '{:4.1f}')} "
+            f"{safe((d.get('risk', 0.0))*100, '{:5.1f}') }"
         )
     table = [header, sep] + rows
     lines = [
@@ -2175,7 +2184,16 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     ]
     # Rischio settimanale
     if weekly_risk is not None and weekly_label is not None:
-        label_map = {"ALTO": "🔴 Alto", "MEDIO": "🟠 Medio", "BASSO": "🟡 Basso", "NESSUNO": "🟢 Nessuno"}
+        label_map = {
+            "ALTO": "🔴 Alto",
+            "HIGH": "🔴 Alto",
+            "MEDIO": "🟠 Medio",
+            "MEDIUM": "🟠 Medio",
+            "BASSO": "🟡 Basso",
+            "LOW": "🟡 Basso",
+            "NESSUNO": "🟢 Nessuno",
+            "NONE": "🟢 Nessuno",
+        }
         label_str = label_map.get(str(weekly_label).upper(), str(weekly_label))
         lines.append(f"<b>🦠 Weekly Fungal risk:</b> <b>{safe(weekly_risk*100, '{:.2f}')}% {label_str}</b>")
     else:
@@ -2183,11 +2201,12 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
         lines.append("<b>Dati non disponibili per questa posizione o finestra temporale.</b>")
     # Spiegazione sintetica
     lines.append("")
-    if weekly_label and str(weekly_label).upper() == 'ALTO':
+    normalized_weekly_label = str(weekly_label or '').upper()
+    if normalized_weekly_label in {'ALTO', 'HIGH'}:
         lines.append(f"🦠 Rischio fungino elevato: umidità, pioggia e SAR sono tutti su valori critici.")
-    elif weekly_label and str(weekly_label).upper() == 'MEDIO':
+    elif normalized_weekly_label in {'MEDIO', 'MEDIUM'}:
         lines.append(f"🦠 Pressione fungina media: persistenza di umidità e meteo favorevole.")
-    elif weekly_label and str(weekly_label).upper() == 'BASSO':
+    elif normalized_weekly_label in {'BASSO', 'LOW'}:
         lines.append(f"🦠 Rischio fungino basso: area più secca e meno favorevole allo sviluppo.")
     else:
         lines.append(f"🦠 Nessun rischio fungino significativo rilevato nella finestra attuale.")
