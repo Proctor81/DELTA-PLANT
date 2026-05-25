@@ -1315,11 +1315,15 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         ("Pipeline dati",         "Open-Meteo Archive per meteo storico recente + NASA POWER per proxy umidita del suolo, con stesso ordinamento della dashboard Telegram"),
         ("Output principali",     "Mappa area, localita, dashboard testuale live con riga Oggi, daily breakdown giornaliero e rischio settimanale sintetico"),
         ("Fallback web",          "Se il backend live non e disponibile, la pagina resta utilizzabile in modalita demo locale senza bloccare la navigazione del sito"),
+        ("Discovery web",         "La landing pubblica espone metadati strutturati (Open Graph, Twitter Card, JSON-LD), canonical, sitemap.xml, robots.txt e llms.txt per facilitare indicizzazione su motori generalisti, discovery tecnologica/scientifica e retrieval su sistemi LLM/RAG"),
+        ("Ottimizzazione mobile", "La DEMO NASA e stata compattata e verificata su viewport classe iPhone 14 Pro e Samsung Galaxy S22+, con input a 16 px, controlli touch >= 48 px, supporto safe-area e assenza di overflow orizzontale"),
         ("Privacy analytics",     "Gli eventi del sito e della hero demo vengono inviati al monitor visitatori solo dopo consenso analytics esplicito; la demo NASA resta consultabile anche senza tracking"),
     ])
     pdf._bullet([
         "La landing e il bot Telegram condividono le stesse regole di lettura del rischio fungino e la stessa logica di presentazione del giorno piu recente disponibile.",
         "Le richieste live del sito passano dall'endpoint /api/nisar/nasa-only del backend pubblico, cosi la descrizione mostrata sul web resta coerente con quella restituita in chat.",
+        "Il file pubblico llms.txt fornisce a crawler semantici e pipeline RAG una sintesi canonica di DELTA Plant, DELTAPLANO, benchmark, URL preferiti e vincoli di interpretazione del dashboard NASA/SAR.",
+        "Le pagine privacy, cookie e termini del sito espongono ora anch'esse metadati Open Graph, Twitter Card e JSON-LD coerenti con la landing, mentre la pagina di redirect privacy e marcata noindex per evitare duplicazione nei crawler.",
         "Il monitor visitatori first-party puo registrare anche l'avvio della hero dashboard, ma soltanto dopo consenso analytics valido lato server.",
     ])
     pdf._subsection("Learning-by-Doing (upload + metadati)")
