@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import unquote
 
 from nasa_delta_plant.privacy.consent_manager import ConsentManager, DEFAULT_CONSENT
 
@@ -27,7 +28,7 @@ class CookieValidator:
         if not cookie_value:
             return dict(DEFAULT_CONSENT)
         try:
-            parsed = json.loads(cookie_value)
+            parsed = json.loads(unquote(cookie_value))
         except json.JSONDecodeError:
             return dict(DEFAULT_CONSENT)
         return {**DEFAULT_CONSENT, **{key: bool(value) for key, value in parsed.items()}}

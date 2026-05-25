@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
 
 import api.main as api_main
+from nasa_delta_plant.privacy.cookie_validator import CookieValidator
 
 
 class FakeCookieValidator:
@@ -488,6 +490,28 @@ def test_analytics_event_requires_consent_and_is_recorded(nasa_client):
     assert payload["event_type"] == "cta_click"
     assert fake_orchestrator.website_analytics_tracker.events[-1]["event_label"] == "hero_open_bot"
     assert fake_orchestrator.website_analytics_tracker.events[-1]["session_id"]
+
+
+def test_cookie_validator_accepts_urlencoded_browser_cookie():
+    consent_manager = FakeConsentManager()
+    validator = CookieValidator(consent_manager)
+    user_token = "dp_user_token_1234567890"
+
+    consent_manager.grant_consent(
+        user_token,
+        {"analytics": True, "maps": False, "voice": False, "llm": False},
+    )
+    encoded_cookie = quote(
+        json.dumps(
+            {"necessary": True, "analytics": True, "maps": False, "voice": False, "llm": False},
+            separators=(",", ":"),
+        )
+    )
+
+    merged = validator.merged_consent(user_token, encoded_cookie)
+
+    assert merged["analytics"] is True
+    assert validator.feature_allowed(user_token, "analytics", encoded_cookie) is True
 
 
 def test_area_analysis_pdf_token_allows_positive_download_with_filename(nasa_client):
