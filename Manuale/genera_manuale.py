@@ -928,6 +928,9 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "   • Diagnosi finale strutturata in 5 blocchi: ipotesi, differenziale, azioni immediate,",
         "     azioni a breve termine, monitoraggio — con esplicito avviso di incertezza",
         "8. Risposta inviata in chat con paginazione automatica (/continua se testo lungo)",
+        "9. Voce contestuale: nelle fasi testuali della diagnosi guidata DELTA accetta messaggi vocali, li trascrive e li inoltra allo stesso handler usato per il testo",
+        "   - Fasi supportate: descrizione pianta/anomalia, inserimento manuale sensori, risposte di follow-up",
+        "   - Fasi non supportate: attesa foto, scelta sorgente immagine e pulsanti inline obbligatori",
     ])
     pdf._kv_table([
         ("Soglia fallback",          "confidenza < 50% sul modello TFLite reale (configurabile in core/config.py)"),
@@ -935,6 +938,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         ("Reclassificazione LLM",    "Attiva solo se l'utente ha fornito una descrizione"),
         ("Diagnosi conversazionale", "Basata su descrizione + Q&A + dati sensori, senza immagine classificata"),
         ("Foto libera",              "Stessa procedura del flusso guidato: foto → descrizione → sensori → diagnosi"),
+        ("Voce in diagnosi guidata", "Supportata nelle sole fasi testuali (descrizione, sensori manuali, follow-up); bloccata quando DELTA attende foto o pulsanti"),
         ("Diagnosi singolo msg",     "v3.2 — la diagnosi è inviata in un solo messaggio (split automatico a 4000 char)"),
         ("Chiusura conversazione",   "v3.2 — dopo 'Posso fare qualcos'altro per te?' il bot resta in attesa, nessun messaggio non sollecitato"),
         ("HF max_tokens",            "1500 (override via env HF_MAX_TOKENS); timeout 60s (HF_TIMEOUT)"),
@@ -957,6 +961,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Ri-ancoraggio automatico: se l'utente scrive richieste ellittiche come 'approfondisci', 'spiega il rischio' o 'qual è il nome della pianta', il motore conversazionale riusa esplicitamente l'ultima diagnosi come contesto principale.",
         "Igiene della memoria: i messaggi di errore del backend LLM non vengono salvati nella cronologia, per evitare contaminazioni del contesto.",
         "Ripresa automatica: se l'invio della diagnosi fallisce lato Telegram, i flag interni di diagnosi vengono comunque ripuliti e la chat libera torna disponibile.",
+        "Rientro da NASA/SAR: dopo il dashboard generato via Mini App Telegram, DELTA chiude automaticamente lo stato di attesa GPS e il follow-up puo continuare subito in chat libera, anche con messaggi vocali.",
         "Uso operativo: dopo una diagnosi l'utente può chiedere 'approfondisci', 'spiegami il rischio', 'qual è il nome della pianta' o 'spiegami la raccomandazione 2' senza perdere il contesto recente.",
     ])
     pdf._warning_box(
@@ -1174,6 +1179,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
         "Lingua operativa: il messaggio /start e sempre presentato in italiano; la selezione Ryan (EN) o Cris (IT) pilota invece sia la voce TTS sia la lingua delle risposte in chat libera.",
+        "Modalita voce: /voice on | off | auto controlla se DELTAPLANO deve rispondere anche in vocale; /voice_lang it | en | auto forza il pack voce da usare in chat libera.",
         "Modalita NASA-ISRO/SAR: pulsante inline 'Connettiti a NASA-ISRO/SAR' o comando /nasa_sar per avviare acquisizione GPS automatica via Mini App Telegram oppure invio manuale della posizione.",
         "Diagnosi spiegabile: il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico; l'overlay puo essere generato da EfficientFormer anche se la classificazione attiva resta sul backend generale.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
@@ -1188,7 +1194,9 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     pdf._bullet([
         "Esempi: 'Qual è la situazione attuale?', 'Spiega la diagnosi', 'Mostra le ultime raccomandazioni', 'Come si aggiorna il modello?'",
         "La chat libera è disponibile solo se l'orchestrator DELTA è attivo e il bot Telegram è correttamente configurato.",
+        "Voce in chat libera: i messaggi vocali vengono trascritti; in modalita auto testo→testo e voce→voce, mentre /voice on e /voice off permettono di forzare il comportamento.",
         "Durante diagnosi guidata, inserimento manuale dei sensori, upload o sessione /chat dedicata, la chat libera viene sospesa automaticamente per evitare interferenze tra i flussi.",
+        "Eccezione guidata: nella diagnosi Telegram i vocali sono comunque ammessi nelle sole fasi testuali (descrizione, sensori manuali, follow-up), ma non durante attesa foto o pulsanti obbligatori.",
         "Per tornare ai comandi guidati, usa /menu o i pulsanti inline.",
     ])
 
@@ -1270,6 +1278,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         ("Acquisizione GPS",       "Mini App Telegram 'Apri NASA-ISRO/SAR GPS' o bottone 'Invia GPS manualmente'"),
         ("Area analizzata",        "Cerchio di 50 m centrato sul punto GPS condiviso dall'utente"),
         ("Output restituiti",      "Snapshot mappa, report grafico NASA-ISRO/SAR, dashboard testuale live e contesto per domande successive"),
+        ("Follow-up post-dashboard", "Al termine del dashboard la chat torna subito disponibile per domande testuali o vocali di approfondimento, senza dover usare /menu"),
         ("Fonti dati operative",   "Open-Meteo Archive per temperatura/umidita/pioggia giornaliere e NASA POWER (GWETROOT/GWETTOP) per proxy umidita del suolo"),
         ("Fallback operativi",     "Se la Web App non restituisce coordinate valide, il bot invita all'invio manuale della posizione"),
         ("Operativita post-fix",   "Il click del menu produce subito l'istruzione iniziale; dopo aggiornamenti del bot e richiesto restart del servizio delta"),
@@ -1294,6 +1303,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Il rischio fungino giornaliero usa la stessa formula del modulo operativo: humidity_factor = clamp((RH - 60) / 40, 0, 1), temp_factor = clamp((T - 12) / 18, 0, 1), rain_factor = clamp(pioggia_mm / 14, 0, 1), persistenza = rischio_precedente * 0.05, quindi score = clamp(0.40 * humidity_factor + 0.35 * temp_factor + 0.25 * rain_factor + persistenza, 0, 1).",
         "Il rischio fungino settimanale riportato nel dashboard e la media aritmetica dei 7 valori giornalieri; l'etichetta verbale e classificata in BASSO, MEDIO o ALTO sulla stessa logica usata dalla landing Raspberry Pi.",
         "Se NASA POWER restituisce valori mancanti o sentinella (-999) sugli ultimissimi giorni, DELTA mantiene l'ultimo proxy di umidita del suolo valido allineato alle date meteo invece di generare una settimana sintetica tutta uguale.",
+        "Il ritorno del payload Mini App ripulisce lo stato interno di attesa GPS; questo evita che il primo follow-up vocale venga scambiato per una diagnosi guidata ancora aperta.",
     ])
     pdf._bullet([
         "Se il client Telegram non supporta la Mini App o il consenso GPS viene negato, usare l'invio manuale della posizione.",
@@ -1526,6 +1536,17 @@ def _add_troubleshooting(pdf: ManualePDF):
                 "Verificare token in .env (DELTA_TELEGRAM_TOKEN valorizzato e non placeholder)",
                 "Verificare connettivita di rete al boot (network-online target)",
                 "Confermare che TELEGRAM_CONFIG['enable_telegram'] sia True in core/config.py",
+            ]
+        ),
+        (
+            "Dopo il dashboard NASA/SAR un vocale viene rifiutato come diagnosi guidata",
+            [
+                "Comportamento atteso post-fix: dopo il dashboard NASA/SAR la chat libera torna subito disponibile e il follow-up puo arrivare anche in vocale.",
+                "Riavviare il servizio dopo l'aggiornamento: sudo systemctl restart delta",
+                "Verificare che il PID sia cambiato: systemctl show -p MainPID --value delta",
+                "Controllare i log recenti: journalctl -u delta -n 80 --no-pager",
+                "Se compare ancora il rifiuto, cercare tracce dello stato GPS pendente o del messaggio 'Voice mode is not supported during the guided DELTA Plant diagnosis'.",
+                "Come workaround operativo immediato usare /menu una sola volta, poi riprovare il vocale.",
             ]
         ),
         (

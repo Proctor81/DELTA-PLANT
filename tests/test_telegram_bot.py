@@ -482,11 +482,15 @@ def test_handle_nasa_sar_web_app_data_runs_analysis(monkeypatch):
             )
         )
     )
-    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+    context = types.SimpleNamespace(
+        user_data={"awaiting_nasa_sar_location": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
 
     asyncio.run(tg.handle_nasa_sar_web_app_data(update, context))
 
     assert calls == [(45.4642, 9.19, None)]
+    assert "awaiting_nasa_sar_location" not in context.user_data
 
 
 def test_handle_nasa_sar_web_app_data_reports_location_error(monkeypatch):
@@ -514,12 +518,78 @@ def test_handle_nasa_sar_web_app_data_reports_location_error(monkeypatch):
             )
         )
     )
-    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+    context = types.SimpleNamespace(
+        user_data={"awaiting_nasa_sar_location": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
 
     asyncio.run(tg.handle_nasa_sar_web_app_data(update, context))
 
     assert len(messages) == 1
     assert "posizione automatica non è disponibile" in messages[0][0]
+    assert "awaiting_nasa_sar_location" not in context.user_data
+
+
+def test_nasa_sar_web_app_success_unblocks_voice_followup(monkeypatch):
+    turns = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_run(update, context, latitude, longitude, reply_markup=None):
+        return None
+
+    async def fake_download(update):
+        return b"voice-bytes"
+
+    async def fake_transcribe(context, audio_bytes, file_suffix=".ogg"):
+        assert audio_bytes == b"voice-bytes"
+        return "Explain the risk"
+
+    async def fake_welcome(update, context):
+        return None
+
+    async def fake_handle_turn(update, context, user_text, input_mode):
+        turns.append((user_text, input_mode))
+        return "ok"
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_run_nasa_sar_analysis", fake_run)
+    monkeypatch.setattr(tg, "_download_voice_message_bytes", fake_download)
+    monkeypatch.setattr(tg, "transcribe_audio", fake_transcribe)
+    monkeypatch.setattr(tg, "_maybe_send_voice_welcome", fake_welcome)
+    monkeypatch.setattr(tg, "_handle_free_chat_turn", fake_handle_turn)
+
+    nasa_update = types.SimpleNamespace(
+        effective_message=types.SimpleNamespace(
+            web_app_data=types.SimpleNamespace(
+                data=json.dumps(
+                    {
+                        "type": "nasa_sar_location",
+                        "status": "ok",
+                        "latitude": 45.4642,
+                        "longitude": 9.19,
+                    }
+                )
+            )
+        )
+    )
+    context = types.SimpleNamespace(
+        user_data={"awaiting_nasa_sar_location": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    asyncio.run(tg.handle_nasa_sar_web_app_data(nasa_update, context))
+
+    voice_update = types.SimpleNamespace(
+        message=types.SimpleNamespace(voice=object()),
+        effective_user=types.SimpleNamespace(id=501),
+    )
+
+    with pytest.raises(tg.ApplicationHandlerStop):
+        asyncio.run(tg.handle_voice_message(voice_update, context))
+
+    assert turns == [("Explain the risk", "voice")]
 
 
 def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
@@ -676,6 +746,11 @@ def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
             "chat_pending_chunks": ["parte successiva"],
             "chat_pending_parse_mode": "Markdown",
             "chat_seed_context": "Sintesi SAR recente",
+            "diagnosis_active": True,
+            "diag_image_path": "input_images/foglia.jpg",
+            "diag_user_description": "Pomodoro con macchie bianche",
+            "diag_qa_active": True,
+            "upload_active": True,
         }
     )
 
@@ -687,6 +762,11 @@ def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
     assert "chat_pending_chunks" not in context.user_data
     assert "chat_pending_parse_mode" not in context.user_data
     assert "chat_seed_context" not in context.user_data
+    assert context.user_data.get("diagnosis_active") is False
+    assert "diag_image_path" not in context.user_data
+    assert "diag_user_description" not in context.user_data
+    assert "diag_qa_active" not in context.user_data
+    assert "upload_active" not in context.user_data
 
 
 def test_menu_sends_english_prompt_when_override_active(monkeypatch):
@@ -2035,6 +2115,38 @@ def test_handle_voice_message_rejects_guided_diagnosis(monkeypatch):
     assert sends == [tg._VOICE_GUIDED_DIAGNOSIS_REJECT]
 
 
+def test_handle_voice_message_allows_guided_diagnosis_description_phase(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(
+        tg,
+        "_download_voice_message_bytes",
+        lambda update: (_ for _ in ()).throw(AssertionError("la trascrizione deve essere delegata all'handler di stato")),
+    )
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(voice=object()),
+        effective_user=types.SimpleNamespace(id=500),
+    )
+    context = types.SimpleNamespace(
+        user_data={"diagnosis_active": True, "diag_image_path": "input_images/foglia.jpg"},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg.handle_voice_message(update, context))
+
+    assert result is None
+    assert sends == []
+
+
 def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
     turns = []
 
@@ -2071,6 +2183,37 @@ def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
         asyncio.run(tg.handle_voice_message(update, context))
 
     assert turns == [("ciao DELTA", "voice")]
+
+
+def test_receive_user_description_voice_transcribes_and_routes_to_text_handler(monkeypatch):
+    forwarded = []
+
+    async def fake_download(update):
+        return b"voice-bytes"
+
+    async def fake_transcribe(context, audio_bytes, file_suffix=".ogg"):
+        assert audio_bytes == b"voice-bytes"
+        return "Pomodoro con macchie bianche sulle foglie"
+
+    async def fake_receive(update, context):
+        forwarded.append(update.message.text)
+        return tg.STATE_DIAG_SENSOR_MODE
+
+    monkeypatch.setattr(tg, "_download_voice_message_bytes", fake_download)
+    monkeypatch.setattr(tg, "transcribe_audio", fake_transcribe)
+    monkeypatch.setattr(tg, "receive_user_description", fake_receive)
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(voice=object(), reply_text=None, message_thread_id=None),
+        effective_user=types.SimpleNamespace(id=777),
+        effective_chat=types.SimpleNamespace(),
+    )
+    context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
+
+    result = asyncio.run(tg.receive_user_description_voice(update, context))
+
+    assert result == tg.STATE_DIAG_SENSOR_MODE
+    assert forwarded == ["Pomodoro con macchie bianche sulle foglie"]
 
 
 def test_receive_followup_answer_advances_state_machine(monkeypatch):

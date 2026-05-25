@@ -50,6 +50,7 @@ import wave
 from io import BytesIO
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, Optional, Set, List, Tuple
 
 import requests
@@ -242,6 +243,66 @@ def _is_voice_free_chat_context(context: "ContextTypes.DEFAULT_TYPE") -> bool:
     if context.user_data.get("chat_mode_active"):
         return True
     return _free_chat_block_reason(context) == ""
+
+
+def _guided_diagnosis_voice_supported(context: "ContextTypes.DEFAULT_TYPE") -> bool:
+    if context.user_data.get("diag_qa_active") or context.user_data.get("diag_followup_last_question"):
+        return True
+    if "sensor_index" in context.user_data:
+        return True
+    if context.user_data.get("diag_image_path") and not context.user_data.get("diag_user_description"):
+        return True
+    return False
+
+
+def _voice_update_with_text(update: Update, transcript: str) -> Update:
+    original_message = getattr(update, "message", None)
+    proxy_message = SimpleNamespace(
+        text=transcript,
+        reply_text=getattr(original_message, "reply_text", None),
+        message_thread_id=getattr(original_message, "message_thread_id", None),
+    )
+    return SimpleNamespace(
+        message=proxy_message,
+        effective_message=proxy_message,
+        effective_chat=getattr(update, "effective_chat", None),
+        effective_user=getattr(update, "effective_user", None),
+        callback_query=getattr(update, "callback_query", None),
+    )
+
+
+async def _transcribe_voice_message_text(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> Optional[str]:
+    try:
+        voice_bytes = await _download_voice_message_bytes(update)
+        transcript = await transcribe_audio(context, voice_bytes)
+    except Exception as exc:
+        logger.warning("Trascrizione vocale fallita: %s", exc, exc_info=True)
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non riesco a trascrivere il messaggio vocale in questo momento. Puoi riprovare o scrivermi in testo?",
+                "I can't transcribe the voice message right now. You can try again or write to me in text.",
+            ),
+        )
+        return None
+
+    transcript = transcript.strip()
+    if not transcript:
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non sono riuscito a capire il messaggio vocale. Puoi ripetere?",
+                "I couldn't understand the voice message. Can you repeat it?",
+            ),
+        )
+        return None
+
+    return transcript
 
 
 def _voice_reply_mode(context: "ContextTypes.DEFAULT_TYPE") -> str:
@@ -1006,6 +1067,8 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         raise ApplicationHandlerStop
 
     if is_guided_diagnosis_mode(context):
+        if _guided_diagnosis_voice_supported(context):
+            return
         await _send(
             update,
             _ui_text(
@@ -1029,34 +1092,33 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await _maybe_send_voice_welcome(update, context)
 
-    try:
-        voice_bytes = await _download_voice_message_bytes(update)
-        transcript = await transcribe_audio(context, voice_bytes)
-    except Exception as exc:
-        logger.warning("Trascrizione vocale fallita: %s", exc, exc_info=True)
-        await _send(
-            update,
-            _ui_text(
-                context,
-                "Non riesco a trascrivere il messaggio vocale in questo momento. Puoi riprovare o scrivermi in testo?",
-                "I can't transcribe the voice message right now. You can try again or write to me in text.",
-            ),
-        )
-        raise ApplicationHandlerStop
-
-    if not transcript.strip():
-        await _send(
-            update,
-            _ui_text(
-                context,
-                "Non sono riuscito a capire il messaggio vocale. Puoi ripetere?",
-                "I couldn't understand the voice message. Can you repeat it?",
-            ),
-        )
+    transcript = await _transcribe_voice_message_text(update, context)
+    if transcript is None:
         raise ApplicationHandlerStop
 
     await _handle_free_chat_turn(update, context, transcript, input_mode="voice")
     raise ApplicationHandlerStop
+
+
+async def receive_user_description_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transcript = await _transcribe_voice_message_text(update, context)
+    if transcript is None:
+        return STATE_DIAG_USER_DESCRIPTION
+    return await receive_user_description(_voice_update_with_text(update, transcript), context)
+
+
+async def manual_sensor_input_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transcript = await _transcribe_voice_message_text(update, context)
+    if transcript is None:
+        return STATE_DIAG_TEMP
+    return await manual_sensor_input(_voice_update_with_text(update, transcript), context)
+
+
+async def receive_followup_answer_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    transcript = await _transcribe_voice_message_text(update, context)
+    if transcript is None:
+        return STATE_DIAG_FOLLOWUP
+    return await receive_followup_answer(_voice_update_with_text(update, transcript), context)
 
 # ──────────────────────────────────────────────────────────────
 # Handler per chat libera (domanda/risposta non strutturata)
@@ -2623,6 +2685,10 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
     if web_app_data is None:
         return
 
+    # The NASA Web App handoff is terminal for the waiting state even when it
+    # returns an error payload, otherwise free chat and voice stay blocked.
+    context.user_data.pop("awaiting_nasa_sar_location", None)
+
     try:
         payload = json.loads(web_app_data.data)
     except Exception:
@@ -2956,9 +3022,12 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     effective_user = getattr(update, "effective_user", None)
     logger.info("Telegram /menu ricevuto da user_id=%s", effective_user.id if effective_user else "0")
     was_chat_active = bool(context.user_data.get("chat_mode_active"))
+    was_guided_active = bool(_free_chat_block_reason(context))
     _clear_chat_state(context)
+    _clear_diagnosis_state(context)
+    context.user_data.pop("upload_active", None)
     await _send(update, _ui_text(context, "Menu principale:", "Main menu:"), reply_markup=_menu_keyboard(context))
-    if was_chat_active:
+    if was_chat_active or was_guided_active:
         return ConversationHandler.END
 
 
@@ -5101,6 +5170,7 @@ def run_telegram_bot(agent=None):
                 MessageHandler(filters.ALL, diag_expect_photo),
             ],
             STATE_DIAG_USER_DESCRIPTION: [
+                MessageHandler(filters.VOICE, receive_user_description_voice),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_description),
             ],
             STATE_DIAG_SENSOR_MODE: [
@@ -5109,8 +5179,12 @@ def run_telegram_bot(agent=None):
                     pattern=f"^({DIAG_SENSOR_AUTO}|{DIAG_SENSOR_MANUAL})$",
                 )
             ],
-            STATE_DIAG_TEMP: [MessageHandler(filters.TEXT & ~filters.COMMAND, manual_sensor_input)],
+            STATE_DIAG_TEMP: [
+                MessageHandler(filters.VOICE, manual_sensor_input_voice),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, manual_sensor_input),
+            ],
             STATE_DIAG_FOLLOWUP: [
+                MessageHandler(filters.VOICE, receive_followup_answer_voice),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_followup_answer),
             ],
             ConversationHandler.TIMEOUT: [MessageHandler(filters.ALL, timeout)],
