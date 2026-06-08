@@ -912,6 +912,19 @@ _FREE_CHAT_METRIC_LINE_RE = re.compile(
 _FREE_CHAT_INLINE_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 _FREE_CHAT_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _FREE_CHAT_CHART_REQUEST_RE = re.compile(r"\b(grafico|grafici|graph|chart|plot|visual(?:e|izza|ization))\b", re.IGNORECASE)
+_FREE_CHAT_CHART_NEGATION_RE = re.compile(
+    r"(senza\s+(?:alcun\w*\s+)?(?:grafico|grafici)|"
+    r"non\s+(?:voglio|generare|mostrare|inviare).{0,24}(?:grafico|grafici|chart|graph)|"
+    r"\bno\s+(?:grafico|grafici|chart|graph)s?\b|"
+    r"without\s+(?:any\s+)?(?:chart|graph)s?)",
+    re.IGNORECASE,
+)
+_FREE_CHAT_ADVANCED_CHART_REQUEST_RE = re.compile(
+    r"(grafico\s+avanzat|grafici\s+avanzat|grafico\s+premium|grafico\s+evolut|"
+    r"alto\s+impatto\s+grafico|grafico\s+ad\s+alto\s+impatto|"
+    r"advanced\s+(?:chart|graph|visual)|high[- ]impact\s+(?:chart|graphic))",
+    re.IGNORECASE,
+)
 
 
 def _free_chat_heading_icon(context: Optional["ContextTypes.DEFAULT_TYPE"], title: str) -> str:
@@ -943,8 +956,8 @@ def _parse_free_chat_metric_line(line: str) -> Optional[Tuple[str, str]]:
     match = _FREE_CHAT_METRIC_LINE_RE.match(str(line or ""))
     if not match:
         return None
-    label = re.sub(r"\s+", " ", match.group("label")).strip(" -•")
-    value = re.sub(r"\s+", " ", match.group("value")).strip()
+    label = re.sub(r"[`*_]+", "", re.sub(r"\s+", " ", match.group("label"))).strip(" -•")
+    value = re.sub(r"[`*_]+", "", re.sub(r"\s+", " ", match.group("value"))).strip()
     if len(label) < 2 or len(value) < 1:
         return None
     return label, value
@@ -952,6 +965,7 @@ def _parse_free_chat_metric_line(line: str) -> Optional[Tuple[str, str]]:
 
 def _parse_free_chat_metric_segment(segment: str) -> Optional[Tuple[str, str]]:
     cleaned = re.sub(r"^\s*(?:[-*•]\s*)?", "", str(segment or "")).strip().strip("|")
+    cleaned = re.sub(r"[`*_]+", "", cleaned)
     if not cleaned:
         return None
 
@@ -963,8 +977,8 @@ def _parse_free_chat_metric_segment(segment: str) -> Optional[Tuple[str, str]]:
     if len(parts) < 2:
         return None
 
-    label = re.sub(r"\s+", " ", parts[-2]).strip(" -•")
-    value = re.sub(r"\s+", " ", parts[-1]).strip()
+    label = re.sub(r"[`*_]+", "", re.sub(r"\s+", " ", parts[-2])).strip(" -•")
+    value = re.sub(r"[`*_]+", "", re.sub(r"\s+", " ", parts[-1])).strip()
     if len(label) < 2 or len(label) > 24 or len(value) < 1 or len(value) > 32:
         return None
     return label, value
@@ -1040,17 +1054,22 @@ def _free_chat_metric_bar(value: str) -> str:
     return ""
 
 
+def _free_chat_chart_request_mode(user_text: str) -> str:
+    raw = str(user_text or "")
+    if _FREE_CHAT_CHART_NEGATION_RE.search(raw):
+        return "none"
+    if _FREE_CHAT_ADVANCED_CHART_REQUEST_RE.search(raw):
+        return "advanced"
+    if _FREE_CHAT_CHART_REQUEST_RE.search(raw):
+        return "basic"
+    return "none"
+
+
 def _free_chat_requests_chart(user_text: str) -> bool:
-    return bool(_FREE_CHAT_CHART_REQUEST_RE.search(str(user_text or "")))
+    return _free_chat_chart_request_mode(user_text) != "none"
 
 
-def _build_free_chat_metric_chart(
-    context: Optional["ContextTypes.DEFAULT_TYPE"],
-    response_text: str,
-) -> Optional[BytesIO]:
-    if not PIL_AVAILABLE:
-        return None
-
+def _collect_free_chat_chart_metrics(response_text: str) -> List[Tuple[str, str, float]]:
     lines = str(response_text or "").splitlines()
     blocks: List[List[Tuple[str, str]]] = []
     idx = 0
@@ -1068,10 +1087,53 @@ def _build_free_chat_metric_chart(
 
     selected = next((rows for rows in blocks if _should_render_free_chat_metric_table(rows)), None)
     if not selected:
-        return None
+        return []
 
     metrics = [(label, value, _free_chat_metric_strength(value)) for label, value in selected]
-    positive_metrics = [(label, value, score) for label, value, score in metrics if score > 0]
+    return [(label, value, score) for label, value, score in metrics if score > 0]
+
+
+def _load_free_chat_chart_font(size: int, *, bold: bool = False):
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for candidate in font_candidates:
+        try:
+            if ImageFont is not None:
+                return ImageFont.truetype(candidate, size=size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _draw_free_chat_vertical_gradient(image, top_color: Tuple[int, int, int], bottom_color: Tuple[int, int, int]) -> None:
+    draw = ImageDraw.Draw(image)
+    width, height = image.size
+    for y in range(height):
+        ratio = y / max(1, height - 1)
+        color = tuple(int(top_color[index] + (bottom_color[index] - top_color[index]) * ratio) for index in range(3))
+        draw.line((0, y, width, y), fill=color + (255,))
+
+
+def _draw_free_chat_text_centered(draw, box: Tuple[int, int, int, int], text: str, *, font, fill: Tuple[int, int, int, int]) -> None:
+    left, top, right, bottom = box
+    text_box = draw.textbbox((0, 0), text, font=font)
+    text_width = text_box[2] - text_box[0]
+    text_height = text_box[3] - text_box[1]
+    x = left + max(0, (right - left - text_width) / 2)
+    y = top + max(0, (bottom - top - text_height) / 2)
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def _build_free_chat_metric_chart(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    response_text: str,
+) -> Optional[BytesIO]:
+    if not PIL_AVAILABLE:
+        return None
+
+    positive_metrics = _collect_free_chat_chart_metrics(response_text)
     if len(positive_metrics) < 2:
         return None
 
@@ -1106,12 +1168,100 @@ def _build_free_chat_metric_chart(
     return payload
 
 
+def _build_free_chat_advanced_chart(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    response_text: str,
+) -> Optional[BytesIO]:
+    if not PIL_AVAILABLE:
+        return None
+
+    metrics = _collect_free_chat_chart_metrics(response_text)
+    if len(metrics) < 2:
+        return None
+
+    width = 1280
+    height = max(780, 320 + len(metrics) * 108)
+    image = Image.new("RGBA", (width, height), (9, 18, 38, 255))
+    _draw_free_chat_vertical_gradient(image, (8, 20, 43), (10, 92, 122))
+    draw = ImageDraw.Draw(image, "RGBA")
+
+    draw.ellipse((width - 320, -120, width + 120, 300), fill=(56, 189, 248, 54))
+    draw.ellipse((-160, height - 280, 260, height + 100), fill=(45, 212, 191, 42))
+    draw.rounded_rectangle((52, 48, width - 52, height - 48), radius=36, fill=(255, 255, 255, 232))
+    draw.rounded_rectangle((72, 72, width - 72, height - 72), radius=28, outline=(148, 163, 184, 70), width=2)
+
+    title_font = _load_free_chat_chart_font(46, bold=True)
+    subtitle_font = _load_free_chat_chart_font(22)
+    heading_font = _load_free_chat_chart_font(28, bold=True)
+    value_font = _load_free_chat_chart_font(34, bold=True)
+    label_font = _load_free_chat_chart_font(22)
+    micro_font = _load_free_chat_chart_font(18)
+
+    title = _ui_text(context, "DELTA Visual Chart", "DELTA Visual Chart")
+    subtitle = _ui_text(
+        context,
+        "Visualizzazione avanzata generata solo su richiesta esplicita dell'utente",
+        "Advanced visualization generated only on explicit user request",
+    )
+    draw.text((110, 104), title, font=title_font, fill=(15, 23, 42, 255))
+    draw.text((112, 160), subtitle, font=subtitle_font, fill=(71, 85, 105, 255))
+
+    summary_score = sum(score for _, _, score in metrics) / max(1, len(metrics))
+    gauge_box = (118, 240, 394, 516)
+    draw.rounded_rectangle((94, 214, 418, 548), radius=30, fill=(15, 23, 42, 235))
+    draw.text((132, 244), _ui_text(context, "Sintesi trend", "Trend summary"), font=heading_font, fill=(226, 232, 240, 255))
+    draw.arc(gauge_box, start=140, end=400, fill=(51, 65, 85, 255), width=22)
+    draw.arc(gauge_box, start=140, end=140 + int(260 * (summary_score / 100.0)), fill=(34, 197, 94, 255), width=22)
+    _draw_free_chat_text_centered(draw, gauge_box, f"{int(round(summary_score))}%", font=value_font, fill=(248, 250, 252, 255))
+    draw.text((160, 476), _ui_text(context, "Impatto sintetico", "Visual impact"), font=label_font, fill=(148, 163, 184, 255))
+
+    palette = [
+        (14, 165, 233, 255),
+        (45, 212, 191, 255),
+        (249, 115, 22, 255),
+        (236, 72, 153, 255),
+        (168, 85, 247, 255),
+    ]
+    max_score = max(score for _, _, score in metrics) or 1.0
+    card_left = 472
+    card_right = width - 110
+    bar_left = card_left + 26
+    bar_right = card_right - 150
+    bar_width = bar_right - bar_left
+
+    for index, (label, value, score) in enumerate(metrics[:5]):
+        top = 238 + index * 108
+        accent = palette[index % len(palette)]
+        draw.rounded_rectangle((card_left, top, card_right, top + 84), radius=26, fill=(15, 23, 42, 238))
+        draw.rounded_rectangle((card_left, top, card_left + 14, top + 84), radius=14, fill=accent)
+        draw.text((bar_left, top + 18), str(label), font=heading_font, fill=(248, 250, 252, 255))
+        draw.text((card_right - 120, top + 18), str(value), font=heading_font, fill=(191, 219, 254, 255))
+        draw.rounded_rectangle((bar_left, top + 56, bar_right, top + 68), radius=8, fill=(51, 65, 85, 255))
+        current_bar = int(bar_width * max(0.12, score / max_score))
+        draw.rounded_rectangle((bar_left, top + 56, bar_left + current_bar, top + 68), radius=8, fill=accent)
+        draw.text((bar_right + 18, top + 48), f"{int(round(score))}%", font=micro_font, fill=(148, 163, 184, 255))
+
+    footer = _ui_text(
+        context,
+        "DELTA usa una visualizzazione locale PIL: nessuna chiamata LLM aggiuntiva per il grafico.",
+        "DELTA uses a local PIL visualization: no extra LLM call for the chart.",
+    )
+    draw.text((112, height - 118), footer, font=micro_font, fill=(71, 85, 105, 255))
+
+    payload = BytesIO()
+    image.save(payload, format="PNG")
+    payload.name = "delta_free_chat_advanced_chart.png"
+    payload.seek(0)
+    return payload
+
+
 async def _maybe_send_free_chat_chart(
     update: Update,
     context: "ContextTypes.DEFAULT_TYPE",
     response_text: str,
     *,
     chart_requested: bool,
+    advanced_chart_requested: bool = False,
 ) -> None:
     if not chart_requested:
         return
@@ -1119,18 +1269,25 @@ async def _maybe_send_free_chat_chart(
     if chat is None:
         return
 
-    chart_payload = await asyncio.to_thread(_build_free_chat_metric_chart, context, response_text)
+    caption = _ui_text(
+        context,
+        "📈 Mini-grafico DELTA generato su richiesta dagli indicatori della risposta.",
+        "📈 DELTA mini-chart generated on request from the response indicators.",
+    )
+    chart_payload = None
+    if advanced_chart_requested:
+        chart_payload = await asyncio.to_thread(_build_free_chat_advanced_chart, context, response_text)
+        caption = _ui_text(
+            context,
+            "🎨 Grafico avanzato DELTA generato su richiesta esplicita dagli indicatori della risposta.",
+            "🎨 DELTA advanced chart generated on explicit request from the response indicators.",
+        )
+    if chart_payload is None:
+        chart_payload = await asyncio.to_thread(_build_free_chat_metric_chart, context, response_text)
     if chart_payload is None:
         return
 
-    await chat.send_photo(
-        photo=chart_payload,
-        caption=_ui_text(
-            context,
-            "📈 Mini-grafico DELTA generato su richiesta dagli indicatori della risposta.",
-            "📈 DELTA mini-chart generated on request from the response indicators.",
-        ),
-    )
+    await chat.send_photo(photo=chart_payload, caption=caption)
 
 
 def _render_free_chat_metric_table(
@@ -1231,6 +1388,7 @@ async def _respond_free_chat_output(
     *,
     input_mode: str,
     chart_requested: bool = False,
+    advanced_chart_requested: bool = False,
 ) -> None:
     reply_markup = _chat_exit_keyboard(context) if context.user_data.get("chat_mode_active") else None
 
@@ -1247,7 +1405,13 @@ async def _respond_free_chat_output(
                 caption=_voice_caption(response_text),
                 reply_markup=reply_markup,
             )
-            await _maybe_send_free_chat_chart(update, context, response_text, chart_requested=chart_requested)
+            await _maybe_send_free_chat_chart(
+                update,
+                context,
+                response_text,
+                chart_requested=chart_requested,
+                advanced_chart_requested=advanced_chart_requested,
+            )
             return
         except Exception as exc:
             logger.warning("Fallback a testo per risposta vocale: %s", exc, exc_info=True)
@@ -1268,7 +1432,13 @@ async def _respond_free_chat_output(
         reply_markup=reply_markup,
         parse_mode=parse_mode,
     )
-    await _maybe_send_free_chat_chart(update, context, response_text, chart_requested=chart_requested)
+    await _maybe_send_free_chat_chart(
+        update,
+        context,
+        response_text,
+        chart_requested=chart_requested,
+        advanced_chart_requested=advanced_chart_requested,
+    )
 
 
 async def _handle_free_chat_turn(
@@ -1279,12 +1449,14 @@ async def _handle_free_chat_turn(
     input_mode: str,
 ) -> str:
     response = await _generate_free_chat_response(update, context, user_text)
+    chart_request_mode = _free_chat_chart_request_mode(user_text)
     await _respond_free_chat_output(
         update,
         context,
         response,
         input_mode=input_mode,
-        chart_requested=_free_chat_requests_chart(user_text),
+        chart_requested=chart_request_mode != "none",
+        advanced_chart_requested=chart_request_mode == "advanced",
     )
     return response
 

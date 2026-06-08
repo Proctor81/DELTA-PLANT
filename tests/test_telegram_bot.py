@@ -1107,7 +1107,15 @@ def test_respond_free_chat_output_uses_rich_html_when_needed(monkeypatch):
 def test_free_chat_requests_chart_detects_explicit_visual_prompt():
     assert tg._free_chat_requests_chart("Fammi un grafico del rischio") is True
     assert tg._free_chat_requests_chart("Show me a chart") is True
+    assert tg._free_chat_requests_chart("Rispondi senza grafici e senza immagini") is False
     assert tg._free_chat_requests_chart("Spiegami il rischio") is False
+
+
+def test_free_chat_chart_request_mode_detects_advanced_prompt():
+    assert tg._free_chat_chart_request_mode("Fammi un grafico avanzato ad alto impatto") == "advanced"
+    assert tg._free_chat_chart_request_mode("Show me an advanced chart") == "advanced"
+    assert tg._free_chat_chart_request_mode("Fammi un grafico") == "basic"
+    assert tg._free_chat_chart_request_mode("No chart, text only") == "none"
 
 
 def test_respond_free_chat_output_sends_chart_only_when_requested(monkeypatch):
@@ -1142,10 +1150,54 @@ def test_respond_free_chat_output_sends_chart_only_when_requested(monkeypatch):
     assert photos == ["📈 Mini-grafico DELTA generato su richiesta dagli indicatori della risposta."]
 
 
+def test_respond_free_chat_output_sends_advanced_chart_when_explicitly_requested(monkeypatch):
+    sends = []
+    photos = []
+
+    async def fake_send_chat_paginated(update, context, text, reply_markup=None, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    class FakeChat:
+        async def send_photo(self, photo, caption=None):
+            photos.append(caption)
+
+    monkeypatch.setattr(tg, "_send_chat_paginated", fake_send_chat_paginated)
+    monkeypatch.setattr(tg, "_should_reply_with_voice", lambda context, input_mode: False)
+    monkeypatch.setattr(tg, "_build_free_chat_advanced_chart", lambda context, text: BytesIO(b"fake-advanced-chart"))
+
+    context = types.SimpleNamespace(user_data={"chat_mode_active": True})
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+
+    asyncio.run(
+        tg._respond_free_chat_output(
+            update,
+            context,
+            "### Rischio\n- Temperatura: 23 C\n- Umidita: 71%\n- Stato: alto\n",
+            input_mode="text",
+            chart_requested=True,
+            advanced_chart_requested=True,
+        )
+    )
+
+    assert len(sends) == 1
+    assert photos == ["🎨 Grafico avanzato DELTA generato su richiesta esplicita dagli indicatori della risposta."]
+
+
 def test_build_free_chat_metric_chart_accepts_inline_pipe_metrics():
     context = types.SimpleNamespace(user_data={})
 
     payload = tg._build_free_chat_metric_chart(
+        context,
+        "**Vite:** Temperatura: 24 C | Umidita: 68% | Rischio: medio",
+    )
+
+    assert payload is not None
+
+
+def test_build_free_chat_advanced_chart_accepts_inline_pipe_metrics():
+    context = types.SimpleNamespace(user_data={})
+
+    payload = tg._build_free_chat_advanced_chart(
         context,
         "**Vite:** Temperatura: 24 C | Umidita: 68% | Rischio: medio",
     )
