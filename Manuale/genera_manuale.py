@@ -976,23 +976,29 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "con: numero richieste LLM, errori, lunghezza media risposta, modello usato e "
         "ultimo accesso. Include un istogramma ASCII comparativo tra tutti gli utenti "
         "autorizzati e una sezione 'Altri utenti' per quelli non in scientists.json. "
-        "Il report viene salvato in logs/deltaplano_inference_stats.txt."
+        "Legge anche file di log ruotati (.1 e .gz), deduplica righe duplicate e "
+        "ignora tracce sintetiche di test (fake-model/FakeEngine), evitando conteggi "
+        "gonfiati. Il report viene salvato in logs/deltaplano_inference_stats.txt."
     )
 
     pdf._subsection("5.4d Pannello amministratore — monitor visitatori del sito")
     pdf._body(
         "Dal pannello amministratore la voce [11] 'Monitor visitatori deltaplant.ai' "
         "mostra il traffico del sito pubblico in forma first-party e privacy-safe. "
-        "Gli eventi vengono registrati solo dopo consenso analytics esplicito e sono "
-        "salvati in locale nel database SQLite data/analytics/website_events.sqlite, "
-        "senza memorizzare identificativi personali in chiaro. Il monitor consente di "
-        "vedere panoramiche a 24 ore, 7 giorni e 30 giorni, pagine piu viste, referrer, "
-        "campagne UTM, dispositivi, lingue, eventi recenti ed export JSON del report."
+        "Gli eventi vengono registrati solo dopo consenso analytics esplicito. Il "
+        "monitor interroga prima il report live protetto dell'API pubblica e, solo se "
+        "non disponibile, ricade sul database SQLite locale configurato, senza "
+        "memorizzare identificativi personali in chiaro. Il monitor consente di vedere "
+        "panoramiche a 24 ore, 7 giorni e 30 giorni, pagine piu viste, referrer, "
+        "campagne UTM, dispositivi, lingue, eventi recenti, diagnostica del report "
+        "remoto ed export JSON del report."
     )
     pdf._bullet([
         "Eventi raccolti con consenso: page view, session start, uscita pagina con engagement, click outbound, avvio dashboard NASA/SAR, submit riuscito del form contatti, cambio lingua e aggiornamenti consenso.",
-        "Storage locale: data/analytics/website_events.sqlite sul dispositivo che esegue l'API DELTA; nessun invio a piattaforme advertising o pixel terzi.",
+        "Storage operativo: gli eventi risiedono nello storage runtime dell'istanza che esegue l'API DELTA; il percorso predefinito e data/analytics/website_events.sqlite ma puo essere ridefinito dalla configurazione. Nessun invio a piattaforme advertising o pixel terzi.",
+        "Report remoto protetto: il pannello admin firma un bearer JWT con scope admin:analytics:read verso /api/analytics/report; se la chiamata fallisce, il monitor mostra il motivo del fallback e puo aprire la voce [6] Diagnostica report remoto.",
         "Autorita del consenso: l'endpoint /api/analytics/events accetta eventi solo se la categoria analytics risulta abilitata lato server nella registry cifrata del consenso.",
+        "Bootstrap consenso: dopo redeploy o reset dello storage runtime, il frontend risincronizza il consenso analytics lato server prima di inviare nuovi eventi.",
         "Uso operativo: il monitor e pensato per il controllo interno dell'efficacia del sito e per verificare quali pagine o call-to-action generano piu interesse, senza pubblicare i dati raccolti.",
     ])
 
@@ -3587,13 +3593,15 @@ def _add_security(pdf: ManualePDF):
            ("[10] Statistiche inferenza DELTAPLANO_bot",
             "Produce un report per utente autorizzato sul traffico LLM del bot: "
             "richieste, errori, modelli usati, ultimo accesso e istogramma ASCII. "
-            "Salva anche un report testuale in logs/deltaplano_inference_stats.txt."),
+            "Legge anche log ruotati, deduplica duplicati e salva un report testuale "
+            "in logs/deltaplano_inference_stats.txt."),
            ("[11] Monitor visitatori deltaplant.ai",
             "Apre il monitor analytics first-party del sito pubblico. Mostra visitatori "
             "unici, sessioni, page view, CTA, referrer, lingue, dispositivi ed eventi "
-            "recenti a 24h/7g/30g, con possibilita di esportare un report JSON. I dati "
-            "sono raccolti solo dopo consenso analytics e restano nel database locale "
-            "data/analytics/website_events.sqlite."),
+            "recenti a 24h/7g/30g, leggendo prima il report live protetto dell'API "
+            "pubblica e usando il fallback SQLite locale solo se necessario. Include "
+            "export JSON e diagnostica del report remoto. I dati sono raccolti solo "
+            "dopo consenso analytics."),
     ])
 
     pdf._subsection("15.4 Cambio Password")
@@ -3808,7 +3816,9 @@ def _add_github_publisher(pdf: ManualePDF):
         "impedisce strutturalmente che i dati locali vengano mai committati. "
         "Dal 2026 questa separazione comprende anche il nuovo monitor visitatori "
         "del sito deltaplant.ai: gli eventi analytics first-party, se autorizzati "
-        "dall'utente del sito, restano in locale e non vengono pubblicati su GitHub."
+        "dall'utente del sito, restano nello storage operativo first-party del backend "
+        "o nel fallback locale e non vengono pubblicati su GitHub. Il pannello Admin "
+        "puo leggerli via report remoto protetto senza renderli dati versionati."
     )
     pdf._kv_table([
         ("Pubblicati su GitHub",
@@ -3850,8 +3860,10 @@ def _add_github_publisher(pdf: ManualePDF):
         ("logs/",
          "File di log di sistema con timestamp e messaggi di runtime."),
         ("data/analytics/",
-         "Database SQLite del monitor visitatori del sito (website_events.sqlite) "
-         "e relativi export JSON: analytics first-party solo locali, esclusi dal repository."),
+            "Database SQLite del monitor visitatori del sito (website_events.sqlite) "
+            "ed eventuali export JSON locali. In produzione il monitor puo leggere anche "
+            "il report remoto protetto, ma le copie locali di analytics first-party "
+            "restano escluse dal repository."),
         ("datasets/captures/",
          "Immagini acquisite dalla camera durante le sessioni di analisi."),
     ])
