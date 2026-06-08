@@ -140,10 +140,6 @@ export class SiteAnalytics {
   async syncConsentFromPreferences(preferences = {}, source = "landing_preference_center") {
     const current = this.manager.getConsent();
     const nextAnalytics = Boolean(preferences.analytics);
-    if (Boolean(current.analytics) === nextAnalytics) {
-      return current;
-    }
-
     return this.manager.saveConsent(
       {
         analytics: nextAnalytics,
