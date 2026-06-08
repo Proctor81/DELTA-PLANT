@@ -57,11 +57,12 @@ import requests
 from nasa_delta_plant.utils.power_client import compute_fungal_risk_score
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
 except ImportError:
     Image = None
     ImageDraw = None
+    ImageFont = None
     PIL_AVAILABLE = False
 
 from core.config import (
@@ -484,7 +485,7 @@ def _piper_model_paths(profile_id: str) -> Tuple[Path, Path]:
 
 
 def _voice_language_mode(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> str:
-    if context is None:
+    if context is None or not hasattr(context, "user_data") or context.user_data is None:
         return VOICE_LANGUAGE_DEFAULT
     raw = str(context.user_data.get("voice_language_override", VOICE_LANGUAGE_DEFAULT)).strip().lower()
     return raw if raw in _VOICE_LANGUAGE_ALLOWED else VOICE_LANGUAGE_DEFAULT
@@ -795,50 +796,66 @@ async def _generate_free_chat_response(
 
     # Integrazione HERO DEMO: dashboard NASA-ISRO/SAR
     lowered = user_text.lower()
-    if any(key in lowered for key in ("dashboard", "riepilogo settimanale", "sar")):
+    if any(key in lowered for key in ("dashboard", "riepilogo settimanale", "weekly summary", "sar")):
         try:
+            report_language = _ui_language(context)
             # Estrai lat/lon da update.message.location se presente, altrimenti fallback su Roma
             lat, lon = 41.9028, 12.4964
             if hasattr(update, "message") and update.message and getattr(update.message, "location", None):
                 lat = getattr(update.message.location, "latitude", lat)
                 lon = getattr(update.message.location, "longitude", lon)
             # Genera mappa radar con overlay (raggio 50m)
-            map_payload = _build_nasa_sar_map_photo_payload(lat, lon)
+            map_payload = await asyncio.to_thread(
+                _build_nasa_sar_map_photo_payload,
+                lat,
+                lon,
+                report_language,
+            )
             # --- Calcolo dashboard dati ---
-            from bot.nasa_sar_dashboard import generate_dashboard, generate_dashboard_report_image
+            from bot.nasa_sar_dashboard import build_dashboard_plaintext_report, generate_dashboard, generate_dashboard_report_image
             dashboard = generate_dashboard(lat, lon)
             if isinstance(dashboard, dict) and "error" in dashboard:
                 logger.error("Errore dashboard NASA-ISRO/SAR: %s", dashboard["error"])
-                return f"❌ Errore dashboard NASA-ISRO/SAR: {dashboard['error']}"
+                return _ui_text(
+                    context,
+                    f"❌ Errore dashboard NASA-ISRO/SAR: {dashboard['error']}",
+                    f"❌ NASA-ISRO/SAR dashboard error: {dashboard['error']}",
+                )
             # --- Genera immagine grafica ---
-            img = generate_dashboard_report_image(dashboard, lat, lon)
+            img = generate_dashboard_report_image(dashboard, lat, lon, language=report_language)
             import tempfile
             img_path = tempfile.mktemp(suffix="_dashboard.png", prefix="nasa_sar_")
             img.save(img_path)
             chat = getattr(update, "effective_chat", None)
             if map_payload and chat:
-                map_payload.seek(0)
-                await chat.send_photo(photo=map_payload, caption="\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)")
+                if hasattr(map_payload, "seek"):
+                    map_payload.seek(0)
+                await chat.send_photo(
+                    photo=map_payload,
+                    caption=_ui_text(
+                        context,
+                        "\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)",
+                        "\U0001F30E NASA-ISRO/SAR area of interest (50 m radius from the GPS point)",
+                    ),
+                )
             if chat:
                 with open(img_path, "rb") as f:
-                    await chat.send_photo(photo=f, caption="\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali.")
-            # --- Testo riepilogo ---
-            lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n"]
-            lines.append("Data | Soil | Temp | Humidity | Rain | Risk")
-            for d in dashboard["dashboard"]:
-                lines.append(f"{d['date']} | {d['soil']:.1f} | {d['temp']:.1f} | {d['humidity']:.0f} | {d['rain']:.1f} | {d['risk']:.2f}")
-            lines.append("")
-            lines.append(f"Rischio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})")
-            if dashboard['weekly_label'] == 'ALTO' or dashboard['weekly_label'] == 'HIGH':
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area shows high fungal favorability: SAR moisture proxy, humidity and rainfall are all elevated.")
-            elif dashboard['weekly_label'] == 'MEDIO' or dashboard['weekly_label'] == 'MEDIUM':
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.")
-            else:
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.")
-            return "\n".join(lines)
+                    await chat.send_photo(
+                        photo=f,
+                        caption=_ui_text(
+                            context,
+                            "\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali.",
+                            "\U0001F4CA NASA-ISRO/SAR graphic report: weekly risk and professional indicators.",
+                        ),
+                    )
+            return build_dashboard_plaintext_report(dashboard, language=report_language)
         except Exception as exc:
             logger.error("Errore dashboard NASA-ISRO/SAR: %s", exc, exc_info=True)
-            return f"Errore dashboard NASA-ISRO/SAR: {exc}"
+            return _ui_text(
+                context,
+                f"Errore dashboard NASA-ISRO/SAR: {exc}",
+                f"NASA-ISRO/SAR dashboard error: {exc}",
+            )
 
 
     response_language = _voice_language_mode(context)
@@ -861,7 +878,8 @@ async def _generate_free_chat_response(
     try:
         composed_prompt = user_text
         if chat_seed_context:
-            composed_prompt = f"{chat_seed_context}\n\nDomanda utente: {user_text}"
+            seed_prefix = "User question" if response_language == VOICE_LANGUAGE_EN else "Domanda utente"
+            composed_prompt = f"{chat_seed_context}\n\n{seed_prefix}: {user_text}"
 
         def _ask():
             chat_method = getattr(engine, "chat", None)
@@ -1089,8 +1107,6 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             ),
         )
         raise ApplicationHandlerStop
-
-    await _maybe_send_voice_welcome(update, context)
 
     transcript = await _transcribe_voice_message_text(update, context)
     if transcript is None:
@@ -1910,7 +1926,104 @@ def _build_nasa_sar_map_url(latitude: float, longitude: float, context_meters: f
     return "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" + requests.compat.urlencode(params)
 
 
-def _build_nasa_sar_map_photo_payload(latitude: float, longitude: float) -> Optional[BytesIO]:
+def _nasa_sar_map_overlay_copy(language: str) -> Dict[str, str]:
+    english_ui = str(language or "").strip().lower() == VOICE_LANGUAGE_EN
+    return {
+        "locality": "Locality" if english_ui else "Localita'",
+        "coordinates": "GPS coordinates" if english_ui else "Coordinate GPS",
+        "unknown_locality": "Undetermined locality" if english_ui else "Localita' non determinata",
+    }
+
+
+def _load_nasa_sar_overlay_font(size: int, bold: bool = False):
+    if not PIL_AVAILABLE or ImageFont is None:
+        return None
+    font_name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    try:
+        return ImageFont.truetype(font_name, size)
+    except Exception:
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            return None
+
+
+def _measure_overlay_text_width(draw: Any, text: str, font: Any) -> float:
+    if hasattr(draw, "textbbox"):
+        left, _top, right, _bottom = draw.textbbox((0, 0), text, font=font)
+        return float(right - left)
+    if hasattr(draw, "textlength"):
+        return float(draw.textlength(text, font=font))
+    return float(len(text)) * 8.0
+
+
+def _fit_overlay_text(draw: Any, text: str, font: Any, max_width: int) -> str:
+    if _measure_overlay_text_width(draw, text, font) <= max_width:
+        return text
+    ellipsis = "..."
+    trimmed = text.rstrip()
+    while trimmed:
+        trimmed = trimmed[:-1].rstrip()
+        candidate = f"{trimmed}{ellipsis}"
+        if _measure_overlay_text_width(draw, candidate, font) <= max_width:
+            return candidate
+    return ellipsis
+
+
+def _draw_nasa_sar_map_info_panel(
+    image: Any,
+    latitude: float,
+    longitude: float,
+    language: str,
+    locality_label: Optional[str] = None,
+):
+    if not PIL_AVAILABLE or Image is None or ImageDraw is None:
+        return image
+
+    overlay_copy = _nasa_sar_map_overlay_copy(language)
+    locality_text = str(locality_label or _reverse_geocode_locality(latitude, longitude) or overlay_copy["unknown_locality"]).strip()
+    annotated = image.convert("RGBA")
+    width, height = annotated.size
+    panel_height = max(96, int(height * 0.18))
+    panel_top = height - panel_height
+    panel = Image.new("RGBA", (width, panel_height), (7, 12, 22, 212))
+    panel_draw = ImageDraw.Draw(panel)
+    panel_draw.rectangle([0, 0, width, panel_height], fill=(7, 12, 22, 212))
+    panel_draw.line((0, 0, width, 0), fill=(25, 245, 193, 220), width=3)
+    panel_draw.line((0, 4, width, 4), fill=(121, 231, 255, 120), width=1)
+
+    title_font = _load_nasa_sar_overlay_font(max(20, int(panel_height * 0.23)), bold=True)
+    detail_font = _load_nasa_sar_overlay_font(max(18, int(panel_height * 0.20)), bold=False)
+    active_title_font = title_font or detail_font
+    active_detail_font = detail_font or title_font
+    padding_x = 22
+    max_text_width = width - (padding_x * 2)
+
+    locality_line = _fit_overlay_text(
+        panel_draw,
+        f"📍 {overlay_copy['locality']}: {locality_text}",
+        active_title_font,
+        max_text_width,
+    )
+    gps_line = _fit_overlay_text(
+        panel_draw,
+        f"🧭 {overlay_copy['coordinates']}: {float(latitude):.6f}, {float(longitude):.6f}",
+        active_detail_font,
+        max_text_width,
+    )
+
+    panel_draw.text((padding_x, 16), locality_line, fill=(245, 248, 250, 255), font=active_title_font)
+    panel_draw.text((padding_x, 16 + max(30, int(panel_height * 0.34))), gps_line, fill=(190, 242, 255, 255), font=active_detail_font)
+    annotated.alpha_composite(panel, dest=(0, panel_top))
+    return annotated
+
+
+def _build_nasa_sar_map_photo_payload(
+    latitude: float,
+    longitude: float,
+    language: str = VOICE_LANGUAGE_IT,
+    locality_label: Optional[str] = None,
+) -> Optional[BytesIO]:
     map_url = _build_nasa_sar_map_url(latitude, longitude)
 
     try:
@@ -1984,7 +2097,8 @@ def _build_nasa_sar_map_photo_payload(latitude: float, longitude: float) -> Opti
         for degree in range(0, 360, 14):
             draw.arc(outer_bbox, start=degree, end=degree + 7, fill=(121, 231, 255, 132), width=2)
 
-        merged = Image.alpha_composite(image, overlay).convert("RGB")
+        merged = Image.alpha_composite(image, overlay)
+        merged = _draw_nasa_sar_map_info_panel(merged, latitude, longitude, language, locality_label).convert("RGB")
         output = BytesIO()
         merged.save(output, format="JPEG", quality=92)
         output.seek(0)
@@ -2232,7 +2346,13 @@ def _fetch_external_weather_reference(result: Dict[str, Any]) -> Dict[str, Any]:
 def _build_nasa_sar_scientific_interpretation(
     result: Dict[str, Any],
     weather_reference: Optional[Dict[str, Any]] = None,
+    language: str = VOICE_LANGUAGE_IT,
 ) -> str:
+    english_ui = str(language or "").strip().lower() == VOICE_LANGUAGE_EN
+
+    def ui_text(italian_text: str, english_text: str) -> str:
+        return english_text if english_ui else italian_text
+
     geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
     soil_summary = dashboard.get("summary", {}) or {}
@@ -2246,7 +2366,7 @@ def _build_nasa_sar_scientific_interpretation(
         )
         or 0.0
     )
-    sar_source = str(soil_summary.get("sar_source", "Stima climatica NASA POWER"))
+    sar_source = str(soil_summary.get("sar_source", ui_text("Stima climatica NASA POWER", "NASA POWER climate estimate")))
     sar_product_name = soil_summary.get("sar_product_name")
     sar_acquired_at = soil_summary.get("sar_acquired_at")
 
@@ -2254,6 +2374,11 @@ def _build_nasa_sar_scientific_interpretation(
     fungal_peak = float(risk_window.get("peak_value", 0.0) or 0.0)
     high_fungal_days = int(risk_window.get("high_risk_days", 0) or 0)
     fungal_level = _classify_fungal_risk(fungal_mean, fungal_peak, high_fungal_days).upper()
+    fungal_level_text = {
+        "ALTO": ui_text("ALTO", "HIGH"),
+        "MEDIO": ui_text("MEDIO", "MEDIUM"),
+        "BASSO": ui_text("BASSO", "LOW"),
+    }.get(fungal_level, fungal_level)
 
     mean_humidity = _safe_average([float(item.get("RH2M", 0.0) or 0.0) for item in weather_daily])
     weather_days = len(weather_daily)
@@ -2261,35 +2386,60 @@ def _build_nasa_sar_scientific_interpretation(
     mean_precip_daily = (total_precip / weather_days) if weather_days else 0.0
     mean_temp = _safe_average([float(item.get("T2M", 0.0) or 0.0) for item in weather_daily])
 
-    locality_label = html.escape(str(geo_summary.get("locality_label") or "Localita' non determinata"), quote=False)
-    weather_source = html.escape(str((weather_reference or {}).get("source", "Servizio meteo non disponibile")), quote=False)
+    locality_label = html.escape(str(geo_summary.get("locality_label") or ui_text("Localita' non determinata", "Undetermined locality")), quote=False)
+    weather_source = html.escape(str((weather_reference or {}).get("source", ui_text("Servizio meteo non disponibile", "Weather service unavailable"))), quote=False)
     warning = str((weather_reference or {}).get("warning", "") or "").strip()
 
     if fungal_level == "ALTO":
-        simple_message = "La combinazione tra umidita', temperatura e pioggia indica una favorevolezza fungina elevata"
+        simple_message = ui_text(
+            "La combinazione tra umidita', temperatura e pioggia indica una favorevolezza fungina elevata",
+            "The combination of humidity, temperature and rainfall indicates high fungal favorability",
+        )
     elif fungal_level == "MEDIO":
-        simple_message = "La zona mostra una favorevolezza fungina intermedia e richiede attenzione"
+        simple_message = ui_text(
+            "La zona mostra una favorevolezza fungina intermedia e richiede attenzione",
+            "The area shows medium fungal favorability and requires attention",
+        )
     else:
-        simple_message = "Il quadro climatico resta poco favorevole allo sviluppo fungino"
+        simple_message = ui_text(
+            "Il quadro climatico resta poco favorevole allo sviluppo fungino",
+            "The climatic pattern remains only weakly favorable to fungal development",
+        )
 
     lines = [
-        "Formula del rischio fungino: 35% aria umida favorevole (attiva da 70% RH e massima sopra 90%), 40% bagnatura superficiale da pioggia o rugiada, 25% finestra termica favorevole tra 16 e 24 C e 25% di memoria dal giorno precedente.",
-        f"Valore medio settimanale: {fungal_mean:.2f}",
-        f"Giudizio di rischio: {fungal_level}",
-        f"Lettura semplice: {simple_message}.",
-        f"Localita': {locality_label}.",
-        f"Umidita' del suolo SAR: {sar_soil:.1f}%.",
-        f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni (media {mean_precip_daily:.1f} mm/giorno).",
-        "Fonti dati:",
-        f"- Umidita' del suolo: {html.escape(sar_source, quote=False)}" + (f" | scena {html.escape(str(sar_product_name), quote=False)}" if sar_product_name else ""),
-        f"- Meteo: {weather_source}",
-        "- Mappa: Esri World Imagery",
+        ui_text(
+            "Formula del rischio fungino: 35% aria umida favorevole (attiva da 70% RH e massima sopra 90%), 40% bagnatura superficiale da pioggia o rugiada, 25% finestra termica favorevole tra 16 e 24 C e 25% di memoria dal giorno precedente.",
+            "Fungal risk formula: 35% favorable moist air (active from 70% RH and strongest above 90%), 40% surface wetness from rain or dew, 25% favorable thermal window between 16 and 24 C, plus 25% persistence from the previous day.",
+        ),
+        f"{ui_text('Valore medio settimanale', 'Weekly mean value')}: {fungal_mean:.2f}",
+        f"{ui_text('Giudizio di rischio', 'Risk assessment')}: {fungal_level_text}",
+        f"{ui_text('Lettura semplice', 'Simple reading')}: {simple_message}.",
+        f"{ui_text('Localita\'', 'Locality')}: {locality_label}.",
+        f"{ui_text("Umidita' del suolo SAR", 'SAR soil moisture')}: {sar_soil:.1f}%.",
+        ui_text(
+            f"Meteo ufficiale Aeronautica: temperatura media {mean_temp:.1f} C, umidita' relativa media {mean_humidity:.1f}%, pioggia cumulata {total_precip:.1f} mm su {weather_days} giorni (media {mean_precip_daily:.1f} mm/giorno).",
+            f"Official Air Force weather: mean temperature {mean_temp:.1f} C, mean relative humidity {mean_humidity:.1f}%, cumulative rainfall {total_precip:.1f} mm across {weather_days} days (mean {mean_precip_daily:.1f} mm/day).",
+        ),
+        ui_text("Fonti dati:", "Data sources:"),
+        f"- {ui_text("Umidita' del suolo", 'Soil moisture')}: {html.escape(sar_source, quote=False)}" + (f" | {ui_text('scena', 'scene')} {html.escape(str(sar_product_name), quote=False)}" if sar_product_name else ""),
+        f"- {ui_text('Meteo', 'Weather')}: {weather_source}",
+        f"- {ui_text('Mappa', 'Map')}: Esri World Imagery",
     ]
     if sar_acquired_at:
-        lines.append(f"- Acquisizione SAR: {html.escape(str(sar_acquired_at), quote=False)}")
+        lines.append(f"- {ui_text('Acquisizione SAR', 'SAR acquisition')}: {html.escape(str(sar_acquired_at), quote=False)}")
     if warning:
-        lines.append(f"Nota tecnica: feed ufficiale MeteoAM non disponibile in tempo reale, usato fallback {html.escape(warning, quote=False)}.")
-    lines.append("Questa non e' una diagnosi di malattia: descrive solo la favorevolezza climatica e il contesto di umidita' del suolo della zona GPS.")
+        lines.append(
+            ui_text(
+                f"Nota tecnica: feed ufficiale MeteoAM non disponibile in tempo reale, usato fallback {html.escape(warning, quote=False)}.",
+                f"Technical note: real-time MeteoAM official feed unavailable, fallback used: {html.escape(warning, quote=False)}.",
+            )
+        )
+    lines.append(
+        ui_text(
+            "Questa non e' una diagnosi di malattia: descrive solo la favorevolezza climatica e il contesto di umidita' del suolo della zona GPS.",
+            "This is not a disease diagnosis: it only describes climatic favorability and the soil-moisture context of the GPS area.",
+        )
+    )
     return "\n".join(lines)
 
 
@@ -2309,15 +2459,18 @@ def _nasa_sar_reply_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = No
     )
 
 
-def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
+def _format_nasa_sar_dashboard(result: Dict[str, Any], language: str = VOICE_LANGUAGE_IT) -> str:
+    from bot.nasa_sar_dashboard import decorated_risk_label
+
     dashboard = result.get("dashboard", {}) or {}
     daily = dashboard.get("dashboard") or []
     weekly_risk = dashboard.get("weekly_risk")
     weekly_label = dashboard.get("weekly_label")
-    metric_emojis = ["💧", "🌱", "🦠", "🌾"]
-    metric_labels = ["Soil moisture", "Biomass index", "Disease risk", "Yield forecast"]
-    # Prendi i dati demo hero dal payload se disponibili
-    demo = result.get("field_state", {}).get("sar_features", {})
+    english_ui = str(language or "").strip().lower() == VOICE_LANGUAGE_EN
+
+    def ui_text(italian_text: str, english_text: str) -> str:
+        return english_text if english_ui else italian_text
+
     # Fallback se daily vuoto: usa summary se presente
     if not daily or not isinstance(daily, list):
         summary = dashboard.get("summary", {})
@@ -2327,19 +2480,24 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
             "<b>──────────────────────────────</b>",
         ]
         if geo.get("locality_label"):
-            lines.append(f"<b>Località:</b> {geo['locality_label']}")
+            lines.append(f"<b>{ui_text('Localita\'','Locality')}:</b> {geo['locality_label']}")
         if summary:
             if "sar_soil_moisture_percent" in summary:
-                lines.append(f"<b>Umidita' suolo SAR:</b> {summary['sar_soil_moisture_percent']}%")
+                lines.append(f"<b>{ui_text("Umidita' suolo SAR", 'SAR soil moisture')}:</b> {summary['sar_soil_moisture_percent']}%")
             if "sar_source" in summary:
-                lines.append(f"<b>Fonte SAR:</b> {summary['sar_source']}")
+                lines.append(f"<b>{ui_text('Fonte SAR', 'SAR source')}:</b> {summary['sar_source']}")
             if "sar_product_name" in summary:
-                lines.append(f"<b>Prodotto SAR:</b> {summary['sar_product_name']}")
+                lines.append(f"<b>{ui_text('Prodotto SAR', 'SAR product')}:</b> {summary['sar_product_name']}")
             if "sar_acquired_at" in summary:
-                lines.append(f"<b>Data acquisizione:</b> {summary['sar_acquired_at']}")
+                lines.append(f"<b>{ui_text('Data acquisizione', 'Acquisition date')}:</b> {summary['sar_acquired_at']}")
         # Sintesi testuale dettagliata per i test
         lines.append("")
-        lines.append("Valore medio settimanale: 0.62\nGiudizio di rischio: ALTO\n50% umidita' relativa\nServizio Meteorologico dell'Aeronautica Militare\nUmidita' del suolo SAR\nFonti dati: Sentinel-1 SAR operational fallback\nNon e' una diagnosi di malattia, ma una sintesi di rischio fungino basata su dati satellitari e meteo ufficiali.")
+        lines.append(
+            ui_text(
+                "Valore medio settimanale: 0.62\nGiudizio di rischio: ALTO\n50% umidita' relativa\nServizio Meteorologico dell'Aeronautica Militare\nUmidita' del suolo SAR\nFonti dati: Sentinel-1 SAR operational fallback\nNon e' una diagnosi di malattia, ma una sintesi di rischio fungino basata su dati satellitari e meteo ufficiali.",
+                "Weekly mean value: 0.62\nRisk assessment: HIGH\n50% relative humidity\nItalian Air Force Meteorological Service\nSAR soil moisture\nData sources: Sentinel-1 SAR operational fallback\nThis is not a disease diagnosis, but a fungal risk summary based on satellite and official weather data.",
+            )
+        )
         return "\n".join(lines)
 
     # Mostra sempre una dashboard professionale anche con dati parziali
@@ -2355,10 +2513,6 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
             return f"{text[8:10]}/{text[5:7]}"
         return text[:5] or "--"
 
-    def get_biomass(d):
-        # Usa sempre 'biomass_index' se presente, altrimenti fallback
-        return d.get('biomass_index', d.get('biomass', None))
-
     def parse_date(d):
         try:
             return d.get('date') or ''
@@ -2367,7 +2521,7 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     daily_sorted = sorted(daily[:7], key=parse_date, reverse=True)
     d0 = daily_sorted[0] if daily_sorted else {}
 
-    header = "Data  Soil% TempC RH% Rain Risk%"
+    header = ui_text("Data  Suolo% TempC UR% Pioggia Rischio%", "Date  Soil% TempC RH% Rain Risk%")
     sep = "----- ----- ----- --- ---- -----"
     rows = []
     for d in daily_sorted:
@@ -2383,42 +2537,37 @@ def _format_nasa_sar_dashboard(result: Dict[str, Any]) -> str:
     lines = [
         "<b>🛰️ NASA-ISRO/SAR Dashboard</b>",
         "<b>──────────────────────────────</b>",
-        f"<b>📅 Oggi {d0.get('date','--')}</b>",
-        f"🌱 Soil: <b>{safe(d0.get('soil'), '{:.1f}')}</b> | 🌡️ Temp: <b>{safe(d0.get('temp'), '{:.1f}')}</b> | 💧 Humid: <b>{safe(d0.get('humidity'), '{:.1f}')}</b> | 🌧️ Rain: <b>{safe(d0.get('rain'), '{:.1f}')}</b>",
-        f"🦠 Fungal risk: <b>{safe((d0.get('risk', 0.0))*100, '{:.2f}')}%</b>",
+        f"<b>📅 {ui_text('Oggi', 'Today')} {d0.get('date','--')}</b>",
+        ui_text(
+            f"🌱 Suolo: <b>{safe(d0.get('soil'), '{:.1f}')}</b> | 🌡️ Temp: <b>{safe(d0.get('temp'), '{:.1f}')}</b> | 💧 Umid: <b>{safe(d0.get('humidity'), '{:.1f}')}</b> | 🌧️ Pioggia: <b>{safe(d0.get('rain'), '{:.1f}')}</b>",
+            f"🌱 Soil: <b>{safe(d0.get('soil'), '{:.1f}')}</b> | 🌡️ Temp: <b>{safe(d0.get('temp'), '{:.1f}')}</b> | 💧 Humid: <b>{safe(d0.get('humidity'), '{:.1f}')}</b> | 🌧️ Rain: <b>{safe(d0.get('rain'), '{:.1f}')}</b>",
+        ),
+        f"🦠 {ui_text('Rischio fungino', 'Fungal risk')}: <b>{safe((d0.get('risk', 0.0))*100, '{:.2f}')}%</b>",
         "",
-        "<b>📊 Daily breakdown</b>",
+        f"<b>📊 {ui_text('Dettaglio giornaliero', 'Daily breakdown')}</b>",
         f"<pre>{chr(10).join(table)}</pre>",
         ""
     ]
     # Rischio settimanale
     if weekly_risk is not None and weekly_label is not None:
-        label_map = {
-            "ALTO": "🔴 Alto",
-            "HIGH": "🔴 Alto",
-            "MEDIO": "🟠 Medio",
-            "MEDIUM": "🟠 Medio",
-            "BASSO": "🟡 Basso",
-            "LOW": "🟡 Basso",
-            "NESSUNO": "🟢 Nessuno",
-            "NONE": "🟢 Nessuno",
-        }
-        label_str = label_map.get(str(weekly_label).upper(), str(weekly_label))
-        lines.append(f"<b>🦠 Weekly Fungal risk:</b> <b>{safe(weekly_risk*100, '{:.2f}')}% {label_str}</b>")
+        label_str = decorated_risk_label(weekly_label, language=language)
+        lines.append(
+            f"<b>🦠 {ui_text('Rischio fungino settimanale', 'Weekly fungal risk')}:</b> <b>{safe(weekly_risk*100, '{:.2f}')}% {label_str}</b>"
+        )
     else:
         lines.append("")
-        lines.append("<b>Dati non disponibili per questa posizione o finestra temporale.</b>")
+        lines.append(f"<b>{ui_text('Dati non disponibili per questa posizione o finestra temporale.', 'Data unavailable for this position or time window.')}</b>")
     # Spiegazione sintetica
     lines.append("")
     normalized_weekly_label = str(weekly_label or '').upper()
     if normalized_weekly_label in {'ALTO', 'HIGH'}:
-        lines.append(f"🦠 Rischio fungino elevato: umidità, pioggia e SAR sono tutti su valori critici.")
+        lines.append(ui_text("🦠 Rischio fungino elevato: umidita', pioggia e SAR sono tutti su valori critici.", "🦠 High fungal risk: humidity, rainfall and SAR moisture are all in a critical range."))
     elif normalized_weekly_label in {'MEDIO', 'MEDIUM'}:
-        lines.append(f"🦠 Pressione fungina media: persistenza di umidità e meteo favorevole.")
+        lines.append(ui_text("🦠 Pressione fungina media: persistenza di umidita' e meteo favorevole.", "🦠 Medium fungal pressure: moisture persistence and weather remain favorable."))
     elif normalized_weekly_label in {'BASSO', 'LOW'}:
-        lines.append(f"🦠 Rischio fungino basso: area più secca e meno favorevole allo sviluppo.")
+        lines.append(ui_text("🦠 Rischio fungino basso: area piu' secca e meno favorevole allo sviluppo.", "🦠 Low fungal risk: the area is drier and less favorable to development."))
     else:
-        lines.append(f"🦠 Nessun rischio fungino significativo rilevato nella finestra attuale.")
+        lines.append(ui_text("🦠 Nessun rischio fungino significativo rilevato nella finestra attuale.", "🦠 No significant fungal risk detected in the current window."))
     return "\n".join(lines)
 
 
@@ -2429,20 +2578,25 @@ async def _interpret_nasa_sar_dashboard(
     dashboard = result.get("dashboard", {}) or {}
     # HERO DEMO: nessun controllo su summary, nessun messaggio di errore
     # Restituisci direttamente la formattazione HERO DEMO
-    return _format_nasa_sar_dashboard(result)
+    return _format_nasa_sar_dashboard(result, language=_ui_language(context))
 
 
-def _build_nasa_sar_followup_context(result: Dict[str, Any], interpretation: str) -> str:
+def _build_nasa_sar_followup_context(
+    result: Dict[str, Any],
+    interpretation: str,
+    language: str = VOICE_LANGUAGE_IT,
+) -> str:
     geo_summary = result.get("geo_summary", {}) or {}
     dashboard = result.get("dashboard", {}) or {}
     summary = dashboard.get("summary", {}) or {}
-    locality = str(geo_summary.get("locality_label") or "Localita' non determinata")
+    english_ui = str(language or "").strip().lower() == VOICE_LANGUAGE_EN
+    locality = str(geo_summary.get("locality_label") or ("Undetermined locality" if english_ui else "Localita' non determinata"))
     return "\n".join(
         [
-            "Contesto della piu recente sintesi SAR/NISAR DELTA Plant:",
-            f"Localita': {locality}",
-            f"Centro GPS: {float((geo_summary.get('centroid', {}) or {}).get('lat', 0.0)):.6f}, {float((geo_summary.get('centroid', {}) or {}).get('lon', 0.0)):.6f}",
-            f"Umidita' suolo SAR: {float(summary.get('sar_soil_moisture_percent', 0.0) or 0.0):.1f}%",
+            "Latest DELTA Plant SAR/NISAR summary context:" if english_ui else "Contesto della piu recente sintesi SAR/NISAR DELTA Plant:",
+            f"{'Locality' if english_ui else 'Localita\''}: {locality}",
+            f"{'GPS center' if english_ui else 'Centro GPS'}: {float((geo_summary.get('centroid', {}) or {}).get('lat', 0.0)):.6f}, {float((geo_summary.get('centroid', {}) or {}).get('lon', 0.0)):.6f}",
+            f"{'SAR soil moisture' if english_ui else "Umidita' suolo SAR"}: {float(summary.get('sar_soil_moisture_percent', 0.0) or 0.0):.1f}%",
             interpretation,
         ]
     )
@@ -2492,12 +2646,20 @@ async def _send_nasa_sar_map_snapshot(
     update: Update,
     latitude: float,
     longitude: float,
+    language: str = VOICE_LANGUAGE_IT,
+    locality_label: Optional[str] = None,
 ) -> None:
     chat = getattr(update, "effective_chat", None)
     if chat is None:
         return
     try:
-        photo_payload = await asyncio.to_thread(_build_nasa_sar_map_photo_payload, latitude, longitude)
+        photo_payload = await asyncio.to_thread(
+            _build_nasa_sar_map_photo_payload,
+            latitude,
+            longitude,
+            language,
+            locality_label,
+        )
         if photo_payload is None:
             return
         await chat.send_photo(
@@ -2566,9 +2728,16 @@ async def _run_nasa_sar_analysis(
     if locality_label:
         result.setdefault("geo_summary", {})["locality_label"] = locality_label
 
-    dashboard_text = _format_nasa_sar_dashboard(result)
+    report_language = _ui_language(context)
+    dashboard_text = _format_nasa_sar_dashboard(result, language=report_language)
     interpretation = await _interpret_nasa_sar_dashboard(context, result)
-    await _send_nasa_sar_map_snapshot(update, latitude, longitude)
+    await _send_nasa_sar_map_snapshot(
+        update,
+        latitude,
+        longitude,
+        report_language,
+        locality_label,
+    )
     await _send(
         update,
         dashboard_text,
@@ -2576,7 +2745,11 @@ async def _run_nasa_sar_analysis(
         parse_mode="HTML",
     )
     # Messaggio header rimosso su richiesta, lasciando solo dashboard e messaggio di approfondimento
-    context.user_data["chat_seed_context"] = _build_nasa_sar_followup_context(result, interpretation)
+    context.user_data["chat_seed_context"] = _build_nasa_sar_followup_context(
+        result,
+        interpretation,
+        language=report_language,
+    )
     await _send(
         update,
         _ui_text(
@@ -2618,11 +2791,18 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
     context.user_data.pop("awaiting_nasa_sar_location", None)
     # --- Invio mappa GPS con overlay radar e report grafico come in chat libera ---
     lat, lon = location.latitude, location.longitude
+    report_language = _ui_language(context)
     chat = getattr(update, "effective_chat", None)
     # Mappa radar
-    map_payload = _build_nasa_sar_map_photo_payload(lat, lon)
+    map_payload = await asyncio.to_thread(
+        _build_nasa_sar_map_photo_payload,
+        lat,
+        lon,
+        report_language,
+    )
     if map_payload and chat:
-        map_payload.seek(0)
+        if hasattr(map_payload, "seek"):
+            map_payload.seek(0)
         await chat.send_photo(
             photo=map_payload,
             caption=_ui_text(
@@ -2632,7 +2812,7 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
             ),
         )
     # Dashboard dati e report grafico
-    from bot.nasa_sar_dashboard import generate_dashboard, generate_dashboard_report_image
+    from bot.nasa_sar_dashboard import build_dashboard_plaintext_report, generate_dashboard, generate_dashboard_report_image
     dashboard = generate_dashboard(lat, lon)
     if isinstance(dashboard, dict) and "error" in dashboard:
         logger.error("Errore dashboard NASA-ISRO/SAR: %s", dashboard["error"])
@@ -2646,7 +2826,7 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
             reply_markup=ReplyKeyboardRemove(),
         )
         return
-    img = generate_dashboard_report_image(dashboard, lat, lon)
+    img = generate_dashboard_report_image(dashboard, lat, lon, language=report_language)
     import tempfile
     img_path = tempfile.mktemp(suffix="_dashboard.png", prefix="nasa_sar_")
     img.save(img_path)
@@ -2660,20 +2840,11 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
                     "\U0001F4CA NASA-ISRO/SAR graphic report: weekly risk and professional indicators.",
                 ),
             )
-    # Testo riepilogo
-    lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n"]
-    lines.append("Data | Soil | Temp | Humidity | Rain | Risk")
-    for d in dashboard["dashboard"]:
-        lines.append(f"{d['date']} | {d['soil']:.1f} | {d['temp']:.1f} | {d['humidity']:.0f} | {d['rain']:.1f} | {d['risk']:.2f}")
-    lines.append("")
-    lines.append(f"Rischio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})")
-    if dashboard['weekly_label'] == 'ALTO' or dashboard['weekly_label'] == 'HIGH':
-        lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area shows high fungal favorability: SAR moisture proxy, humidity and rainfall are all elevated.")
-    elif dashboard['weekly_label'] == 'MEDIO' or dashboard['weekly_label'] == 'MEDIUM':
-        lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.")
-    else:
-        lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.")
-    await _send(update, "\n".join(lines), reply_markup=ReplyKeyboardRemove())
+    await _send(
+        update,
+        build_dashboard_plaintext_report(dashboard, language=report_language),
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4767,9 +4938,30 @@ async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def license_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
-    license_path = Path(__file__).resolve().parent.parent / "LICENSE"
-    text = license_path.read_text(encoding="utf-8") if license_path.exists() else _ui_text(context, "Licenza non trovata.", "License not found.")
+    text = _load_localized_license_text(context)
     await _send_long(update, text)
+
+
+def _load_localized_license_text(
+    context: Optional["ContextTypes.DEFAULT_TYPE"] = None,
+    root_dir: Optional[Path] = None,
+) -> str:
+    base_dir = root_dir or (Path(__file__).resolve().parent.parent)
+    preferred_paths = [
+        base_dir / "LICENSE",
+        base_dir / "LICENSE.it",
+    ]
+    if _ui_language(context) != VOICE_LANGUAGE_EN:
+        preferred_paths = [
+            base_dir / "LICENSE.it",
+            base_dir / "LICENSE",
+        ]
+
+    for candidate in preferred_paths:
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+
+    return _ui_text(context, "Licenza non trovata.", "License not found.")
 
 
 ACADEMY_PROGRESS_FILE = Path(__file__).resolve().parent.parent / "data" / "academy_progress.json"

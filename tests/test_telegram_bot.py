@@ -190,6 +190,28 @@ def test_maybe_send_voice_welcome_uses_english_copy_when_override_active(monkeyp
     assert sends[0].startswith("🎙️ Voice mode is available in free chat.")
 
 
+def test_load_localized_license_text_prefers_italian_for_cris(tmp_path):
+    (tmp_path / "LICENSE").write_text("ENGLISH LICENSE", encoding="utf-8")
+    (tmp_path / "LICENSE.it").write_text("LICENZA ITALIANA", encoding="utf-8")
+
+    context = types.SimpleNamespace(user_data={})
+
+    result = tg._load_localized_license_text(context, root_dir=tmp_path)
+
+    assert result == "LICENZA ITALIANA"
+
+
+def test_load_localized_license_text_prefers_english_for_ryan(tmp_path):
+    (tmp_path / "LICENSE").write_text("ENGLISH LICENSE", encoding="utf-8")
+    (tmp_path / "LICENSE.it").write_text("LICENZA ITALIANA", encoding="utf-8")
+
+    context = types.SimpleNamespace(user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN})
+
+    result = tg._load_localized_license_text(context, root_dir=tmp_path)
+
+    assert result == "ENGLISH LICENSE"
+
+
 def test_send_personalized_welcome_voice_uses_tts_and_send_voice(monkeypatch):
     calls = []
 
@@ -722,10 +744,91 @@ def test_format_nasa_sar_dashboard_uses_latest_day_and_compact_daily_breakdown()
     )
 
     assert "📅 Oggi 2026-05-25" in text
-    assert "Data  Soil% TempC RH% Rain Risk%" in text
+    assert "Data  Suolo% TempC UR% Pioggia Rischio%" in text
     assert "25/05" in text
     assert "19/05" in text
     assert text.index("25/05") < text.index("19/05")
+
+
+def test_format_nasa_sar_dashboard_localizes_to_english():
+    text = tg._format_nasa_sar_dashboard(
+        {
+            "dashboard": {
+                "dashboard": [
+                    {
+                        "date": "2026-05-19",
+                        "soil": 31.4,
+                        "temp": 21.2,
+                        "humidity": 72.0,
+                        "rain": 3.4,
+                        "risk": 0.41,
+                    },
+                    {
+                        "date": "2026-05-25",
+                        "soil": 28.8,
+                        "temp": 24.5,
+                        "humidity": 41.0,
+                        "rain": 0.0,
+                        "risk": 0.24,
+                    },
+                ],
+                "weekly_risk": 0.325,
+                "weekly_label": "MEDIO",
+            }
+        },
+        language=tg.VOICE_LANGUAGE_EN,
+    )
+
+    assert "📅 Today 2026-05-25" in text
+    assert "Date  Soil% TempC RH% Rain Risk%" in text
+    assert "<b>🦠 Weekly fungal risk:</b> <b>32.50% 🟠 Medium</b>" in text
+    assert "🦠 Medium fungal pressure" in text
+
+
+def test_format_nasa_sar_dashboard_keeps_same_layout_across_languages():
+    payload = {
+        "dashboard": {
+            "dashboard": [
+                {
+                    "date": "2026-05-19",
+                    "soil": 31.4,
+                    "temp": 21.2,
+                    "humidity": 72.0,
+                    "rain": 3.4,
+                    "risk": 0.41,
+                },
+                {
+                    "date": "2026-05-25",
+                    "soil": 28.8,
+                    "temp": 24.5,
+                    "humidity": 41.0,
+                    "rain": 0.0,
+                    "risk": 0.24,
+                },
+            ],
+            "weekly_risk": 0.325,
+            "weekly_label": "MEDIO",
+        }
+    }
+
+    text_it = tg._format_nasa_sar_dashboard(payload)
+    text_en = tg._format_nasa_sar_dashboard(payload, language=tg.VOICE_LANGUAGE_EN)
+
+    emoji_sequence = ["🛰️", "📅", "🌱", "🌡️", "💧", "🌧️", "🦠", "📊", "🦠", "🟠", "🦠"]
+    for token in emoji_sequence:
+        assert token in text_it
+        assert token in text_en
+
+    assert text_it.index("📅") < text_it.index("📊") < text_it.index("🟠")
+    assert text_en.index("📅") < text_en.index("📊") < text_en.index("🟠")
+    assert "25/05" in text_it and "19/05" in text_it
+    assert "25/05" in text_en and "19/05" in text_en
+    assert text_it.index("25/05") < text_it.index("19/05")
+    assert text_en.index("25/05") < text_en.index("19/05")
+    assert "<b>📊 Dettaglio giornaliero</b>" in text_it
+    assert "<b>📊 Daily breakdown</b>" in text_en
+    assert "<b>🦠 Rischio fungino settimanale:</b> <b>32.50% 🟠 Medio</b>" in text_it
+    assert "<b>🦠 Weekly fungal risk:</b> <b>32.50% 🟠 Medium</b>" in text_en
 
 
 def test_menu_clears_chat_mode_and_ends_chat_session(monkeypatch):
@@ -1130,6 +1233,42 @@ def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
     assert "chat_seed_context" not in context.user_data
 
 
+def test_generate_free_chat_response_localizes_seed_context_prefix_in_english(monkeypatch):
+    prompts = []
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat(self, user_id, prompt, response_language=None):
+            prompts.append((user_id, prompt, response_language))
+            return "english contextual reply"
+
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=42),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "voice_language_override": tg.VOICE_LANGUAGE_EN,
+            "chat_seed_context": "Latest SAR summary: MEDIUM risk around Rome.",
+        },
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._generate_free_chat_response(update, context, "Why?"))
+
+    assert result == "english contextual reply"
+    assert prompts[0][0] == "42"
+    assert "Latest SAR summary: MEDIUM risk around Rome." in prompts[0][1]
+    assert "User question: Why?" in prompts[0][1]
+    assert "Domanda utente" not in prompts[0][1]
+    assert prompts[0][2] == tg.VOICE_LANGUAGE_EN
+    assert "chat_seed_context" not in context.user_data
+
+
 def test_generate_free_chat_response_passes_english_override_to_engine(monkeypatch):
     prompts = []
 
@@ -1196,9 +1335,9 @@ def test_generate_free_chat_response_nasa_sends_photos(monkeypatch, tmp_path):
         "_get_chat_engine",
         lambda context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
     )
-    monkeypatch.setattr(tg, "_build_nasa_sar_map_photo_payload", lambda lat, lon: BytesIO(b"map"))
+    monkeypatch.setattr(tg, "_build_nasa_sar_map_photo_payload", lambda lat, lon, *args, **kwargs: BytesIO(b"map"))
     monkeypatch.setattr(nasa_dashboard, "generate_dashboard", lambda lat, lon: fake_dashboard)
-    monkeypatch.setattr(nasa_dashboard, "generate_dashboard_report_image", lambda dashboard, lat, lon: FakeImage())
+    monkeypatch.setattr(nasa_dashboard, "generate_dashboard_report_image", lambda dashboard, lat, lon, **kwargs: FakeImage())
     monkeypatch.setattr(tempfile, "mktemp", lambda **kwargs: str(tmp_path / "nasa_dashboard.png"))
 
     update = types.SimpleNamespace(
@@ -1217,6 +1356,67 @@ def test_generate_free_chat_response_nasa_sends_photos(monkeypatch, tmp_path):
     assert photos[0] == "\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)"
     assert photos[1] == "\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali."
     assert "Rischio settimanale: 0.62 (MEDIO)" in result
+
+
+def test_generate_free_chat_response_nasa_localizes_english(monkeypatch, tmp_path):
+    photos = []
+
+    class FakeChat:
+        async def send_action(self, action):
+            return None
+
+        async def send_photo(self, photo, caption=None):
+            photos.append(caption)
+
+    class FakeImage:
+        def save(self, path):
+            Path(path).write_bytes(b"fake-dashboard")
+
+    fake_dashboard = {
+        "dashboard": [
+            {
+                "date": "2026-05-19",
+                "soil": 12.3,
+                "temp": 23.4,
+                "humidity": 78,
+                "rain": 4.5,
+                "risk": 0.62,
+            }
+        ],
+        "weekly_risk": 0.62,
+        "weekly_label": "MEDIO",
+    }
+
+    import bot.nasa_sar_dashboard as nasa_dashboard
+
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+    monkeypatch.setattr(tg, "_build_nasa_sar_map_photo_payload", lambda lat, lon, *args, **kwargs: BytesIO(b"map"))
+    monkeypatch.setattr(nasa_dashboard, "generate_dashboard", lambda lat, lon: fake_dashboard)
+    monkeypatch.setattr(nasa_dashboard, "generate_dashboard_report_image", lambda dashboard, lat, lon, **kwargs: FakeImage())
+    monkeypatch.setattr(tempfile, "mktemp", lambda **kwargs: str(tmp_path / "nasa_dashboard_en.png"))
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=42),
+        effective_chat=FakeChat(),
+        message=types.SimpleNamespace(location=None),
+    )
+    context = types.SimpleNamespace(
+        user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._generate_free_chat_response(update, context, "show me sar dashboard"))
+
+    assert len(photos) == 2
+    assert photos[0] == "\U0001F30E NASA-ISRO/SAR area of interest (50 m radius from the GPS point)"
+    assert photos[1] == "\U0001F4CA NASA-ISRO/SAR graphic report: weekly risk and professional indicators."
+    assert "Date | Soil | Temp | Humidity | Rain | Risk" in result
+    assert "Weekly risk: 0.62 (MEDIUM)" in result
+    assert "Weekly mean risk 0.62." in result
 
 
 def test_run_nasa_sar_analysis_sets_chat_seed_context_and_sends_map(monkeypatch):
@@ -1274,6 +1474,36 @@ def test_run_nasa_sar_analysis_sets_chat_seed_context_and_sends_map(monkeypatch)
     assert any("Ora puoi chiedermi approfondimenti" in text for text, _, _ in sends)
     assert "chat_seed_context" in context.user_data
     assert "Valore medio settimanale" in context.user_data["chat_seed_context"]
+
+
+def test_build_nasa_sar_map_photo_payload_adds_bottom_overlay_with_locality_and_gps(monkeypatch):
+    if not tg.PIL_AVAILABLE:
+        pytest.skip("Pillow non disponibile")
+
+    source = tg.Image.new("RGB", (320, 240), (72, 96, 124))
+    source_payload = BytesIO()
+    source.save(source_payload, format="JPEG", quality=95)
+    source_bytes = source_payload.getvalue()
+
+    class FakeResponse:
+        def __init__(self, content):
+            self.content = content
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(tg.requests, "get", lambda *args, **kwargs: FakeResponse(source_bytes))
+    monkeypatch.setattr(tg, "_reverse_geocode_locality", lambda latitude, longitude: "Rome, Lazio, Italy")
+
+    payload = tg._build_nasa_sar_map_photo_payload(41.9028, 12.4964, language=tg.VOICE_LANGUAGE_EN)
+
+    rendered = tg.Image.open(payload).convert("RGB")
+    top_pixel = rendered.getpixel((24, 24))
+    bottom_pixel = rendered.getpixel((24, rendered.height - 18))
+
+    assert payload is not None
+    assert rendered.size == (320, 240)
+    assert sum(bottom_pixel) < sum(top_pixel)
 
 
 def test_free_chat_handler_ignores_dedicated_chat_session(monkeypatch):
@@ -2160,9 +2390,6 @@ def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
         assert audio_bytes == b"voice-bytes"
         return "ciao DELTA"
 
-    async def fake_welcome(update, context):
-        return None
-
     async def fake_handle_turn(update, context, user_text, input_mode):
         turns.append((user_text, input_mode))
         return "ok"
@@ -2170,7 +2397,6 @@ def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
     monkeypatch.setattr(tg, "_guard", fake_guard)
     monkeypatch.setattr(tg, "_download_voice_message_bytes", fake_download)
     monkeypatch.setattr(tg, "transcribe_audio", fake_transcribe)
-    monkeypatch.setattr(tg, "_maybe_send_voice_welcome", fake_welcome)
     monkeypatch.setattr(tg, "_handle_free_chat_turn", fake_handle_turn)
 
     update = types.SimpleNamespace(
@@ -2183,6 +2409,93 @@ def test_handle_voice_message_routes_transcript_in_free_chat(monkeypatch):
         asyncio.run(tg.handle_voice_message(update, context))
 
     assert turns == [("ciao DELTA", "voice")]
+
+
+def test_run_nasa_sar_analysis_localizes_dashboard_and_seed_context_in_english(monkeypatch):
+    sends = []
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup, parse_mode))
+
+    async def fake_send_map(update, latitude, longitude, language=tg.VOICE_LANGUAGE_IT, locality_label=None):
+        return None
+
+    class FakeChat:
+        async def send_action(self, action):
+            return None
+
+    class FakeOrchestrator:
+        async def analyze_nasa_only(self, geo_data, date_range):
+            return {
+                "geo_summary": {
+                    "centroid": {"lat": 41.9028, "lon": 12.4964},
+                    "radius_m": 50,
+                },
+                "dashboard": {
+                    "summary": {
+                        "sar_soil_moisture_percent": 31.4,
+                        "sar_source": "Sentinel-1 SAR operational fallback",
+                        "sar_product_name": "S1A_TEST_PRODUCT",
+                        "sar_acquired_at": "2026-05-17T10:00:00+00:00",
+                    },
+                },
+                "nasa_power": {"daily": []},
+            }
+
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_send_nasa_sar_map_snapshot", fake_send_map)
+    monkeypatch.setattr(tg, "_get_nasa_orchestrator", lambda context: FakeOrchestrator())
+    monkeypatch.setattr(tg, "_reverse_geocode_locality", lambda latitude, longitude: "Rome, Lazio, Italy")
+
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+    context = types.SimpleNamespace(
+        user_data={"voice_language_override": tg.VOICE_LANGUAGE_EN},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    asyncio.run(tg._run_nasa_sar_analysis(update, context, 41.9028, 12.4964))
+
+    assert any("<b>Locality:</b> Rome, Lazio, Italy" in text for text, _, _ in sends)
+    assert any("<b>SAR soil moisture:</b> 31.4%" in text for text, _, _ in sends)
+    assert any("You can now ask me for deeper analysis" in text for text, _, _ in sends)
+    assert "chat_seed_context" in context.user_data
+    assert "Latest DELTA Plant SAR/NISAR summary context:" in context.user_data["chat_seed_context"]
+    assert "Domanda utente" not in context.user_data["chat_seed_context"]
+
+
+def test_build_nasa_sar_scientific_interpretation_localizes_to_english():
+    text = tg._build_nasa_sar_scientific_interpretation(
+        {
+            "geo_summary": {
+                "locality_label": "Rome, Lazio, Italy",
+            },
+            "dashboard": {
+                "summary": {
+                    "sar_soil_moisture_percent": 31.4,
+                    "sar_source": "Sentinel-1 SAR operational fallback",
+                    "sar_product_name": "S1A_TEST_PRODUCT",
+                    "sar_acquired_at": "2026-05-17T10:00:00+00:00",
+                },
+            },
+        },
+        weather_reference={
+            "source": "Italian Air Force Meteorological Service",
+            "daily": [
+                {"day": "2026-05-11", "T2M": 20.4, "RH2M": 80.0, "PRECTOTCORR": 2.0},
+                {"day": "2026-05-17", "T2M": 19.6, "RH2M": 84.0, "PRECTOTCORR": 4.0},
+            ],
+        },
+        language=tg.VOICE_LANGUAGE_EN,
+    )
+
+    assert "Weekly mean value" in text
+    assert "Risk assessment:" in text
+    assert "Simple reading:" in text
+    assert "Locality: Rome, Lazio, Italy." in text
+    assert "SAR soil moisture: 31.4%." in text
+    assert "Data sources:" in text
+    assert "This is not a disease diagnosis" in text
+    assert "Valore medio settimanale" not in text
 
 
 def test_receive_user_description_voice_transcribes_and_routes_to_text_handler(monkeypatch):

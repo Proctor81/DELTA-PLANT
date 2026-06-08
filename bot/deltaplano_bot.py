@@ -3,11 +3,9 @@ import asyncio
 import inspect
 import logging
 import threading
+import bot.nasa_sar_dashboard as nasa_dashboard
 from chat.chat_engine import ChatEngine
 from vision.mobilenet_service import MobileNetService
-
-# HERO DEMO LOGIC: dashboard NASA-ISRO/SAR
-from bot.nasa_sar_dashboard import generate_dashboard
 
 logger = logging.getLogger("delta.deltaplano_bot")
 
@@ -48,10 +46,23 @@ class DELTAPLANOBot:
         self.chat_engine = ChatEngine()
         self.vision_service = MobileNetService()
 
-    def handle_message(self, user_id, text: str, image_path: str = None, telegram_bot=None, chat_id=None) -> str:
+    def handle_message(
+        self,
+        user_id,
+        text: str,
+        image_path: str = None,
+        telegram_bot=None,
+        chat_id=None,
+        response_language: str = "it",
+    ) -> str:
         import logging
         logger = logging.getLogger("deltaplano.bot")
         logger.warning(f"[DEBUG] handle_message chiamato: user_id={user_id}, text={text}")
+        english_ui = str(response_language or "").strip().lower() == "en"
+
+        def ui_text(italian_text: str, english_text: str) -> str:
+            return english_text if english_ui else italian_text
+
         """
         Solo logica HERO DEMO: dashboard NASA-ISRO/SAR, nessun altro modello.
         """
@@ -77,23 +88,9 @@ class DELTAPLANOBot:
             geo_data = {"type": "circle", "center": {"lat": lat, "lng": lon}, "radius": 50}
             result = _run_awaitable_sync(orchestrator.analyze_nasa_only(geo_data, date_range))
             dashboard = result["dashboard"]
-            # --- Genera testo ---
-            lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n"]
-            lines.append("Data | Soil | Temp | Humidity | Rain | Risk")
-            for d in dashboard["dashboard"]:
-                lines.append(f"{d['date']} | {d['soil']:.1f} | {d['temp']:.1f} | {d['humidity']:.0f} | {d['rain']:.1f} | {d['risk']:.2f}")
-            lines.append("")
-            lines.append(f"Rischio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})")
-            # Testo esplicativo HERO DEMO
-            if dashboard['weekly_label'] == 'ALTO' or dashboard['weekly_label'] == 'HIGH':
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area shows high fungal favorability: SAR moisture proxy, humidity and rainfall are all elevated.")
-            elif dashboard['weekly_label'] == 'MEDIO' or dashboard['weekly_label'] == 'MEDIUM':
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.")
-            else:
-                lines.append(f"Weekly mean risk {dashboard['weekly_risk']:.2f}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.")
+            report_text = nasa_dashboard.build_dashboard_plaintext_report(dashboard, language=response_language)
             # --- Genera immagine grafica ---
-            from bot.nasa_sar_dashboard import generate_dashboard_report_image
-            img = generate_dashboard_report_image(dashboard, lat, lon)
+            img = nasa_dashboard.generate_dashboard_report_image(dashboard, lat, lon, language=response_language)
             import tempfile
             img_path = tempfile.mktemp(suffix="_dashboard.png", prefix="nasa_sar_")
             img.save(img_path)
@@ -102,20 +99,21 @@ class DELTAPLANOBot:
                 try:
                     with open(img_path, "rb") as f:
                         try:
-                            send_result = telegram_bot.send_photo(chat_id=chat_id, photo=f, caption="\n".join(lines))
+                            send_result = telegram_bot.send_photo(chat_id=chat_id, photo=f, caption=report_text)
                         except TypeError:
                             f.seek(0)
-                            send_result = telegram_bot.send_photo(photo=f, caption="\n".join(lines))
+                            send_result = telegram_bot.send_photo(photo=f, caption=report_text)
                         if inspect.isawaitable(send_result):
                             _run_awaitable_sync(send_result)
-                    return "[Immagine dashboard inviata su Telegram]"
+                    return ui_text("[Immagine dashboard inviata su Telegram]", "[Dashboard image sent on Telegram]")
                 except Exception as e:
-                    lines.append(f"[ERRORE invio immagine Telegram: {e}]")
-            lines.append("")
-            lines.append(f"[Immagine dashboard salvata: {img_path}]")
-            return "\n".join(lines)
+                    report_text = f"{report_text}\n{ui_text('[ERRORE invio immagine Telegram:', '[Telegram image send error:]')} {e}]"
+            return f"{report_text}\n\n{ui_text('[Immagine dashboard salvata:', '[Dashboard image saved:')} {img_path}]"
         # Tutto il resto: nessun altro modello, fallback o simulazione
-        return "Solo la logica HERO DEMO è attiva. Scrivi 'dashboard' per il riepilogo settimanale."
+        return ui_text(
+            "Solo la logica HERO DEMO è attiva. Scrivi 'dashboard' per il riepilogo settimanale.",
+            "Only the HERO DEMO logic is active. Type 'dashboard' for the weekly summary.",
+        )
 
     def handle_command(self, user_id, command: str) -> str:
         """Gestisce comandi speciali del bot."""

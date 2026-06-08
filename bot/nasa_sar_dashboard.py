@@ -2,14 +2,131 @@ import io
 import logging
 import os
 from datetime import date as date_type
+from typing import Any, Dict, List, Optional
 
 from PIL import Image, ImageDraw
 import numpy as np
 from PIL import ImageFont
-def generate_dashboard_report_image(dashboard: dict, lat: float, lon: float, size: int = 700) -> Image.Image:
+import requests
+
+from nasa_delta_plant.utils.power_client import compute_fungal_risk_score
+
+
+NASA_SOIL_PARAMETERS = ("GWETROOT", "GWETTOP")
+REPORT_LANGUAGE_IT = "it"
+REPORT_LANGUAGE_EN = "en"
+
+
+def _normalize_report_language(language: str) -> str:
+    return REPORT_LANGUAGE_EN if str(language or "").strip().lower() == REPORT_LANGUAGE_EN else REPORT_LANGUAGE_IT
+
+
+def _normalize_risk_label(label: Any) -> str:
+    normalized = str(label or "").strip().upper()
+    if normalized in {"HIGH", "ALTO"}:
+        return "ALTO"
+    if normalized in {"MEDIUM", "MEDIO"}:
+        return "MEDIO"
+    if normalized in {"LOW", "BASSO"}:
+        return "BASSO"
+    if normalized in {"NONE", "NESSUNO"}:
+        return "NESSUNO"
+    return normalized
+
+
+def localize_risk_label(label: Any, language: str = REPORT_LANGUAGE_IT) -> str:
+    normalized_language = _normalize_report_language(language)
+    normalized_label = _normalize_risk_label(label)
+    localized = {
+        "ALTO": {REPORT_LANGUAGE_IT: "ALTO", REPORT_LANGUAGE_EN: "HIGH"},
+        "MEDIO": {REPORT_LANGUAGE_IT: "MEDIO", REPORT_LANGUAGE_EN: "MEDIUM"},
+        "BASSO": {REPORT_LANGUAGE_IT: "BASSO", REPORT_LANGUAGE_EN: "LOW"},
+        "NESSUNO": {REPORT_LANGUAGE_IT: "NESSUNO", REPORT_LANGUAGE_EN: "NONE"},
+    }
+    return localized.get(normalized_label, {}).get(normalized_language, str(label or "").strip())
+
+
+def decorated_risk_label(label: Any, language: str = REPORT_LANGUAGE_IT) -> str:
+    normalized_language = _normalize_report_language(language)
+    normalized_label = _normalize_risk_label(label)
+    decorated = {
+        "ALTO": {REPORT_LANGUAGE_IT: "🔴 Alto", REPORT_LANGUAGE_EN: "🔴 High"},
+        "MEDIO": {REPORT_LANGUAGE_IT: "🟠 Medio", REPORT_LANGUAGE_EN: "🟠 Medium"},
+        "BASSO": {REPORT_LANGUAGE_IT: "🟡 Basso", REPORT_LANGUAGE_EN: "🟡 Low"},
+        "NESSUNO": {REPORT_LANGUAGE_IT: "🟢 Nessuno", REPORT_LANGUAGE_EN: "🟢 None"},
+    }
+    fallback = localize_risk_label(normalized_label, normalized_language)
+    return decorated.get(normalized_label, {}).get(normalized_language, fallback)
+
+
+def _dashboard_report_copy(language: str) -> Dict[str, Any]:
+    normalized_language = _normalize_report_language(language)
+    if normalized_language == REPORT_LANGUAGE_EN:
+        return {
+            "language": normalized_language,
+            "table_header": "Date | Soil | Temp | Humidity | Rain | Risk",
+            "weekly_risk": "Weekly risk",
+            "weekly_average": "Weekly average risk",
+            "no_data": "No weekly risk data available for the selected window.",
+            "headers": ["Date", "Soil", "Temp", "Humidity", "Rain", "Risk"],
+            "narratives": {
+                "ALTO": "Weekly mean risk {risk:.2f}. The micro-area shows high fungal favorability: SAR moisture proxy, humidity and rainfall are all elevated.",
+                "MEDIO": "Weekly mean risk {risk:.2f}. Moisture persistence and official weather support indicate a medium fungal pressure around this 50 m radius.",
+                "BASSO": "Weekly mean risk {risk:.2f}. The micro-area looks comparatively drier and less supportive for fungal development across the current 7-day weather window.",
+                "NESSUNO": "Weekly mean risk {risk:.2f}. No significant fungal favorability is emerging in the current 7-day weather window.",
+            },
+        }
+    return {
+        "language": normalized_language,
+        "table_header": "Data | Suolo | Temp | Umidita' | Pioggia | Rischio",
+        "weekly_risk": "Rischio settimanale",
+        "weekly_average": "Rischio medio settimanale",
+        "no_data": "Dati di rischio settimanale non disponibili per la finestra selezionata.",
+        "headers": ["Data", "Suolo", "Temp", "Umidita'", "Pioggia", "Rischio"],
+        "narratives": {
+            "ALTO": "Rischio medio settimanale {risk:.2f}. La micro-area mostra un'elevata favorevolezza fungina: proxy SAR di umidita', umidita' relativa e pioggia sono tutti elevati.",
+            "MEDIO": "Rischio medio settimanale {risk:.2f}. La persistenza dell'umidita' e il supporto del meteo ufficiale indicano una pressione fungina media nel raggio di 50 metri.",
+            "BASSO": "Rischio medio settimanale {risk:.2f}. La micro-area appare piu' asciutta e meno favorevole allo sviluppo fungino nella finestra meteo corrente di 7 giorni.",
+            "NESSUNO": "Rischio medio settimanale {risk:.2f}. Non emergono condizioni di favorevolezza fungina significative nella finestra meteo corrente di 7 giorni.",
+        },
+    }
+
+
+def build_dashboard_plaintext_report(dashboard: Dict[str, Any], language: str = REPORT_LANGUAGE_IT) -> str:
+    copy = _dashboard_report_copy(language)
+    daily = list(dashboard.get("dashboard") or [])
+    weekly_risk = dashboard.get("weekly_risk")
+    normalized_label = _normalize_risk_label(dashboard.get("weekly_label")) or "BASSO"
+    localized_label = localize_risk_label(normalized_label, copy["language"])
+
+    lines = ["\U0001F30E NASA-ISRO/SAR Dashboard\n", copy["table_header"]]
+    for day in daily:
+        lines.append(
+            f"{day['date']} | {day['soil']:.1f} | {day['temp']:.1f} | {day['humidity']:.0f} | {day['rain']:.1f} | {day['risk']:.2f}"
+        )
+
+    lines.append("")
+    if weekly_risk is None:
+        lines.append(copy["no_data"])
+        return "\n".join(lines)
+
+    lines.append(f"{copy['weekly_risk']}: {weekly_risk:.2f} ({localized_label})")
+    lines.append(copy["narratives"].get(normalized_label, copy["narratives"]["BASSO"]).format(risk=weekly_risk))
+    return "\n".join(lines)
+
+
+def generate_dashboard_report_image(
+    dashboard: dict,
+    lat: float,
+    lon: float,
+    size: int = 700,
+    language: str = REPORT_LANGUAGE_IT,
+) -> Image.Image:
     """
     Genera un report grafico professionale NASA-ISRO/SAR Dashboard con tabella dati settimanali e barra rischio.
     """
+    copy = _dashboard_report_copy(language)
+    localized_label = localize_risk_label(dashboard.get("weekly_label"), copy["language"])
     img = Image.new("RGB", (size, size), (18, 24, 38))
     draw = ImageDraw.Draw(img)
     # Titolo
@@ -24,10 +141,15 @@ def generate_dashboard_report_image(dashboard: dict, lat: float, lon: float, siz
     draw.rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], outline=(121,231,255), width=2)
     fill_w = int(bar_w * dashboard["weekly_risk"])
     draw.rectangle([bar_x, bar_y, bar_x+fill_w, bar_y+bar_h], fill=(255,90,90,180))
-    draw.text((bar_x+bar_w+16, bar_y+4), f"Rischio medio settimanale: {dashboard['weekly_risk']:.2f} ({dashboard['weekly_label']})", fill=(255,255,255), font=font_header)
+    draw.text(
+        (bar_x+bar_w+16, bar_y+4),
+        f"{copy['weekly_average']}: {dashboard['weekly_risk']:.2f} ({localized_label})",
+        fill=(255,255,255),
+        font=font_header,
+    )
 
     # Tabella dati
-    headers = ["Data", "Soil", "Temp", "Humidity", "Rain", "Risk"]
+    headers = copy["headers"]
     col_x = [20, 120, 200, 280, 380, 460]
     y0 = 140
     for i, h in enumerate(headers):
@@ -45,7 +167,6 @@ def generate_dashboard_report_image(dashboard: dict, lat: float, lon: float, siz
     synth = f"Lat: {lat:.5f}, Lon: {lon:.5f}"
     draw.text((20, size-40), synth, fill=(121,231,255), font=font)
     return img
-import requests
 
 
 def _fallback_satellite_image(lat: float, lon: float, radius_m: int = 50, size: int = 512) -> Image.Image:
@@ -113,11 +234,6 @@ def get_satellite_image_with_marker(lat: float, lon: float, radius_m: int = 50, 
         logging.warning("NASA/SAR map fallback: download mappa satellite fallito (%s), uso placeholder locale", exc)
         return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
 import datetime
-from typing import Dict, Any, List, Optional
-from nasa_delta_plant.utils.power_client import compute_fungal_risk_score
-
-
-NASA_SOIL_PARAMETERS = ("GWETROOT", "GWETTOP")
 
 
 def _normalize_power_soil_value(raw_value: Any) -> Optional[float]:
