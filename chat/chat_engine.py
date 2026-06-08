@@ -7,7 +7,7 @@ import logging
 import re
 from pathlib import Path
 from memory.conversation_memory import ConversationMemory
-from llm.huggingface_llm import HuggingFaceLLM, DELTA_SYSTEM_PROMPT
+from llm.huggingface_llm import HF_DEFAULT_MODEL, HuggingFaceLLM, DELTA_SYSTEM_PROMPT
 
 logger = logging.getLogger("delta.chat_engine")
 
@@ -202,7 +202,7 @@ class ChatEngine:
         # Backend LLM unico: HuggingFace cloud
         self._hf_llm = HuggingFaceLLM(
             api_token=os.environ.get("HF_API_TOKEN", ""),
-            model_name=os.environ.get("HF_MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct"),
+            model_name=os.environ.get("HF_MODEL_NAME", HF_DEFAULT_MODEL),
             max_tokens=int(os.environ.get("HF_MAX_TOKENS", "1500")),
             temperature=0.65,
             timeout=int(os.environ.get("HF_TIMEOUT", "60")),

@@ -4113,20 +4113,20 @@ def _add_license_appendix(pdf: "ManualePDF"):
 
 
 def _add_hf_llm_chat(pdf: ManualePDF):
-    """Sezione 14b: HuggingFace LLM — Chat AI con Llama 3 e pulsante 'Chiedi a DELTA'."""
+    """Sezione 14b: HuggingFace LLM — Chat AI con Qwen3 e pulsante 'Chiedi a DELTA'."""
     pdf.add_page()
     pdf._section_title("14b. CHAT AI — HUGGINGFACE LLM E PULSANTE «CHIEDI A DELTA»")
 
     pdf._body(
         "DELTA Plant integra un motore di chat AI basato su modelli linguistici di grandi "
         "dimensioni (LLM) via HuggingFace Inference API. L'utente può conversare liberamente "
-        "con un esperto agronomico virtuale basato su Llama 3.1 8B Instruct, sia dal bot "
+        "con un esperto agronomico virtuale basato su Qwen3-14B, sia dal bot "
         "Telegram sia dalla CLI locale, senza bisogno di eseguire il modello in locale."
     )
 
     pdf._subsection("14b.1 Architettura")
     pdf._kv_table([
-        ("Modello primario",       "meta-llama/Llama-3.1-8B-Instruct (HuggingFace InferenceClient)"),
+        ("Modello primario",       "Qwen/Qwen3-14B (HuggingFace InferenceClient)"),
         ("Fallback secondario",    "Ollama locale (solo orchestrator, se configurato)"),
         ("Fallback finale",        "Messaggio di errore controllato (nessun backend disponibile)"),
         ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
@@ -4145,14 +4145,14 @@ def _add_hf_llm_chat(pdf: ManualePDF):
 
     pdf._subsection("14b.2 Configurazione token HuggingFace")
     pdf._body(
-        "Per usare il modello Llama-3.1-8B-Instruct è necessario un token HuggingFace "
-        "con accesso al modello abilitato (richiesta accettazione termini su hf.co/meta-llama). "
+        "Per usare il modello Qwen/Qwen3-14B è necessario un token HuggingFace "
+        "con permesso 'Make calls to Inference Providers'. "
         "Il token va inserito nel file .env:"
     )
     pdf._code_block(
         "# Nel file .env nella directory del progetto\n"
         "HF_API_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
-        "HF_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct\n\n"
+        "HF_MODEL_NAME=Qwen/Qwen3-14B\n\n"
         "# Il sistema valida il token all'avvio:\n"
         "# [INFO] delta.huggingface_llm: Token HF valido — utente: TuoNomeHF\n\n"
         "# Se il token non è valido o assente, ChatEngine segnala backend non disponibile.",
@@ -4160,15 +4160,15 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     )
     pdf._body("Modello HuggingFace configurato (senza rotazione automatica):")
     pdf._bullet([
-        "meta-llama/Llama-3.1-8B-Instruct (default consigliato)",
+        "Qwen/Qwen3-14B (default consigliato)",
         "Modificabile via variabile ambiente HF_MODEL_NAME",
+        "Thinking mode Qwen disabilitato via API per mantenere formato risposta compatibile con DELTA",
     ])
     pdf._info_box(
-        "ACCESSO AL MODELLO LLAMA",
-        "meta-llama/Llama-3.1-8B-Instruct richiede accettazione dei termini Meta su HuggingFace. "
-        "Visitare: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct "
-        "e accettare la licenza con l'account collegato al token. "
-        "Senza accesso il sistema segnala che il backend configurato non e disponibile.",
+        "ACCESSO AL MODELLO QWEN",
+        "Qwen/Qwen3-14B usa la distribuzione HuggingFace pubblica del modello Qwen3 e non dipende "
+        "dalla licenza gated Meta di Llama. E comunque necessario un token con permesso 'Make calls to Inference Providers' "
+        "e un provider HF disponibile per il modello configurato. Pagina modello: https://huggingface.co/Qwen/Qwen3-14B",
         color=BLUE_MID,
     )
 

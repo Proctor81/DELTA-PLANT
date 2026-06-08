@@ -9,6 +9,7 @@ import structlog
 from ..tools.registry import registry
 from delta_orchestrator.adapters.huggingface_adapter import HuggingFaceAdapter
 from delta_orchestrator.adapters.ollama_adapter import OllamaAdapter
+from llm.huggingface_llm import HF_DEFAULT_MODEL
 
 logger = structlog.get_logger("executor_node")
 
@@ -46,7 +47,7 @@ class ExecutorNode(BaseNode):
         # ── PRIORITA 1: HuggingFace cloud ─────────────────────────────────
         hf_token = os.environ.get("HF_API_TOKEN", "")
         if hf_token:
-            hf_model = os.environ.get("HF_MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
+            hf_model = os.environ.get("HF_MODEL_NAME", HF_DEFAULT_MODEL)
             hf_adapter = HuggingFaceAdapter(model_name=hf_model, api_token=hf_token)
             try:
                 llm_response = await hf_adapter.generate(user_message)

@@ -6,8 +6,9 @@ Seleziona automaticamente il miglior modello disponibile dalla lista di priorit�
 """
 
 import os
+import re
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 
 logger = logging.getLogger("delta.huggingface_llm")
 
@@ -64,10 +65,67 @@ Sei l'interfaccia intelligente di un sistema Raspberry Pi con telecamera e senso
 # ─────────────────────────────────────────────────────────────────────────────
 # Modello default consigliato (sovrascrivibile con HF_MODEL_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
-HF_DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+HF_DEFAULT_MODEL = "Qwen/Qwen3-14B"
 
 # Conservata per compatibilita con test/tooling legacy.
 HF_MODEL_PRIORITY = [HF_DEFAULT_MODEL]
+
+HF_QWEN3_MODEL_PREFIX = "qwen/qwen3-"
+HF_QWEN_NO_THINK_TAG = "/no_think"
+_THINK_BLOCK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.IGNORECASE | re.DOTALL)
+
+
+def is_qwen3_model(model_name: Optional[str]) -> bool:
+    return str(model_name or "").strip().lower().startswith(HF_QWEN3_MODEL_PREFIX)
+
+
+def prepare_hf_messages(model: str, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    prepared = [dict(message) for message in messages]
+    if not is_qwen3_model(model):
+        return prepared
+
+    injected = False
+    for message in prepared:
+        if str(message.get("role") or "").strip().lower() == "system":
+            content = str(message.get("content") or "").strip()
+            if HF_QWEN_NO_THINK_TAG not in content:
+                message["content"] = f"{content}\n\n{HF_QWEN_NO_THINK_TAG}".strip()
+            injected = True
+            break
+
+    if not injected and prepared:
+        content = str(prepared[0].get("content") or "").strip()
+        if HF_QWEN_NO_THINK_TAG not in content:
+            prepared[0]["content"] = f"{content} {HF_QWEN_NO_THINK_TAG}".strip()
+
+    return prepared
+
+
+def build_hf_completion_kwargs(
+    *,
+    model: str,
+    messages: List[Dict[str, str]],
+    max_tokens: int,
+    temperature: float,
+) -> Dict[str, Any]:
+    kwargs: Dict[str, Any] = {
+        "model": model,
+        "messages": prepare_hf_messages(model, messages),
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if is_qwen3_model(model):
+        # Qwen3 puo emettere blocchi <think>; lo disabilitiamo per mantenere
+        # invariato il formato delle risposte nel resto dell'infrastruttura.
+        kwargs["extra_body"] = {"enable_thinking": False}
+    return kwargs
+
+
+def sanitize_hf_chat_output(content: Optional[str]) -> str:
+    raw = str(content or "").strip()
+    if not raw:
+        return ""
+    return _THINK_BLOCK_RE.sub("", raw, count=1).strip()
 
 
 class HuggingFaceLLM:
@@ -203,12 +261,14 @@ class HuggingFaceLLM:
         """Verifica se un modello è raggiungibile con una chiamata di test minima."""
         try:
             resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": "ok"}],
-                max_tokens=5,
-                temperature=0.1,
+                **build_hf_completion_kwargs(
+                    model=model,
+                    messages=[{"role": "user", "content": "ok"}],
+                    max_tokens=5,
+                    temperature=0.1,
+                )
             )
-            _ = resp.choices[0].message.content
+            _ = sanitize_hf_chat_output(resp.choices[0].message.content)
             return True
         except Exception as e:
             logger.debug(f"Modello {model} non disponibile: {e}")
@@ -280,12 +340,14 @@ class HuggingFaceLLM:
             try:
                 client = self._get_client()
                 resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
+                    **build_hf_completion_kwargs(
+                        model=model,
+                        messages=messages,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                    )
                 )
-                answer = resp.choices[0].message.content.strip()
+                answer = sanitize_hf_chat_output(resp.choices[0].message.content)
                 logger.info(f"HF risposta generata con {model} ({len(answer)} chars)")
                 return answer, model
 

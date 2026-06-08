@@ -8,8 +8,10 @@ class _FakeCompletions:
     def __init__(self, outcomes):
         self._outcomes = list(outcomes)
         self.calls = 0
+        self.kwargs_history = []
 
     def create(self, **kwargs):
+        self.kwargs_history.append(kwargs)
         outcome = self._outcomes[self.calls]
         self.calls += 1
         if isinstance(outcome, Exception):
@@ -143,3 +145,27 @@ def test_validate_token_reports_invalid_token_on_401(monkeypatch):
 
     assert ok is False
     assert "Token HF non valido" in message
+
+
+def test_huggingface_llm_qwen_disables_thinking_mode(monkeypatch):
+    llm = HuggingFaceLLM(api_token="hf_test", model_name="Qwen/Qwen3-14B")
+    fake_client = _FakeClient(["Risposta pulita"])
+    monkeypatch.setattr(llm, "_get_client", lambda: fake_client)
+
+    response, model = llm.chat("ciao")
+
+    assert response == "Risposta pulita"
+    assert model == "Qwen/Qwen3-14B"
+    assert fake_client.completions.kwargs_history[0]["extra_body"] == {"enable_thinking": False}
+    assert "/no_think" in fake_client.completions.kwargs_history[0]["messages"][0]["content"]
+
+
+def test_huggingface_llm_strips_qwen_think_block(monkeypatch):
+    llm = HuggingFaceLLM(api_token="hf_test", model_name="Qwen/Qwen3-14B")
+    fake_client = _FakeClient(["<think>ragionamento interno</think>\nRisposta finale"])
+    monkeypatch.setattr(llm, "_get_client", lambda: fake_client)
+
+    response, model = llm.chat("ciao")
+
+    assert response == "Risposta finale"
+    assert model == "Qwen/Qwen3-14B"

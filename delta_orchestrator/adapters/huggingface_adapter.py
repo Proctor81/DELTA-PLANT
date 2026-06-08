@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional
 import os
 import structlog
 
+from llm.huggingface_llm import HF_DEFAULT_MODEL, build_hf_completion_kwargs, sanitize_hf_chat_output
+
 logger = structlog.get_logger("huggingface_adapter")
 
 # Sistema prompt per il contesto dell'orchestratore
@@ -24,7 +26,7 @@ class HuggingFaceAdapter(BaseLLMAdapter):
     """
 
     # Modello default consigliato (sovrascrivibile con HF_MODEL_NAME)
-    _DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+    _DEFAULT_MODEL = HF_DEFAULT_MODEL
 
     def __init__(
         self,
@@ -62,12 +64,14 @@ class HuggingFaceAdapter(BaseLLMAdapter):
         model = self._active_model or self.model_name
         try:
             resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=512,
-                temperature=0.65,
+                **build_hf_completion_kwargs(
+                    model=model,
+                    messages=messages,
+                    max_tokens=512,
+                    temperature=0.65,
+                )
             )
-            answer = resp.choices[0].message.content.strip()
+            answer = sanitize_hf_chat_output(resp.choices[0].message.content)
             self._active_model = model
             logger.info(
                 "HuggingFace risposta OK",
