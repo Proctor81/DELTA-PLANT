@@ -904,12 +904,333 @@ async def _generate_free_chat_response(
     return response
 
 
+_FREE_CHAT_HEADING_RE = re.compile(r"^\s{0,3}(#{2,4})\s*(.+?)\s*$")
+_FREE_CHAT_BULLET_RE = re.compile(r"^\s*(?:[-*•]\s+)(.+?)\s*$")
+_FREE_CHAT_METRIC_LINE_RE = re.compile(
+    r"^\s*(?:[-*•]\s*)?(?P<label>[A-Za-zÀ-ÿ0-9 /()%'.+-]{2,24})\s*:\s*(?P<value>[^:\n]{1,32})\s*$"
+)
+_FREE_CHAT_INLINE_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_FREE_CHAT_INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_FREE_CHAT_CHART_REQUEST_RE = re.compile(r"\b(grafico|grafici|graph|chart|plot|visual(?:e|izza|ization))\b", re.IGNORECASE)
+
+
+def _free_chat_heading_icon(context: Optional["ContextTypes.DEFAULT_TYPE"], title: str) -> str:
+    normalized = str(title or "").strip().lower()
+    icon_map = [
+        (("sintesi", "summary", "overview"), "🔎"),
+        (("sintomi", "symptoms"), "🧬"),
+        (("cause", "fattori", "drivers"), "🌦️"),
+        (("preven", "prevent"), "🛡️"),
+        (("tratt", "control", "intervent"), "💊"),
+        (("consigli", "tips", "practical"), "📌"),
+        (("monitor", "monitoraggio"), "📡"),
+        (("rischio", "risk"), "📊"),
+    ]
+    for hints, icon in icon_map:
+        if any(hint in normalized for hint in hints):
+            return icon
+    return "💬"
+
+
+def _render_free_chat_inline_html(text: str) -> str:
+    escaped = html.escape(str(text or "").strip(), quote=False)
+    escaped = _FREE_CHAT_INLINE_CODE_RE.sub(r"<code>\1</code>", escaped)
+    escaped = _FREE_CHAT_INLINE_BOLD_RE.sub(r"<b>\1</b>", escaped)
+    return escaped
+
+
+def _parse_free_chat_metric_line(line: str) -> Optional[Tuple[str, str]]:
+    match = _FREE_CHAT_METRIC_LINE_RE.match(str(line or ""))
+    if not match:
+        return None
+    label = re.sub(r"\s+", " ", match.group("label")).strip(" -•")
+    value = re.sub(r"\s+", " ", match.group("value")).strip()
+    if len(label) < 2 or len(value) < 1:
+        return None
+    return label, value
+
+
+def _parse_free_chat_metric_segment(segment: str) -> Optional[Tuple[str, str]]:
+    cleaned = re.sub(r"^\s*(?:[-*•]\s*)?", "", str(segment or "")).strip().strip("|")
+    if not cleaned:
+        return None
+
+    direct_match = _parse_free_chat_metric_line(cleaned)
+    if direct_match:
+        return direct_match
+
+    parts = [part.strip() for part in cleaned.split(":") if part.strip()]
+    if len(parts) < 2:
+        return None
+
+    label = re.sub(r"\s+", " ", parts[-2]).strip(" -•")
+    value = re.sub(r"\s+", " ", parts[-1]).strip()
+    if len(label) < 2 or len(label) > 24 or len(value) < 1 or len(value) > 32:
+        return None
+    return label, value
+
+
+def _extract_free_chat_metric_rows(line: str) -> List[Tuple[str, str]]:
+    stripped = str(line or "").strip()
+    if not stripped:
+        return []
+
+    raw_segments = [segment.strip() for segment in stripped.strip("|").split("|") if segment.strip()]
+    if not raw_segments:
+        return []
+
+    rows = [row for row in (_parse_free_chat_metric_segment(segment) for segment in raw_segments) if row]
+    if rows:
+        return rows
+
+    single = _parse_free_chat_metric_segment(stripped)
+    return [single] if single else []
+
+
+def _free_chat_metric_strength(value: str) -> float:
+    raw_value = str(value or "").strip().lower()
+    percent_match = re.search(r"(\d{1,3})(?:[.,]\d+)?\s*%", raw_value)
+    if percent_match:
+        return float(max(0, min(100, int(percent_match.group(1)))))
+
+    numeric_match = re.search(r"(-?\d{1,3})(?:[.,](\d+))?", raw_value)
+    if numeric_match:
+        whole = numeric_match.group(1)
+        decimals = numeric_match.group(2) or "0"
+        try:
+            value_num = float(f"{whole}.{decimals}")
+        except ValueError:
+            value_num = 0.0
+        return max(0.0, value_num)
+
+    qualitative_map = {
+        "very low": 12.5,
+        "molto basso": 12.5,
+        "basso": 25.0,
+        "low": 25.0,
+        "moderato": 50.0,
+        "moderate": 50.0,
+        "medio": 62.5,
+        "medium": 62.5,
+        "alto": 75.0,
+        "high": 75.0,
+        "severo": 87.5,
+        "severe": 87.5,
+        "critico": 100.0,
+        "critical": 100.0,
+    }
+    for token, weight in qualitative_map.items():
+        if token in raw_value:
+            return weight
+    return 0.0
+
+
+def _should_render_free_chat_metric_table(rows: List[Tuple[str, str]]) -> bool:
+    if len(rows) < 3:
+        return False
+    strong_metrics = sum(1 for _, value in rows if _free_chat_metric_strength(value) > 0)
+    return strong_metrics >= 2
+
+
+def _free_chat_metric_bar(value: str) -> str:
+    strength = _free_chat_metric_strength(value)
+    if strength > 0:
+        filled = max(1, min(8, int(round(strength / 12.5))))
+        return "█" * filled + "░" * (8 - filled)
+    return ""
+
+
+def _free_chat_requests_chart(user_text: str) -> bool:
+    return bool(_FREE_CHAT_CHART_REQUEST_RE.search(str(user_text or "")))
+
+
+def _build_free_chat_metric_chart(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    response_text: str,
+) -> Optional[BytesIO]:
+    if not PIL_AVAILABLE:
+        return None
+
+    lines = str(response_text or "").splitlines()
+    blocks: List[List[Tuple[str, str]]] = []
+    idx = 0
+    while idx < len(lines):
+        block: List[Tuple[str, str]] = []
+        while idx < len(lines):
+            rows = _extract_free_chat_metric_rows(lines[idx])
+            if not rows:
+                break
+            block.extend(rows)
+            idx += 1
+        if block:
+            blocks.append(block)
+        idx += 1
+
+    selected = next((rows for rows in blocks if _should_render_free_chat_metric_table(rows)), None)
+    if not selected:
+        return None
+
+    metrics = [(label, value, _free_chat_metric_strength(value)) for label, value in selected]
+    positive_metrics = [(label, value, score) for label, value, score in metrics if score > 0]
+    if len(positive_metrics) < 2:
+        return None
+
+    max_score = max(score for _, _, score in positive_metrics) or 1.0
+    width = 900
+    height = 120 + len(positive_metrics) * 72
+    image = Image.new("RGB", (width, height), color=(247, 250, 252))
+    draw = ImageDraw.Draw(image)
+    title_font = ImageFont.load_default()
+    text_font = ImageFont.load_default()
+    bar_left = 260
+    bar_right = width - 80
+    bar_width = bar_right - bar_left
+    title = _ui_text(context, "DELTA mini-grafico indicatori", "DELTA mini-chart metrics")
+    subtitle = _ui_text(context, "Generato solo su richiesta esplicita", "Generated only on explicit request")
+    draw.text((40, 24), title, fill=(25, 36, 52), font=title_font)
+    draw.text((40, 52), subtitle, fill=(90, 103, 116), font=text_font)
+
+    for index, (label, value, score) in enumerate(positive_metrics):
+        top = 100 + index * 72
+        normalized = max(0.08, score / max_score)
+        current_bar_width = int(bar_width * normalized)
+        draw.text((40, top), str(label), fill=(31, 41, 55), font=text_font)
+        draw.text((40, top + 24), str(value), fill=(100, 116, 139), font=text_font)
+        draw.rounded_rectangle((bar_left, top + 8, bar_right, top + 34), radius=10, fill=(226, 232, 240))
+        draw.rounded_rectangle((bar_left, top + 8, bar_left + current_bar_width, top + 34), radius=10, fill=(14, 116, 144))
+
+    payload = BytesIO()
+    image.save(payload, format="PNG")
+    payload.name = "delta_free_chat_chart.png"
+    payload.seek(0)
+    return payload
+
+
+async def _maybe_send_free_chat_chart(
+    update: Update,
+    context: "ContextTypes.DEFAULT_TYPE",
+    response_text: str,
+    *,
+    chart_requested: bool,
+) -> None:
+    if not chart_requested:
+        return
+    chat = getattr(update, "effective_chat", None)
+    if chat is None:
+        return
+
+    chart_payload = await asyncio.to_thread(_build_free_chat_metric_chart, context, response_text)
+    if chart_payload is None:
+        return
+
+    await chat.send_photo(
+        photo=chart_payload,
+        caption=_ui_text(
+            context,
+            "📈 Mini-grafico DELTA generato su richiesta dagli indicatori della risposta.",
+            "📈 DELTA mini-chart generated on request from the response indicators.",
+        ),
+    )
+
+
+def _render_free_chat_metric_table(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    rows: List[Tuple[str, str]],
+) -> str:
+    label_header = _ui_text(context, "Voce", "Item")
+    value_header = _ui_text(context, "Valore", "Value")
+    bar_header = _ui_text(context, "Trend", "Trend")
+    label_width = max(len(label_header), min(18, max(len(label) for label, _ in rows)))
+    value_width = max(len(value_header), min(16, max(len(value) for _, value in rows)))
+    rendered_rows = [(label[:label_width], value[:value_width], _free_chat_metric_bar(value)) for label, value in rows]
+    has_bars = any(bar for _, _, bar in rendered_rows)
+
+    table_lines = [
+        f"{label_header:<{label_width}}  {value_header:<{value_width}}" + (f"  {bar_header}" if has_bars else ""),
+        f"{'-' * label_width}  {'-' * value_width}" + (f"  {'-' * len(bar_header)}" if has_bars else ""),
+    ]
+    for label, value, bar in rendered_rows:
+        line = f"{label:<{label_width}}  {value:<{value_width}}"
+        if has_bars:
+            line += f"  {bar or '-'}"
+        table_lines.append(line)
+    return f"<pre>{html.escape(chr(10).join(table_lines), quote=False)}</pre>"
+
+
+def _format_free_chat_for_telegram(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    response_text: str,
+) -> Tuple[str, Optional[str]]:
+    text = str(response_text or "").strip()
+    if not text:
+        return text, None
+
+    lines = text.splitlines()
+    metric_row_count = sum(len(_extract_free_chat_metric_rows(line)) for line in lines)
+    should_format = (
+        "###" in text
+        or "**" in text
+        or any(_FREE_CHAT_BULLET_RE.match(line) for line in lines)
+        or metric_row_count >= 3
+    )
+    if not should_format:
+        return text, None
+
+    formatted_lines: List[str] = []
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx].rstrip()
+        stripped = line.strip()
+
+        if not stripped:
+            if formatted_lines and formatted_lines[-1] != "":
+                formatted_lines.append("")
+            idx += 1
+            continue
+
+        metric_rows: List[Tuple[str, str]] = []
+        next_idx = idx
+        while next_idx < len(lines):
+            rows = _extract_free_chat_metric_rows(lines[next_idx])
+            if not rows:
+                break
+            metric_rows.extend(rows)
+            next_idx += 1
+        if _should_render_free_chat_metric_table(metric_rows):
+            formatted_lines.append(_render_free_chat_metric_table(context, metric_rows))
+            idx = next_idx
+            continue
+
+        heading_match = _FREE_CHAT_HEADING_RE.match(line)
+        if heading_match:
+            heading_text = heading_match.group(2).strip().rstrip(":")
+            if heading_text and heading_text[0].isalnum():
+                heading_text = f"{_free_chat_heading_icon(context, heading_text)} {heading_text}"
+            formatted_lines.append(f"<b>{html.escape(heading_text, quote=False)}</b>")
+            idx += 1
+            continue
+
+        bullet_match = _FREE_CHAT_BULLET_RE.match(line)
+        if bullet_match:
+            formatted_lines.append(f"• {_render_free_chat_inline_html(bullet_match.group(1))}")
+            idx += 1
+            continue
+
+        formatted_lines.append(_render_free_chat_inline_html(line))
+        idx += 1
+
+    while formatted_lines and formatted_lines[-1] == "":
+        formatted_lines.pop()
+    return "\n".join(formatted_lines), "HTML"
+
+
 async def _respond_free_chat_output(
     update: Update,
     context: "ContextTypes.DEFAULT_TYPE",
     response_text: str,
     *,
     input_mode: str,
+    chart_requested: bool = False,
 ) -> None:
     reply_markup = _chat_exit_keyboard(context) if context.user_data.get("chat_mode_active") else None
 
@@ -926,6 +1247,7 @@ async def _respond_free_chat_output(
                 caption=_voice_caption(response_text),
                 reply_markup=reply_markup,
             )
+            await _maybe_send_free_chat_chart(update, context, response_text, chart_requested=chart_requested)
             return
         except Exception as exc:
             logger.warning("Fallback a testo per risposta vocale: %s", exc, exc_info=True)
@@ -938,12 +1260,15 @@ async def _respond_free_chat_output(
                 ),
             )
 
+    rendered_text, parse_mode = _format_free_chat_for_telegram(context, response_text)
     await _send_chat_paginated(
         update,
         context,
-        response_text,
+        rendered_text,
         reply_markup=reply_markup,
+        parse_mode=parse_mode,
     )
+    await _maybe_send_free_chat_chart(update, context, response_text, chart_requested=chart_requested)
 
 
 async def _handle_free_chat_turn(
@@ -954,7 +1279,13 @@ async def _handle_free_chat_turn(
     input_mode: str,
 ) -> str:
     response = await _generate_free_chat_response(update, context, user_text)
-    await _respond_free_chat_output(update, context, response, input_mode=input_mode)
+    await _respond_free_chat_output(
+        update,
+        context,
+        response,
+        input_mode=input_mode,
+        chart_requested=_free_chat_requests_chart(user_text),
+    )
     return response
 
 

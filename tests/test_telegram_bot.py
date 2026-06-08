@@ -1009,6 +1009,150 @@ def test_send_chat_paginated_short_message(monkeypatch):
     assert context.user_data == {}
 
 
+def test_format_free_chat_for_telegram_keeps_simple_text_plain():
+    context = types.SimpleNamespace(user_data={})
+
+    text, parse_mode = tg._format_free_chat_for_telegram(context, "Risposta breve senza struttura.")
+
+    assert text == "Risposta breve senza struttura."
+    assert parse_mode is None
+
+
+def test_format_free_chat_for_telegram_builds_html_and_metric_table():
+    context = types.SimpleNamespace(user_data={})
+    response = (
+        "### Sintesi\n"
+        "**Peronospora probabile** su vite.\n\n"
+        "- Temperatura: 24 C\n"
+        "- Umidita: 68%\n"
+        "- Rischio: medio\n"
+    )
+
+    text, parse_mode = tg._format_free_chat_for_telegram(context, response)
+
+    assert parse_mode == "HTML"
+    assert "<b>🔎 Sintesi</b>" in text
+    assert "<b>Peronospora probabile</b> su vite." in text
+    assert "<pre>" in text
+    assert "Temperatura" in text
+    assert "68%" in text
+    assert "█" in text
+    assert "###" not in text
+
+
+def test_format_free_chat_for_telegram_builds_table_from_inline_pipe_metrics():
+    context = types.SimpleNamespace(user_data={})
+    response = "**Vite:** Temperatura: 24 C | Umidita: 68% | Rischio: medio"
+
+    text, parse_mode = tg._format_free_chat_for_telegram(context, response)
+
+    assert parse_mode == "HTML"
+    assert "<pre>" in text
+    assert "Temperatura" in text
+    assert "Umidita" in text
+    assert "Rischio" in text
+
+
+def test_format_free_chat_for_telegram_keeps_descriptive_rows_as_bullets():
+    context = types.SimpleNamespace(user_data={})
+    response = (
+        "### Profilo\n"
+        "- Sede: Italia\n"
+        "- Mercato: Europa\n"
+        "- Canale: Retail\n"
+    )
+
+    text, parse_mode = tg._format_free_chat_for_telegram(context, response)
+
+    assert parse_mode == "HTML"
+    assert "<pre>" not in text
+    assert "• Sede: Italia" in text
+    assert "• Mercato: Europa" in text
+
+
+def test_respond_free_chat_output_uses_rich_html_when_needed(monkeypatch):
+    calls = []
+
+    async def fake_send_chat_paginated(update, context, text, reply_markup=None, parse_mode=None):
+        calls.append((text, reply_markup, parse_mode))
+
+    monkeypatch.setattr(tg, "_send_chat_paginated", fake_send_chat_paginated)
+    monkeypatch.setattr(tg, "_should_reply_with_voice", lambda context, input_mode: False)
+
+    context = types.SimpleNamespace(user_data={"chat_mode_active": True})
+    response = (
+        "### Rischio\n"
+        "- Temperatura: 23 C\n"
+        "- Umidita: 71%\n"
+        "- Stato: alto\n"
+    )
+
+    asyncio.run(
+        tg._respond_free_chat_output(
+            object(),
+            context,
+            response,
+            input_mode="text",
+        )
+    )
+
+    assert len(calls) == 1
+    text, reply_markup, parse_mode = calls[0]
+    assert reply_markup is not None
+    assert parse_mode == "HTML"
+    assert "<pre>" in text
+    assert "<b>📊 Rischio</b>" in text
+
+
+def test_free_chat_requests_chart_detects_explicit_visual_prompt():
+    assert tg._free_chat_requests_chart("Fammi un grafico del rischio") is True
+    assert tg._free_chat_requests_chart("Show me a chart") is True
+    assert tg._free_chat_requests_chart("Spiegami il rischio") is False
+
+
+def test_respond_free_chat_output_sends_chart_only_when_requested(monkeypatch):
+    sends = []
+    photos = []
+
+    async def fake_send_chat_paginated(update, context, text, reply_markup=None, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    class FakeChat:
+        async def send_photo(self, photo, caption=None):
+            photos.append(caption)
+
+    monkeypatch.setattr(tg, "_send_chat_paginated", fake_send_chat_paginated)
+    monkeypatch.setattr(tg, "_should_reply_with_voice", lambda context, input_mode: False)
+    monkeypatch.setattr(tg, "_build_free_chat_metric_chart", lambda context, text: BytesIO(b"fake-chart"))
+
+    context = types.SimpleNamespace(user_data={"chat_mode_active": True})
+    update = types.SimpleNamespace(effective_chat=FakeChat())
+
+    asyncio.run(
+        tg._respond_free_chat_output(
+            update,
+            context,
+            "### Rischio\n- Temperatura: 23 C\n- Umidita: 71%\n- Stato: alto\n",
+            input_mode="text",
+            chart_requested=True,
+        )
+    )
+
+    assert len(sends) == 1
+    assert photos == ["📈 Mini-grafico DELTA generato su richiesta dagli indicatori della risposta."]
+
+
+def test_build_free_chat_metric_chart_accepts_inline_pipe_metrics():
+    context = types.SimpleNamespace(user_data={})
+
+    payload = tg._build_free_chat_metric_chart(
+        context,
+        "**Vite:** Temperatura: 24 C | Umidita: 68% | Rischio: medio",
+    )
+
+    assert payload is not None
+
+
 def test_continue_diagnosis_message_uses_chat_pending_when_no_diag(monkeypatch):
     calls = []
 
