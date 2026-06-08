@@ -228,6 +228,16 @@ def _free_chat_block_message(block_reason: str) -> str:
     return "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu."
 
 
+def _is_nasa_sar_manual_location_fallback_text(text: str) -> bool:
+    normalized = " ".join(
+        str(text or "")
+        .replace("📍", " ")
+        .replace("🛰️", " ")
+        .split()
+    ).strip().lower()
+    return normalized in {"invia gps manualmente", "send gps manually"}
+
+
 def is_guided_diagnosis_mode(
     context: "ContextTypes.DEFAULT_TYPE",
     chat_id: Optional[int] = None,
@@ -1657,12 +1667,24 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if not update.message or not update.message.text:
         logger.debug("free_chat_handler: messaggio vuoto o non testuale")
         return
+    user_text = update.message.text.strip()
     block_reason = _free_chat_block_reason(context)
+    if block_reason == "awaiting_nasa_sar_location" and _is_nasa_sar_manual_location_fallback_text(user_text):
+        logger.info("free_chat_handler: client senza location nativa durante attesa NASA/SAR, invio istruzioni dedicate")
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "📍 Questo client Telegram non ha condiviso una posizione GPS reale. Se stai usando Telegram Web/Desktop, apri DELTAPLANO dal telefono e usa di nuovo Invia GPS manualmente oppure Apri NASA-ISRO/SAR GPS. Qui resto in attesa della posizione; usa /annulla per uscire.",
+                "📍 This Telegram client did not share a real GPS position. If you are using Telegram Web/Desktop, open DELTAPLANO on your phone and use Send GPS manually again or Open NASA-ISRO/SAR GPS. I will keep waiting for the location here; use /annulla to exit.",
+            ),
+            reply_markup=_nasa_sar_reply_keyboard(context),
+        )
+        return
     if block_reason:
         logger.info("free_chat_handler: flusso strutturato attivo (%s), invio feedback", block_reason)
         await _send(update, _free_chat_block_message(block_reason))
         return
-    user_text = update.message.text.strip()
     user_id = str(update.effective_user.id) if update.effective_user else "0"
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
     await _handle_free_chat_turn(update, context, user_text, input_mode="text")
@@ -3292,60 +3314,11 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
         return
 
     context.user_data.pop("awaiting_nasa_sar_location", None)
-    # --- Invio mappa GPS con overlay radar e report grafico come in chat libera ---
-    lat, lon = location.latitude, location.longitude
-    report_language = _ui_language(context)
-    chat = getattr(update, "effective_chat", None)
-    # Mappa radar
-    map_payload = await asyncio.to_thread(
-        _build_nasa_sar_map_photo_payload,
-        lat,
-        lon,
-        report_language,
-    )
-    if map_payload and chat:
-        if hasattr(map_payload, "seek"):
-            map_payload.seek(0)
-        await chat.send_photo(
-            photo=map_payload,
-            caption=_ui_text(
-                context,
-                "\U0001F30E Area di interesse NASA-ISRO/SAR (raggio 50m dal punto GPS)",
-                "\U0001F30E NASA-ISRO/SAR area of interest (50 m radius from the GPS point)",
-            ),
-        )
-    # Dashboard dati e report grafico
-    from bot.nasa_sar_dashboard import build_dashboard_plaintext_report, generate_dashboard, generate_dashboard_report_image
-    dashboard = generate_dashboard(lat, lon)
-    if isinstance(dashboard, dict) and "error" in dashboard:
-        logger.error("Errore dashboard NASA-ISRO/SAR: %s", dashboard["error"])
-        await _send(
-            update,
-            _ui_text(
-                context,
-                f"❌ Errore dashboard NASA-ISRO/SAR: {dashboard['error']}",
-                f"❌ NASA-ISRO/SAR dashboard error: {dashboard['error']}",
-            ),
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return
-    img = generate_dashboard_report_image(dashboard, lat, lon, language=report_language)
-    import tempfile
-    img_path = tempfile.mktemp(suffix="_dashboard.png", prefix="nasa_sar_")
-    img.save(img_path)
-    if chat:
-        with open(img_path, "rb") as f:
-            await chat.send_photo(
-                photo=f,
-                caption=_ui_text(
-                    context,
-                    "\U0001F4CA Report grafico NASA-ISRO/SAR: rischio settimanale e indicatori professionali.",
-                    "\U0001F4CA NASA-ISRO/SAR graphic report: weekly risk and professional indicators.",
-                ),
-            )
-    await _send(
+    await _run_nasa_sar_analysis(
         update,
-        build_dashboard_plaintext_report(dashboard, language=report_language),
+        context,
+        location.latitude,
+        location.longitude,
         reply_markup=ReplyKeyboardRemove(),
     )
 

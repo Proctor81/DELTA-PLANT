@@ -620,27 +620,23 @@ def test_handle_nasa_sar_location_runs_analysis_and_clears_flag(monkeypatch):
     async def fake_guard(update):
         return True
 
-    # Mock effective_chat.send_photo e _send
-    class FakeChat:
-        async def send_photo(self, photo, caption=None):
-            calls.append((photo, caption))
-
-    async def fake_send(update, text, reply_markup=None, parse_mode=None):
-        calls.append(("send", text))
-
     monkeypatch.setattr(tg, "_guard", fake_guard)
-    monkeypatch.setattr(tg, "_send", fake_send)
+
+    async def fake_run(update, context, latitude, longitude, reply_markup=None):
+        calls.append((latitude, longitude, reply_markup))
+
+    monkeypatch.setattr(tg, "_run_nasa_sar_analysis", fake_run)
 
     update = types.SimpleNamespace(
         message=types.SimpleNamespace(location=types.SimpleNamespace(latitude=41.9028, longitude=12.4964)),
-        effective_chat=FakeChat(),
     )
     context = types.SimpleNamespace(user_data={"awaiting_nasa_sar_location": True}, application=types.SimpleNamespace(bot_data={}))
 
     asyncio.run(tg.handle_nasa_sar_location(update, context))
 
-    # Verifica che almeno una chiamata send_photo sia avvenuta e che il flag sia stato rimosso
-    assert any(isinstance(c[0], (bytes, str, type(None))) for c in calls if isinstance(c, tuple))
+    assert len(calls) == 1
+    assert calls[0][0:2] == (41.9028, 12.4964)
+    assert isinstance(calls[0][2], tg.ReplyKeyboardRemove)
     assert context.user_data == {}
 
 
@@ -2153,6 +2149,54 @@ def test_free_chat_handler_warns_during_sensor_collection(monkeypatch):
     assert sends == [
         "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu.",
     ]
+
+
+def test_free_chat_handler_explains_manual_gps_fallback_on_telegram_web(monkeypatch):
+    sends = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append((text, reply_markup, parse_mode))
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="Invia GPS manualmente"),
+        effective_user=types.SimpleNamespace(id=77),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"awaiting_nasa_sar_location": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+    assert len(sends) == 1
+    assert "Telegram Web/Desktop" in sends[0][0]
+    assert "resto in attesa della posizione" in sends[0][0]
+    assert isinstance(sends[0][1], tg.ReplyKeyboardMarkup)
+    assert sends[0][2] is None
 
 
 def test_is_guided_diagnosis_mode_detects_transient_markers():
