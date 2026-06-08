@@ -104,6 +104,7 @@ class FakeConsentManager:
 class FakeWebsiteAnalyticsTracker:
     def __init__(self) -> None:
         self.events = []
+        self.report_calls = []
 
     def record_event(self, payload: dict, session_id: str | None = None) -> dict:
         stored = {**payload, "session_id": session_id}
@@ -114,6 +115,46 @@ class FakeWebsiteAnalyticsTracker:
             "event_type": payload["event_type"],
             "page_path": payload["page_path"],
             "created_at": "2026-05-25T12:00:00+00:00",
+        }
+
+    def build_report(self, days: int = 30, recent_limit: int = 12) -> dict:
+        self.report_calls.append({"days": days, "recent_limit": recent_limit})
+        return {
+            "window_days": days,
+            "generated_at": "2026-05-25T12:00:00+00:00",
+            "storage_path": "/tmp/fake.sqlite",
+            "totals": {
+                "total_events": 3,
+                "unique_visitors": 2,
+                "unique_sessions": 2,
+                "page_views": 2,
+                "session_starts": 1,
+                "cta_clicks": 0,
+                "outbound_clicks": 0,
+                "hero_dashboard_runs": 0,
+                "contact_submissions": 0,
+                "avg_engagement_seconds": 4.5,
+            },
+            "consent_overview": None,
+            "event_breakdown": [{"event_type": "page_view", "count": 2}],
+            "top_pages": [{"page_path": "/", "count": 2}],
+            "top_referrers": [],
+            "top_campaigns": [],
+            "device_breakdown": [],
+            "language_breakdown": [],
+            "daily": [{"day": "2026-05-25", "events": 3, "visitors": 2}],
+            "recent_events": [
+                {
+                    "created_at": "2026-05-25T12:00:00+00:00",
+                    "event_type": "page_view",
+                    "event_label": "home",
+                    "page_path": "/",
+                    "referrer_host": None,
+                    "device_type": "desktop",
+                    "language": "en-US",
+                    "engaged_seconds": None,
+                }
+            ][:recent_limit],
         }
 
 
@@ -512,6 +553,50 @@ def test_cookie_validator_accepts_urlencoded_browser_cookie():
 
     assert merged["analytics"] is True
     assert validator.feature_allowed(user_token, "analytics", encoded_cookie) is True
+
+
+def test_admin_analytics_report_requires_admin_bearer_scope(nasa_client):
+    client, fake_orchestrator = nasa_client
+
+    denied = client.get("/api/analytics/report")
+
+    assert denied.status_code == 401
+
+    allowed_token = api_main.create_session_token(
+        {
+            "sub": "delta-admin",
+            "scope": "admin:analytics:read",
+            "iss": "delta-admin-panel",
+            "iat": 1780891200,
+            "exp": 4102444800,
+        }
+    )
+    allowed = client.get(
+        "/api/analytics/report?days=7&recent_limit=5",
+        headers={"Authorization": f"Bearer {allowed_token}"},
+    )
+
+    assert allowed.status_code == 200
+    payload = allowed.json()
+    assert payload["report_source"] == "remote_api"
+    assert payload["totals"]["total_events"] == 3
+    assert fake_orchestrator.website_analytics_tracker.report_calls[-1] == {"days": 7, "recent_limit": 5}
+
+    wrong_scope_token = api_main.create_session_token(
+        {
+            "sub": "delta-admin",
+            "scope": "admin:other",
+            "iss": "delta-admin-panel",
+            "iat": 1780891200,
+            "exp": 4102444800,
+        }
+    )
+    forbidden = client.get(
+        "/api/analytics/report",
+        headers={"Authorization": f"Bearer {wrong_scope_token}"},
+    )
+
+    assert forbidden.status_code == 403
 
 
 def test_area_analysis_pdf_token_allows_positive_download_with_filename(nasa_client):

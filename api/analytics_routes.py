@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
+from jose import JWTError, jwt
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
@@ -11,6 +13,8 @@ from pydantic import BaseModel, Field
 USER_TOKEN_PATTERN = r"^[A-Za-z0-9._:-]{16,128}$"
 SESSION_PATTERN = r"^[A-Za-z0-9._:-]{6,128}$"
 EVENT_TYPE_PATTERN = r"^[a-z0-9_:-]{3,32}$"
+ADMIN_ANALYTICS_SCOPE = "admin:analytics:read"
+ADMIN_ANALYTICS_ISSUER = "delta-admin-panel"
 
 
 class AnalyticsEventRequest(BaseModel):
@@ -31,6 +35,36 @@ class AnalyticsEventRequest(BaseModel):
 
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+
+def _require_admin_analytics_claims(request: Request) -> dict[str, Any]:
+    authorization = request.headers.get("Authorization", "").strip()
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="Missing admin analytics bearer token.")
+
+    settings = getattr(request.app.state, "settings", None)
+    if settings is None:
+        raise HTTPException(status_code=503, detail="Application settings unavailable.")
+
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key.get_secret_value(),
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False},
+        )
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid admin analytics token.") from exc
+
+    if payload.get("scope") != ADMIN_ANALYTICS_SCOPE or payload.get("iss") != ADMIN_ANALYTICS_ISSUER:
+        raise HTTPException(status_code=403, detail="Admin analytics scope missing.")
+
+    expires_at = payload.get("exp")
+    if isinstance(expires_at, (int, float)) and expires_at < datetime.now(timezone.utc).timestamp():
+        raise HTTPException(status_code=401, detail="Expired admin analytics token.")
+
+    return payload
 
 
 @router.post("/events", status_code=status.HTTP_202_ACCEPTED)
@@ -55,3 +89,26 @@ async def ingest_event(request: Request, payload: AnalyticsEventRequest) -> dict
         session_id=payload.session_id or session_payload.get("sub"),
     )
     return result
+
+
+@router.get("/report")
+async def analytics_report(
+    request: Request,
+    days: int = 30,
+    recent_limit: int = 15,
+) -> dict[str, Any]:
+    _require_admin_analytics_claims(request)
+
+    tracker = getattr(request.app.state, "analytics_tracker", None)
+    if tracker is None:
+        tracker = getattr(request.app.state.orchestrator, "website_analytics_tracker", None)
+    if tracker is None:
+        raise HTTPException(status_code=503, detail="Analytics tracker unavailable.")
+
+    try:
+        report = tracker.build_report(days=days, recent_limit=recent_limit)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to build analytics report: {exc}") from exc
+
+    report["report_source"] = "remote_api"
+    return report

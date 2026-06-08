@@ -7,10 +7,15 @@ configurazione, backup, reset Academy.
 
 import json
 import logging
+import os
 import shutil
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import requests
+from jose import jwt
 
 if TYPE_CHECKING:
     from core.agent import DeltaAgent
@@ -34,6 +39,7 @@ class AdminPanel:
 
     def __init__(self, agent: "DeltaAgent"):
         self.agent = agent
+        self._admin_authenticated = False
 
     # ── Autenticazione ─────────────────────────────────────────
 
@@ -47,13 +53,16 @@ class AdminPanel:
             pw = getpass.getpass("Password: ")
         except (KeyboardInterrupt, EOFError):
             print()
+            self._admin_authenticated = False
             return False
         if verify_password(pw):
             print(f"{GREEN}✔ Accesso autorizzato.{RESET}")
             logger.info("Accesso admin riuscito.")
+            self._admin_authenticated = True
             return True
         print(f"{RED}✘ Password errata. Accesso negato.{RESET}")
         logger.warning("Tentativo di accesso admin FALLITO.")
+        self._admin_authenticated = False
         return False
 
     # ── Menu principale ────────────────────────────────────────
@@ -600,16 +609,10 @@ class AdminPanel:
         - Stampa tabella per utente autorizzato + istogramma ASCII complessivo
         """
         import re
-        from collections import defaultdict
 
         print(f"\n{BOLD}─── STATISTICHE INFERENZA DELTAPLANO_bot ───{RESET}")
 
-        log_dir = _ROOT / "logs"
-        log_files = []
-        for name in ("delta.log", "deltaplano_chat.log", "bot.log", "delta_runtime.log"):
-            p = log_dir / name
-            if p.exists():
-                log_files.append(p)
+        log_files = self._bot_inference_log_files()
         if not log_files:
             print(f"{DIM}Nessun log disponibile in logs/.{RESET}")
             return
@@ -639,74 +642,19 @@ class AdminPanel:
         if not authorized:
             print(f"{YELLOW}⚠ Nessun username autorizzato in {scientists_path.name}.{RESET}")
 
-        # Pattern di parsing
-        rx_chat_ok = re.compile(
-            r"delta\.chat_engine: Risposta HF \[([^\]]+)\] per user (\d+)"
+        parse_result = self._collect_bot_inference_log_stats(log_files)
+        stats = parse_result["stats"]
+        total_hf_chars = parse_result["total_hf_chars"]
+        total_hf_calls = parse_result["total_hf_calls"]
+        total_hf_errors = parse_result["total_hf_errors"]
+        duplicate_lines_skipped = parse_result["duplicate_lines_skipped"]
+        synthetic_lines_skipped = parse_result["synthetic_lines_skipped"]
+
+        print(
+            f"{DIM}Log analizzati: {len(log_files)}  "
+            f"duplicati ignorati={duplicate_lines_skipped}  "
+            f"righe sintetiche ignorate={synthetic_lines_skipped}{RESET}"
         )
-        rx_chat_err = re.compile(r"delta\.chat_engine: HF ha restituito errore")
-        rx_bot_reply = re.compile(
-            r"delta\.deltaplano_bot: Chat LLM risposta per user (\d+)"
-        )
-        rx_hf_chars = re.compile(r"delta\.huggingface_llm: HF risposta generata .*\((\d+) chars\)")
-        rx_hf_err = re.compile(r"delta\.huggingface_llm: Errore HF")
-
-        stats = defaultdict(lambda: {
-            "requests": 0,      # risposte HF associate ad un user
-            "bot_replies": 0,   # log da deltaplano_bot
-            "errors": 0,        # errori HF nel contesto utente
-            "models": set(),
-            "first": None,
-            "last": None,
-        })
-        total_hf_chars = 0
-        total_hf_calls = 0
-        total_hf_errors = 0
-        last_user_seen: str = ""
-
-        ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
-
-        for lf in log_files:
-            try:
-                with lf.open("r", encoding="utf-8", errors="ignore") as fh:
-                    for line in fh:
-                        ts_m = ts_re.match(line)
-                        ts = ts_m.group(1) if ts_m else None
-
-                        m = rx_chat_ok.search(line)
-                        if m:
-                            model, uid = m.group(1), m.group(2)
-                            s = stats[uid]
-                            s["requests"] += 1
-                            s["models"].add(model)
-                            if ts:
-                                s["first"] = ts if not s["first"] or ts < s["first"] else s["first"]
-                                s["last"]  = ts if not s["last"]  or ts > s["last"]  else s["last"]
-                            last_user_seen = uid
-                            continue
-
-                        m = rx_bot_reply.search(line)
-                        if m:
-                            uid = m.group(1)
-                            stats[uid]["bot_replies"] += 1
-                            last_user_seen = uid
-                            continue
-
-                        m = rx_hf_chars.search(line)
-                        if m:
-                            total_hf_chars += int(m.group(1))
-                            total_hf_calls += 1
-                            continue
-
-                        if rx_hf_err.search(line):
-                            total_hf_errors += 1
-                            if last_user_seen:
-                                stats[last_user_seen]["errors"] += 1
-                            continue
-
-                        if rx_chat_err.search(line) and last_user_seen:
-                            stats[last_user_seen]["errors"] += 1
-            except Exception as exc:
-                print(f"{YELLOW}⚠ Errore parsing {lf.name}: {exc}{RESET}")
 
         # Costruisci righe per utente autorizzato
         # Mappa username -> user_id inverso, con normalizzazione (rimuove _ . -)
@@ -854,21 +802,221 @@ class AdminPanel:
                 f"  ad ogni interazione di un utente autorizzato sul bot Telegram.{RESET}"
             )
 
+    def _bot_inference_log_files(self) -> list[Path]:
+        log_dir = _ROOT / "logs"
+        log_files = []
+        for name in ("delta.log", "deltaplano_chat.log", "bot.log", "delta_runtime.log"):
+            log_files.extend(self._discover_bot_inference_log_variants(log_dir, name))
+        return log_files
+
+    @staticmethod
+    def _discover_bot_inference_log_variants(log_dir: Path, base_name: str) -> list[Path]:
+        if not log_dir.exists():
+            return []
+
+        base_path = log_dir / base_name
+        candidates: list[Path] = []
+        if base_path.is_file():
+            candidates.append(base_path)
+
+        for path in log_dir.glob(f"{base_name}.*"):
+            if not path.is_file():
+                continue
+            if AdminPanel._is_rotated_bot_inference_log(path, base_name):
+                candidates.append(path)
+
+        return sorted(
+            set(candidates),
+            key=lambda path: AdminPanel._bot_inference_log_sort_key(path, base_name),
+        )
+
+    @staticmethod
+    def _is_rotated_bot_inference_log(path: Path, base_name: str) -> bool:
+        suffix = path.name[len(base_name):]
+        if not suffix.startswith("."):
+            return False
+
+        parts = [part for part in suffix.split(".") if part]
+        if parts and parts[-1] == "gz":
+            parts = parts[:-1]
+        return len(parts) == 1 and parts[0].isdigit()
+
+    @staticmethod
+    def _bot_inference_log_sort_key(path: Path, base_name: str) -> tuple[int, int, str]:
+        if path.name == base_name:
+            return (1, 0, path.name)
+
+        suffix = path.name[len(base_name):]
+        parts = [part for part in suffix.split(".") if part]
+        if parts and parts[-1] == "gz":
+            parts = parts[:-1]
+        rotation_index = int(parts[0]) if parts and parts[0].isdigit() else 0
+        return (0, -rotation_index, path.name)
+
+    @staticmethod
+    def _open_bot_inference_log(log_file: Path):
+        if log_file.suffix == ".gz":
+            import gzip
+
+            return gzip.open(log_file, "rt", encoding="utf-8", errors="ignore")
+        return log_file.open("r", encoding="utf-8", errors="ignore")
+
+    def _collect_bot_inference_log_stats(self, log_files: list[Path]) -> dict[str, object]:
+        import re
+        from collections import defaultdict
+
+        rx_chat_ok = re.compile(
+            r"delta\.chat_engine: Risposta HF \[([^\]]+)\] per user (\d+)"
+        )
+        rx_chat_err = re.compile(r"delta\.chat_engine: HF ha restituito errore")
+        rx_bot_reply_legacy = re.compile(
+            r"delta\.deltaplano_bot: Chat LLM risposta per user (\d+)"
+        )
+        rx_bot_reply_current = re.compile(
+            r"delta\.interface\.telegram: free_chat_response\[(\d+)\]:"
+        )
+        rx_bot_request_current = re.compile(
+            r"delta\.interface\.telegram: free_chat_handler: Ricevuto da (\d+):"
+        )
+        rx_hf_chars = re.compile(r"delta\.huggingface_llm: HF risposta generata .*\((\d+) chars\)")
+        rx_hf_err = re.compile(r"delta\.huggingface_llm: Errore HF")
+        ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
+
+        stats = defaultdict(
+            lambda: {
+                "requests": 0,
+                "bot_replies": 0,
+                "errors": 0,
+                "models": set(),
+                "first": None,
+                "last": None,
+            }
+        )
+        total_hf_chars = 0
+        total_hf_calls = 0
+        total_hf_errors = 0
+        duplicate_lines_skipped = 0
+        synthetic_lines_skipped = 0
+        seen_lines: set[str] = set()
+        counted_error_fingerprints: set[tuple[str, str]] = set()
+
+        for log_file in log_files:
+            active_user_id = ""
+            try:
+                with self._open_bot_inference_log(log_file) as fh:
+                    for raw_line in fh:
+                        line = raw_line.rstrip("\n")
+                        if line in seen_lines:
+                            duplicate_lines_skipped += 1
+                            continue
+                        seen_lines.add(line)
+
+                        if "fake-model" in line or "FakeEngine" in line:
+                            synthetic_lines_skipped += 1
+                            continue
+
+                        ts_match = ts_re.match(line)
+                        ts = ts_match.group(1) if ts_match else None
+
+                        match = rx_bot_request_current.search(line)
+                        if match:
+                            active_user_id = match.group(1)
+                            continue
+
+                        match = rx_chat_ok.search(line)
+                        if match:
+                            model, uid = match.group(1), match.group(2)
+                            user_stats = stats[uid]
+                            user_stats["requests"] += 1
+                            user_stats["models"].add(model)
+                            if ts:
+                                user_stats["first"] = ts if not user_stats["first"] or ts < user_stats["first"] else user_stats["first"]
+                                user_stats["last"] = ts if not user_stats["last"] or ts > user_stats["last"] else user_stats["last"]
+                            active_user_id = uid
+                            continue
+
+                        match = rx_bot_reply_current.search(line) or rx_bot_reply_legacy.search(line)
+                        if match:
+                            uid = match.group(1)
+                            stats[uid]["bot_replies"] += 1
+                            active_user_id = uid
+                            continue
+
+                        match = rx_hf_chars.search(line)
+                        if match:
+                            total_hf_chars += int(match.group(1))
+                            total_hf_calls += 1
+                            continue
+
+                        if rx_hf_err.search(line):
+                            total_hf_errors += 1
+                            if active_user_id:
+                                fingerprint = (active_user_id, ts or line)
+                                if fingerprint not in counted_error_fingerprints:
+                                    stats[active_user_id]["errors"] += 1
+                                    counted_error_fingerprints.add(fingerprint)
+                            continue
+
+                        if rx_chat_err.search(line) and active_user_id:
+                            fingerprint = (active_user_id, ts or line)
+                            if fingerprint not in counted_error_fingerprints:
+                                stats[active_user_id]["errors"] += 1
+                                counted_error_fingerprints.add(fingerprint)
+            except Exception as exc:
+                print(f"{YELLOW}⚠ Errore parsing {log_file.name}: {exc}{RESET}")
+
+        return {
+            "stats": stats,
+            "total_hf_chars": total_hf_chars,
+            "total_hf_calls": total_hf_calls,
+            "total_hf_errors": total_hf_errors,
+            "duplicate_lines_skipped": duplicate_lines_skipped,
+            "synthetic_lines_skipped": synthetic_lines_skipped,
+        }
+
     def _website_visitor_monitor(self):
         from nasa_delta_plant.privacy.website_analytics import WebsiteAnalyticsTracker
 
-        storage_path = _ROOT / "data" / "analytics" / "website_events.sqlite"
+        storage_path, storage_source = self._resolve_website_analytics_storage_path()
         tracker = WebsiteAnalyticsTracker(storage_path=storage_path)
+        remote_api_base = self._website_analytics_remote_api_base()
 
         while True:
+            diagnostics = self._website_analytics_storage_diagnostics(storage_path)
             self._header()
             print(f"{BOLD}─── MONITOR VISITATORI DELTAPLANT.AI ───{RESET}")
-            print(f"{DIM}Storage locale: {storage_path}{RESET}\n")
+            source_label = "settings/.env" if storage_source == "settings" else "fallback locale"
+            print(f"{DIM}Storage locale: {storage_path} ({source_label}){RESET}")
+            print(f"{DIM}Report live remoto: {remote_api_base}/api/analytics/report{RESET}")
+            print(f"{DIM}Le viste [1]-[5] provano prima il report remoto protetto e usano il DB locale solo come fallback.{RESET}")
+            if diagnostics["error"]:
+                print(f"{YELLOW}⚠ Diagnostica storage: {diagnostics['error']}{RESET}\n")
+            else:
+                latest_event = diagnostics["latest_event_at"] or "mai"
+                exists_label = "si" if diagnostics["exists"] else "no"
+                print(
+                    f"{DIM}DB locale: esiste={exists_label}  size={diagnostics['size_bytes']} B  "
+                    f"eventi={diagnostics['total_events']}  ultimo_evento={latest_event}{RESET}"
+                )
+                if diagnostics["total_events"] == 0:
+                    print(
+                        f"{YELLOW}ℹ Nessun evento nel database locale del monitor.{RESET}\n"
+                        f"{DIM}  Per muovere questo monitor non basta aprire deltaplant.ai: il sito invia page_view e click\n"
+                        f"  solo dopo consenso analytics esplicito dal banner Privacy/Preferences.\n"
+                        f"  Le viste di questo menu proveranno comunque prima il report live dell'API pubblica.\n"
+                        f"  Inoltre questo pannello legge solo lo SQLite del backend API in esecuzione su questa macchina.\n"
+                        f"  Se deltaplant.ai sta inviando eventi a un server remoto, qui vedrai zero finché non apri\n"
+                        f"  l'admin sullo stesso host del backend pubblico o non punti allo stesso storage analytics.\n"
+                        f"  Check operativo: abilita analytics sul sito, ricarica la pagina e verifica il monitor sul server\n"
+                        f"  che ospita api.deltaplant.ai.{RESET}"
+                    )
+            print()
             print(f"  {BOLD}[1]{RESET} Panoramica ultime 24 ore")
             print(f"  {BOLD}[2]{RESET} Panoramica ultimi 7 giorni")
             print(f"  {BOLD}[3]{RESET} Panoramica ultimi 30 giorni")
             print(f"  {BOLD}[4]{RESET} Eventi recenti ultimi 30 giorni")
             print(f"  {BOLD}[5]{RESET} Esporta report JSON ultimi 30 giorni")
+            print(f"  {BOLD}[6]{RESET} Diagnostica report remoto")
             print(f"  {BOLD}[0]{RESET} Indietro")
 
             scelta = input(f"\n{BOLD}> Scelta: {RESET}").strip()
@@ -883,6 +1031,8 @@ class AdminPanel:
                 self._print_website_analytics_recent_events(tracker, 30)
             elif scelta == "5":
                 self._export_website_analytics_report(tracker, 30)
+            elif scelta == "6":
+                self._print_website_analytics_remote_diagnostics()
             elif scelta == "0":
                 return
             else:
@@ -890,11 +1040,214 @@ class AdminPanel:
 
             input(f"\n{DIM}Premi Invio per continuare...{RESET}")
 
+    @staticmethod
+    def _website_analytics_remote_api_base() -> str:
+        configured = (os.getenv("DELTA_PUBLIC_API_BASE") or os.getenv("DELTA_API_BASE") or "").strip()
+        return configured.rstrip("/") if configured else "https://api.deltaplant.ai"
+
+    def _issue_admin_analytics_token(self, lifetime_minutes: int = 5) -> str:
+        if not self._admin_authenticated:
+            raise RuntimeError("Admin authentication required.")
+
+        from nasa_delta_plant.config import get_settings
+
+        settings = get_settings()
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": "delta-admin",
+            "scope": "admin:analytics:read",
+            "iss": "delta-admin-panel",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=lifetime_minutes)).timestamp()),
+        }
+        return jwt.encode(
+            payload,
+            settings.secret_key.get_secret_value(),
+            algorithm=settings.jwt_algorithm,
+        )
+
+    def _fetch_remote_website_analytics_report(
+        self,
+        days: int,
+        recent_limit: int = 15,
+    ) -> tuple[dict[str, object] | None, str | None]:
+        diagnostic = self._request_remote_website_analytics_report(days=days, recent_limit=recent_limit)
+        if diagnostic["ok"]:
+            report = diagnostic["report"]
+            if isinstance(report, dict):
+                report.setdefault("report_source", "remote_api")
+                return report, None
+        error = diagnostic.get("error")
+        return None, str(error) if error else None
+
+    def _request_remote_website_analytics_report(
+        self,
+        days: int,
+        recent_limit: int = 15,
+    ) -> dict[str, object]:
+        api_base = self._website_analytics_remote_api_base()
+        endpoint = f"{api_base}/api/analytics/report"
+        diagnostic: dict[str, object] = {
+            "ok": False,
+            "api_base": api_base,
+            "endpoint": endpoint,
+            "authenticated": self._admin_authenticated,
+            "token_available": False,
+            "status_code": None,
+            "detail": None,
+            "error": None,
+            "report": None,
+        }
+
+        if not self._admin_authenticated:
+            diagnostic["error"] = "Admin non autenticato: impossibile firmare il token report remoto."
+            return diagnostic
+
+        try:
+            token = self._issue_admin_analytics_token()
+        except Exception as exc:
+            diagnostic["error"] = f"Token admin analytics non disponibile: {exc}"
+            return diagnostic
+
+        diagnostic["token_available"] = True
+
+        try:
+            response = requests.get(
+                endpoint,
+                params={"days": days, "recent_limit": recent_limit},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10,
+            )
+        except requests.RequestException as exc:
+            diagnostic["error"] = f"Endpoint report remoto non raggiungibile: {exc}"
+            return diagnostic
+
+        diagnostic["status_code"] = response.status_code
+        try:
+            response_payload = response.json()
+        except ValueError:
+            response_payload = None
+
+        if response.ok:
+            payload = response_payload if isinstance(response_payload, dict) else {}
+            payload.setdefault("report_source", "remote_api")
+            diagnostic["ok"] = True
+            diagnostic["report"] = payload
+            diagnostic["detail"] = "Report remoto disponibile."
+            return diagnostic
+
+        detail = None
+        if isinstance(response_payload, dict):
+            detail = response_payload.get("detail")
+        if not detail:
+            detail = response.text.strip() or f"HTTP {response.status_code}"
+        diagnostic["detail"] = detail
+        diagnostic["error"] = f"Report remoto rifiutato da {endpoint}: {detail}"
+        return diagnostic
+
+    def _load_website_analytics_report(
+        self,
+        tracker,
+        days: int,
+        recent_limit: int = 15,
+    ) -> tuple[dict[str, object], str, str | None]:
+        remote_report, remote_error = self._fetch_remote_website_analytics_report(
+            days=days,
+            recent_limit=recent_limit,
+        )
+        if remote_report is not None:
+            return remote_report, "API pubblica", None
+
+        local_report = tracker.build_report(days=days, recent_limit=recent_limit)
+        local_report["report_source"] = "local_storage"
+        return local_report, "SQLite locale", remote_error
+
+    def _print_website_analytics_remote_diagnostics(self, days: int = 30, recent_limit: int = 5):
+        diagnostic = self._request_remote_website_analytics_report(days=days, recent_limit=recent_limit)
+
+        print(f"\n{BOLD}─── DIAGNOSTICA REPORT REMOTO ───{RESET}")
+        print(f"  API base:             {CYAN}{diagnostic['api_base']}{RESET}")
+        print(f"  Endpoint:             {CYAN}{diagnostic['endpoint']}{RESET}")
+        print(
+            f"  Admin autenticato:    {CYAN}{'si' if diagnostic['authenticated'] else 'no'}{RESET}"
+        )
+        print(
+            f"  Token disponibile:    {CYAN}{'si' if diagnostic['token_available'] else 'no'}{RESET}"
+        )
+
+        status_code = diagnostic.get("status_code")
+        if status_code is not None:
+            print(f"  HTTP status:          {CYAN}{status_code}{RESET}")
+
+        if diagnostic["ok"]:
+            report = diagnostic.get("report") or {}
+            totals = report.get("totals") or {}
+            print(f"  Esito remoto:         {GREEN}OK{RESET}")
+            print(f"  Eventi totali:        {CYAN}{totals.get('total_events', 0)}{RESET}")
+            print(f"  Visitatori unici:     {CYAN}{totals.get('unique_visitors', 0)}{RESET}")
+            print(f"  Sessioni uniche:      {CYAN}{totals.get('unique_sessions', 0)}{RESET}")
+            print(f"  Motivo fallback:      {DIM}nessuno{RESET}")
+            return
+
+        detail = diagnostic.get("detail")
+        error = diagnostic.get("error") or "Sconosciuto"
+        print(f"  Esito remoto:         {YELLOW}FALLBACK LOCALE{RESET}")
+        if detail:
+            print(f"  Dettaglio remoto:     {YELLOW}{detail}{RESET}")
+        print(f"  Motivo fallback:      {YELLOW}{error}{RESET}")
+
+    def _resolve_website_analytics_storage_path(self) -> tuple[Path, str]:
+        default_path = _ROOT / "data" / "analytics" / "website_events.sqlite"
+        try:
+            from nasa_delta_plant.config import get_settings
+
+            configured_path = Path(get_settings().website_analytics_storage_path)
+            return configured_path, "settings"
+        except Exception:
+            return default_path, "fallback"
+
+    def _website_analytics_storage_diagnostics(self, storage_path: Path) -> dict[str, object]:
+        diagnostics: dict[str, object] = {
+            "exists": storage_path.exists(),
+            "size_bytes": storage_path.stat().st_size if storage_path.exists() else 0,
+            "total_events": 0,
+            "latest_event_at": None,
+            "error": None,
+        }
+        if not storage_path.exists():
+            return diagnostics
+
+        try:
+            with sqlite3.connect(str(storage_path)) as connection:
+                tables = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    ).fetchall()
+                }
+                if "website_analytics_events" not in tables:
+                    diagnostics["error"] = "Tabella website_analytics_events assente."
+                    return diagnostics
+
+                row = connection.execute(
+                    "SELECT COUNT(*) AS total_events, MAX(created_at) AS latest_event_at "
+                    "FROM website_analytics_events"
+                ).fetchone()
+                diagnostics["total_events"] = int((row[0] if row else 0) or 0)
+                diagnostics["latest_event_at"] = row[1] if row else None
+        except Exception as exc:
+            diagnostics["error"] = str(exc)
+
+        return diagnostics
+
     def _print_website_analytics_summary(self, tracker, days: int):
-        report = tracker.build_report(days=days)
+        report, source_name, warning = self._load_website_analytics_report(tracker, days=days)
         totals = report["totals"]
 
         print(f"\n{BOLD}─── PANORAMICA VISITATORI ({days} giorni) ───{RESET}")
+        print(f"{DIM}Fonte dati: {source_name}{RESET}")
+        if warning:
+            print(f"{YELLOW}⚠ Fallback locale: {warning}{RESET}")
         print(f"  Visitatori unici:      {CYAN}{totals['unique_visitors']}{RESET}")
         print(f"  Sessioni uniche:       {CYAN}{totals['unique_sessions']}{RESET}")
         print(f"  Eventi totali:         {CYAN}{totals['total_events']}{RESET}")
@@ -939,10 +1292,17 @@ class AdminPanel:
             print(f"\n{DIM}Nessun evento analytics registrato nel periodo selezionato.{RESET}")
 
     def _print_website_analytics_recent_events(self, tracker, days: int):
-        report = tracker.build_report(days=days, recent_limit=15)
+        report, source_name, warning = self._load_website_analytics_report(
+            tracker,
+            days=days,
+            recent_limit=15,
+        )
         recent = report.get("recent_events") or []
 
         print(f"\n{BOLD}─── EVENTI RECENTI ({days} giorni) ───{RESET}")
+        print(f"{DIM}Fonte dati: {source_name}{RESET}")
+        if warning:
+            print(f"{YELLOW}⚠ Fallback locale: {warning}{RESET}")
         if not recent:
             print(f"{DIM}Nessun evento analytics registrato.{RESET}")
             return
@@ -964,8 +1324,16 @@ class AdminPanel:
         export_dir = _ROOT / "exports"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         destination = export_dir / f"website_analytics_{days}d_{timestamp}.json"
-        tracker.export_report(destination, days=days)
-        print(f"\n{GREEN}✔ Report analytics esportato: {destination}{RESET}")
+        report, source_name, warning = self._load_website_analytics_report(
+            tracker,
+            days=days,
+            recent_limit=15,
+        )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        if warning:
+            print(f"{YELLOW}⚠ Export in fallback locale: {warning}{RESET}")
+        print(f"\n{GREEN}✔ Report analytics esportato da {source_name}: {destination}{RESET}")
 
     # ── Helper ─────────────────────────────────────────────────
 
