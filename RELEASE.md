@@ -44,6 +44,12 @@ Tabella completa a 33 classi: [logs/vision_eval/public_600_dual/BENCHMARK_600.md
 - Sezione Contact aggiunta riusando i canali gia documentati del progetto: DELTAPLANO `/feedback`, GitHub Issues e documentazione pubblica.
 - Meta social e asset di anteprima riallineati anche per WhatsApp, con polish mobile del dock audio e migliore gerarchia nella parte finale della pagina.
 
+### Addendum manuale e monitor visitatori — 9 giugno 2026
+
+- Manuale utente aggiornato per documentare in modo esplicito la voce admin `[11] Monitor visitatori deltaplant.ai` e il relativo report remoto protetto `/api/analytics/report`.
+- Chiarito il flusso operativo del consenso analytics sul sito pubblico: su viewport ampi puo apparire il banner `Privacy & cookies`, mentre su mobile o viewport compatti lo stesso consenso puo essere gestito dal pulsante `Privacy` che apre il Preference Center.
+- Documentata anche la verifica live del comportamento atteso: dopo l'abilitazione analytics dalla landing, il monitor remoto puo popolarsi immediatamente con eventi `privacy_update`, `session_start` e `page_view` senza riavvio del backend.
+
 ---
 
 # Release v3.1 — 4 maggio 2026
