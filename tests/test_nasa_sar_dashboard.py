@@ -72,3 +72,46 @@ def test_generate_dashboard_uses_weather_dates_and_weekly_mean(monkeypatch):
     assert result["weekly_risk"] > result["dashboard"][0]["risk"]
     assert result["weekly_label"] in {"BASSO", "MEDIO", "ALTO"}
     assert result["summary"]["weather_window_end"] == "2026-05-25"
+
+
+def test_build_dashboard_plaintext_report_keeps_same_layout_across_languages():
+    sample_dashboard = {
+        "dashboard": [
+            {
+                "date": "2026-05-19",
+                "soil": 12.3,
+                "temp": 23.4,
+                "humidity": 78,
+                "rain": 4.5,
+                "risk": 0.62,
+            },
+            {
+                "date": "2026-05-20",
+                "soil": 14.7,
+                "temp": 24.1,
+                "humidity": 69,
+                "rain": 0.0,
+                "risk": 0.41,
+            },
+        ],
+        "weekly_risk": 0.52,
+        "weekly_label": "MEDIO",
+    }
+
+    report_it = dashboard.build_dashboard_plaintext_report(sample_dashboard, language=dashboard.REPORT_LANGUAGE_IT)
+    report_en = dashboard.build_dashboard_plaintext_report(sample_dashboard, language=dashboard.REPORT_LANGUAGE_EN)
+
+    lines_it = report_it.splitlines()
+    lines_en = report_en.splitlines()
+
+    assert len(lines_it) == len(lines_en)
+    assert lines_it[0] == lines_en[0] == "🌎 NASA-ISRO/SAR Dashboard"
+    assert lines_it[1] == lines_en[1] == ""
+    assert lines_it[3:5] == lines_en[3:5] == [
+        "2026-05-19 | 12.3 | 23.4 | 78 | 4.5 | 0.62",
+        "2026-05-20 | 14.7 | 24.1 | 69 | 0.0 | 0.41",
+    ]
+    assert lines_it[5] == lines_en[5] == ""
+    assert lines_it[6].startswith("Rischio settimanale: 0.52 (")
+    assert lines_en[6].startswith("Weekly risk: 0.52 (")
+    assert report_it.count("🌎") == report_en.count("🌎") == 1

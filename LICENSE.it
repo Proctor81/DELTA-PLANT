@@ -1,0 +1,109 @@
+DELTA PLANT SOFTWARE LICENSE
+
+Copyright © 2026 Paolo Ciccolella. Tutti i diritti riservati.
+Software Release: v3.2
+(Questo campo di release deve essere aggiornato a ogni rilascio software ufficiale.)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SISTEMA CORE (PROPRIETARIO)
+
+Il sistema core di DELTA PLANT, incluso ma non limitato a:
+  • software di controllo principale
+  • sistema di gestione sensori
+  • motore di automazione
+  • moduli di sicurezza ed esecuzione
+
+e' software proprietario.
+
+NON e' consentito:
+  • copiare, modificare, distribuire o fare reverse engineering del sistema core
+  • usare il sistema core al di fuori dell'ecosistema DELTA autorizzato
+  • rimuovere o alterare gli avvisi di copyright
+
+Qualsiasi uso non autorizzato del sistema core e' severamente vietato.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. MODULI / ESTENSIONI (COMPONENTI OPEN SOURCE)
+
+Alcuni moduli, plugin o componenti SDK di DELTA PLANT possono essere rilasciati
+con licenze open-source (come MIT o Apache 2.0).
+
+Questi componenti sono chiaramente indicati nelle rispettive directory.
+
+Per i moduli open-source:
+  • puoi usarli, modificarli e distribuirli
+  • devi rispettare la licenza specificata in ciascun modulo
+  • e' richiesta l'attribuzione all'autore originale
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SERVIZI AI E FUNZIONALITA' CLOUD
+
+Qualsiasi servizio legato all'AI, API cloud o integrazione con modelli esterni
+(incluso ma non limitato all'elaborazione tramite modelli linguistici) e'
+fornito come livello di servizio e NON fa parte dei componenti open-source.
+
+Questi servizi possono:
+  • richiedere autenticazione
+  • essere soggetti a limiti di utilizzo
+  • essere modificati o interrotti in qualsiasi momento
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. ESCLUSIONE DI RESPONSABILITA'
+
+IL SOFTWARE VIENE FORNITO "COSI' COM'E'", SENZA ALCUNA GARANZIA, ESPRESSA O
+IMPLICITA, INCLUSE MA NON LIMITATE ALLE GARANZIE DI COMMERCIABILITA',
+IDONEITA' PER UNO SCOPO SPECIFICO E NON VIOLAZIONE.
+
+L'autore non e' responsabile per:
+  • danni hardware
+  • perdita di dati
+  • comportamento errato dell'automazione
+  • uso improprio del sistema
+
+IN NESSUN CASO L'AUTORE POTRA' ESSERE RITENUTO RESPONSABILE PER ALCUNA
+PRETESA, DANNO O ALTRA RESPONSABILITA', SIA IN AZIONE CONTRATTUALE, ILLECITO
+O ALTRO, DERIVANTE DA, O IN CONNESSIONE CON, IL SOFTWARE O IL SUO UTILIZZO.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. USO PER RICERCA SCIENTIFICA
+
+L'uso del sistema core DELTA PLANT per ricerca scientifica e accademica e'
+consentito solo per finalita' non commerciali, nel rispetto di tutti i termini
+di questa licenza.
+
+Per l'uso di ricerca devi:
+  • mantenere integri tutti gli avvisi di copyright e licenza
+  • fornire chiara attribuzione all'autore in pubblicazioni e report
+  • usare il software nel rispetto delle leggi applicabili e degli standard etici
+  • evitare la redistribuzione del codice core proprietario o di build proprietarie derivate
+
+L'uso di ricerca NON concede diritti di proprieta' o relicensing sul sistema
+core proprietario di DELTA PLANT.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. USO COMMERCIALE
+
+L'uso commerciale del sistema core DELTA PLANT richiede un accordo di licenza
+separato e scritto con l'autore.
+
+I moduli open-source possono essere usati commercialmente secondo le rispettive
+licenze.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. TERMINI FINALI
+
+Usando qualsiasi parte di DELTA PLANT, accetti questi termini.
+
+La violazione di questa licenza puo' comportare la cessazione dei diritti d'uso
+e azioni legali.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FINE DELLA LICENZA

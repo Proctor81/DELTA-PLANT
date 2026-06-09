@@ -5,9 +5,13 @@ Usa huggingface_hub.InferenceClient (API OpenAI-compatibile).
 Seleziona automaticamente il miglior modello disponibile dalla lista di priorità.
 """
 
-import os
+import base64
 import logging
-from typing import List, Dict, Optional, Tuple
+import mimetypes
+import os
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("delta.huggingface_llm")
 
@@ -64,10 +68,85 @@ Sei l'interfaccia intelligente di un sistema Raspberry Pi con telecamera e senso
 # ─────────────────────────────────────────────────────────────────────────────
 # Modello default consigliato (sovrascrivibile con HF_MODEL_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
-HF_DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+HF_DEFAULT_MODEL = "Qwen/Qwen3-14B"
+HF_DEFAULT_VISION_MODEL = "google/gemma-4-31B-it"
 
 # Conservata per compatibilita con test/tooling legacy.
 HF_MODEL_PRIORITY = [HF_DEFAULT_MODEL]
+
+HF_QWEN3_MODEL_PREFIX = "qwen/qwen3-"
+HF_QWEN_NO_THINK_TAG = "/no_think"
+_THINK_BLOCK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.IGNORECASE | re.DOTALL)
+
+
+def is_qwen3_model(model_name: Optional[str]) -> bool:
+    return str(model_name or "").strip().lower().startswith(HF_QWEN3_MODEL_PREFIX)
+
+
+def prepare_hf_messages(model: str, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    prepared = [dict(message) for message in messages]
+    if not is_qwen3_model(model):
+        return prepared
+
+    injected = False
+    for message in prepared:
+        if str(message.get("role") or "").strip().lower() == "system":
+            content = str(message.get("content") or "").strip()
+            if HF_QWEN_NO_THINK_TAG not in content:
+                message["content"] = f"{content}\n\n{HF_QWEN_NO_THINK_TAG}".strip()
+            injected = True
+            break
+
+    if not injected and prepared:
+        content = str(prepared[0].get("content") or "").strip()
+        if HF_QWEN_NO_THINK_TAG not in content:
+            prepared[0]["content"] = f"{content} {HF_QWEN_NO_THINK_TAG}".strip()
+
+    return prepared
+
+
+def build_hf_completion_kwargs(
+    *,
+    model: str,
+    messages: List[Dict[str, str]],
+    max_tokens: int,
+    temperature: float,
+) -> Dict[str, Any]:
+    kwargs: Dict[str, Any] = {
+        "model": model,
+        "messages": prepare_hf_messages(model, messages),
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if is_qwen3_model(model):
+        # Qwen3 puo emettere blocchi <think>; lo disabilitiamo per mantenere
+        # invariato il formato delle risposte nel resto dell'infrastruttura.
+        kwargs["extra_body"] = {"enable_thinking": False}
+    return kwargs
+
+
+def sanitize_hf_chat_output(content: Optional[str]) -> str:
+    raw = str(content or "").strip()
+    if not raw:
+        return ""
+    return _THINK_BLOCK_RE.sub("", raw, count=1).strip()
+
+
+def _image_source_to_data_url(image_source: str) -> str:
+    source = str(image_source or "").strip()
+    if not source:
+        raise ValueError("image_source mancante")
+
+    if source.startswith(("http://", "https://", "data:")):
+        return source
+
+    image_path = Path(source)
+    if not image_path.is_file():
+        raise FileNotFoundError(f"Immagine non trovata: {image_path}")
+
+    mime_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 class HuggingFaceLLM:
@@ -203,12 +282,14 @@ class HuggingFaceLLM:
         """Verifica se un modello è raggiungibile con una chiamata di test minima."""
         try:
             resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": "ok"}],
-                max_tokens=5,
-                temperature=0.1,
+                **build_hf_completion_kwargs(
+                    model=model,
+                    messages=[{"role": "user", "content": "ok"}],
+                    max_tokens=5,
+                    temperature=0.1,
+                )
             )
-            _ = resp.choices[0].message.content
+            _ = sanitize_hf_chat_output(resp.choices[0].message.content)
             return True
         except Exception as e:
             logger.debug(f"Modello {model} non disponibile: {e}")
@@ -237,6 +318,58 @@ class HuggingFaceLLM:
         logger.error("Modello HF configurato non disponibile: %s", model)
         return None
 
+    def _run_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        log_label: str = "HF risposta generata",
+    ) -> Tuple[str, str]:
+        if not self.api_token:
+            return (
+                "⚠️ Token HuggingFace non configurato. "
+                "Imposta HF_API_TOKEN nel file .env",
+                "none",
+            )
+
+        model = self._active_model or self.model_name
+        if not model:
+            return "[DELTA] Nessun modello LLM disponibile.", "none"
+
+        last_error = ""
+        for attempt in range(2):
+            try:
+                client = self._get_client()
+                resp = client.chat.completions.create(
+                    **build_hf_completion_kwargs(
+                        model=model,
+                        messages=messages,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                    )
+                )
+                answer = sanitize_hf_chat_output(resp.choices[0].message.content)
+                logger.info("%s con %s (%d chars)", log_label, model, len(answer))
+                return answer, model
+
+            except Exception as e:
+                err_msg = str(e)
+                last_error = err_msg
+                logger.warning("Errore HF con modello %s: %s", model, err_msg)
+
+                if self._is_auth_error(err_msg):
+                    token_valid, _ = self.validate_token()
+                    if not token_valid:
+                        logger.warning(_TOKEN_HELP)
+                    return self._format_auth_error(token_valid), "none"
+
+                if attempt == 0 and self._is_transient_error(err_msg):
+                    logger.info("Errore HF transiente, ritento una volta sul modello %s", model)
+                    self._reset_client()
+                    continue
+
+                break
+
+        return self._format_runtime_error(last_error), "none"
+
     def chat(
         self,
         user_message: str,
@@ -255,19 +388,6 @@ class HuggingFaceLLM:
         Returns:
             Tupla (response_text, model_used).
         """
-        if not self.api_token:
-            return (
-                "⚠️ Token HuggingFace non configurato. "
-                "Imposta HF_API_TOKEN nel file .env",
-                "none",
-            )
-
-        # Seleziona il modello attivo
-        model = self._active_model or self.model_name
-        if not model:
-            return "[DELTA] Nessun modello LLM disponibile.", "none"
-
-        # Costruisci la sequenza di messaggi
         messages = [
             {"role": "system", "content": system_prompt or DELTA_SYSTEM_PROMPT}
         ]
@@ -275,40 +395,32 @@ class HuggingFaceLLM:
             messages.extend(history)
         messages.append({"role": "user", "content": user_message})
 
-        last_error = ""
-        for attempt in range(2):
-            try:
-                client = self._get_client()
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-                answer = resp.choices[0].message.content.strip()
-                logger.info(f"HF risposta generata con {model} ({len(answer)} chars)")
-                return answer, model
+        return self._run_completion(messages)
 
-            except Exception as e:
-                err_msg = str(e)
-                last_error = err_msg
-                logger.warning(f"Errore HF con modello {model}: {err_msg}")
+    def chat_with_image(
+        self,
+        user_message: str,
+        image_source: str,
+        system_prompt: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        try:
+            image_url = _image_source_to_data_url(image_source)
+        except Exception as exc:
+            logger.warning("Impossibile preparare l'immagine per HF vision: %s", exc)
+            return "[DELTA] Immagine non disponibile per l'analisi visiva multimodale.", "none"
 
-                # Rileva token scaduto/non valido → mostra istruzioni e abbandona subito
-                if self._is_auth_error(err_msg):
-                    token_valid, _ = self.validate_token()
-                    if not token_valid:
-                        logger.warning(_TOKEN_HELP)
-                    return self._format_auth_error(token_valid), "none"
+        messages = [
+            {"role": "system", "content": system_prompt or DELTA_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_message},
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                ],
+            },
+        ]
 
-                if attempt == 0 and self._is_transient_error(err_msg):
-                    logger.info("Errore HF transiente, ritento una volta sul modello %s", model)
-                    self._reset_client()
-                    continue
-
-                break
-
-        return self._format_runtime_error(last_error), "none"
+        return self._run_completion(messages, log_label="HF risposta vision generata")
 
     def is_available(self) -> bool:
         """Verifica se il servizio HF è disponibile."""

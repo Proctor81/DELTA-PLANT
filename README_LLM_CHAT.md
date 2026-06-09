@@ -22,6 +22,8 @@ La release odierna e focalizzata soprattutto su Pipeline X, benchmark, evaluatio
 
 - backend chat principale: HuggingFace Inference API
 - modello configurabile tramite `HF_MODEL_NAME`
+- modello raccomandato e validato nel runtime corrente: `Qwen/Qwen3-14B`
+- per `Qwen/Qwen3-14B` il wrapper runtime forza una modalita no-thinking, cosi l'utente riceve solo la risposta finale
 - memoria per utente persistita su disco in `memory/sessions/<user_id>.json`
 - follow-up diagnostico disponibile anche dopo riavvio del bot
 - i flussi legacy TinyLlama non fanno parte del percorso runtime documentato della release 3.2
@@ -61,7 +63,7 @@ La chat Telegram supporta ora un percorso vocale pensato per la chat libera, sen
 ### Variabili ambiente utili
 
 - `HF_API_TOKEN`: backend LLM per la chat
-- `HF_MODEL_NAME`: modello HuggingFace da usare per la conversazione
+- `HF_MODEL_NAME`: modello HuggingFace da usare per la conversazione, con default operativo consigliato `Qwen/Qwen3-14B`
 - `Piper`: nessuna chiave API, ma richiede il pacchetto `piper-tts`; il modello viene scaricato automaticamente la prima volta
 - `ELEVENLABS_API_KEY`: opzionale, abilita il provider premium ElevenLabs
 - `ELEVENLABS_VOICE_ID`: opzionale, consente di scegliere la voce ElevenLabs

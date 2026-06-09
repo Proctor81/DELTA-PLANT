@@ -56,7 +56,7 @@ SYSTEM_INFO = {
     "release": "v3.2",
     "release_name": "Unified Edge Intelligence",
     "release_date": "2026-05-13",
-    "manual_revision": "2026-05-13",
+    "manual_revision": "2026-06-09",
 }
 
 # ─────────────────────────────────────────────

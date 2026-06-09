@@ -94,12 +94,15 @@ def test_inference(token: str) -> tuple[bool, str]:
         from huggingface_hub import InferenceClient
         client = InferenceClient(api_key=token, timeout=30)
         resp = client.chat.completions.create(
-            model="meta-llama/Llama-3.1-8B-Instruct",
-            messages=[{"role": "user", "content": "Rispondi con una sola parola: ciao"}],
-            max_tokens=10,
+            model="Qwen/Qwen3-14B",
+            messages=[{"role": "user", "content": "Rispondi con una sola parola: ciao /no_think"}],
+            max_tokens=120,
             temperature=0.1,
+            extra_body={"enable_thinking": False},
         )
-        answer = resp.choices[0].message.content.strip()
+        answer = str(resp.choices[0].message.content or "").strip()
+        if not answer:
+            return False, "Inferenza fallita: il provider non ha restituito contenuto finale."
         return True, f"Inferenza OK — risposta: '{answer}'"
     except Exception as exc:
         return False, f"Inferenza fallita: {exc}"

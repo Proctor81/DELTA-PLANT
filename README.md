@@ -106,6 +106,7 @@ python main.py --preflight --enable-api --enable-telegram --daemon
 Per usare la modalita voce del bot Telegram:
 
 - imposta `HF_API_TOKEN` e `HF_MODEL_NAME` per la chat
+- valore consigliato corrente: `HF_MODEL_NAME=Qwen/Qwen3-14B`
 - DELTAPLANO usa `Piper` come provider TTS gratuito locale predefinito
 - al primo utilizzo vocale, il modello italiano Piper viene scaricato automaticamente in `models/piper/`
 - `edge-tts` resta disponibile come fallback gratuito

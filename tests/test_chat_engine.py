@@ -171,3 +171,18 @@ def test_chat_returns_manual_formula_without_manual_keyword(monkeypatch):
 
     assert response == "Risposta letterale dal Manuale DELTA Plant:\n\n## Calcolo del rischio fungino\nFormula aggiornata."
     assert engine._hf_llm.calls == []
+
+
+def test_chat_appends_visual_suffix_to_system_prompt_without_touching_user_input():
+    engine = _build_engine([])
+
+    response = engine.chat(
+        "77",
+        "fammi un grafico professionale del rischio fungino della vite",
+        system_prompt_suffix="ISTRUZIONI VISUAL TELEGRAM",
+    )
+
+    assert response == "Risposta di follow-up"
+    call = engine._hf_llm.calls[0]
+    assert call["user_message"] == "fammi un grafico professionale del rischio fungino della vite"
+    assert "ISTRUZIONI VISUAL TELEGRAM" in call["system_prompt"]

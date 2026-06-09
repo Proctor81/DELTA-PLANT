@@ -141,7 +141,7 @@ DEFAULT_SYSTEM_INFO = {
     "release": "v3.2",
     "release_name": "Unified Edge Intelligence",
     "release_date": "2026-05-13",
-    "manual_revision": "2026-05-13",
+    "manual_revision": "2026-06-09",
 }
 
 
@@ -180,6 +180,37 @@ AMBER      = (180, 105,   0)
 AMBER_LIGHT= (255, 246, 212)
 
 
+PDF_TEXT_TRANSLATION = str.maketrans({
+    "₀": "0",
+    "₁": "1",
+    "₂": "2",
+    "₃": "3",
+    "₄": "4",
+    "₅": "5",
+    "₆": "6",
+    "₇": "7",
+    "₈": "8",
+    "₉": "9",
+    "₊": "+",
+    "₋": "-",
+    "₌": "=",
+    "₍": "(",
+    "₎": ")",
+    "ₐ": "a",
+    "ₑ": "e",
+    "ₒ": "o",
+    "ₓ": "x",
+    "ₕ": "h",
+    "ₖ": "k",
+    "ₗ": "l",
+    "ₘ": "m",
+    "ₙ": "n",
+    "ₚ": "p",
+    "ₛ": "s",
+    "ₜ": "t",
+})
+
+
 
 class ManualePDF(FPDF):
 
@@ -192,6 +223,31 @@ class ManualePDF(FPDF):
         self.add_font("Arial", style="I",  fname=FONT_ITALIC)
         self.add_font("Arial", style="BI", fname=FONT_BOLDITALIC)
         self.add_font("ACode", style="",   fname=FONT_REGULAR)  # fallback monospace
+
+    def _sanitize_pdf_text(self, text):
+        if not isinstance(text, str):
+            return text
+        return text.translate(PDF_TEXT_TRANSLATION)
+
+    def cell(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = self._sanitize_pdf_text(kwargs["text"])
+        elif "txt" in kwargs:
+            kwargs["txt"] = self._sanitize_pdf_text(kwargs["txt"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = self._sanitize_pdf_text(args[2])
+        return super().cell(*args, **kwargs)
+
+    def multi_cell(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = self._sanitize_pdf_text(kwargs["text"])
+        elif "txt" in kwargs:
+            kwargs["txt"] = self._sanitize_pdf_text(kwargs["txt"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = self._sanitize_pdf_text(args[2])
+        return super().multi_cell(*args, **kwargs)
 
     def _warning_box(self, text: str):
         self._info_box("[!] ATTENZIONE", text, color=RED)
@@ -440,7 +496,7 @@ def _add_executive_summary(pdf: 'ManualePDF'):
         "Grazie a una combinazione di sensori ambientali, visione artificiale e modelli di deep learning, DELTA è in grado di riconoscere malattie, carenze e stress delle piante in tempo reale, fornendo diagnosi e consigli pratici per intervenire subito e migliorare la produttività."
     )
     pdf._body(
-        "Il cuore di DELTA è un piccolo computer Raspberry Pi 5, dotato di una fotocamera e di un acceleratore AI (AI HAT 2+), che analizza immagini di foglie, fiori e frutti, misura parametri come temperatura, umidità, luce, CO₂, pH ed EC, e integra tutte queste informazioni per valutare lo stato della pianta."
+        "Il cuore di DELTA è un piccolo computer Raspberry Pi 5, dotato di una fotocamera e di un acceleratore AI (AI HAT 2+), che analizza immagini di foglie, fiori e frutti, misura parametri come temperatura, umidità, luce, CO2, pH ed EC, e integra tutte queste informazioni per valutare lo stato della pianta."
     )
     pdf._body(
         "DELTA non si limita a rilevare problemi: grazie all'Oracolo Quantistico di Grover, valuta il rischio complessivo considerando tutte le possibili interazioni tra fattori ambientali e sintomi, offrendo una visione avanzata e predittiva della salute delle colture."
@@ -507,15 +563,15 @@ def _add_intro(pdf: ManualePDF):
     )
     pdf._subsection(f"Caratteristiche principali — {system_info['release']}")
     pdf._bullet([
-        "Diagnostica fogliare PlantVillage a 33 classi con backend MobileNetV2 + EfficientFormerV2-S1",
-        "EfficientFormerV2-S1 int8 validato on-device, con fallback automatico float32 e explainability LayerCAM",
-        "Pipeline X resumable: fine-tuning, export, evaluation, benchmark, dissemination e rigenerazione del manuale PDF",
-        "Memoria persistente per chat e diagnosi, utile per follow-up coerenti anche dopo riavvio",
-        "Lettura continua di 7 parametri ambientali via I2C o inserimento manuale guidato",
-        "21 regole esperte agronomiche + Oracolo Quantistico di Grover per il Quantum Risk Score [0,1]",
-        "DELTA Academy e Lab MLOps per formazione operatore e miglioramento continuo",
-        "Pannello amministratore, API REST opzionale, export Excel e materiali divulgativi automatici",
-        "Installazione automatica su Raspberry Pi 5 con autostart systemd e preflight AI",
+        "Diagnosi Telegram VLM-first: flusso guidato con foto + sensori e flusso foto-libera vision-only su Hugging Face",
+        "Backend edge nativo MobileNetV2 + EfficientFormerV2-S1 mantenuto come fallback locale e per explainability LayerCAM",
+        "Output Telegram professionale con Quadro sintetico mobile-friendly e referto tecnico in 5 sezioni",
+        "Memoria persistente condivisa tra diagnosi, chat libera, /chat dedicata e follow-up post-diagnosi",
+        "Lettura continua di 7 parametri ambientali via I2C o inserimento manuale guidato con fallback operativo",
+        "Motore agronomico locale con regole esperte e Quantum Risk Score disponibile nel ramo nativo/fallback",
+        "NASA-ISRO/SAR da Telegram con Mini App GPS, dashboard climatica e continuita immediata del follow-up",
+        "Pipeline X resumable, export/benchmark/evaluation e rigenerazione automatica del manuale PDF",
+        "Installazione su Raspberry Pi 5 con preflight AI, API opzionale e autostart systemd",
     ])
     pdf._subsection("Come usare questo manuale")
     pdf._body(
@@ -887,61 +943,44 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("5.4 Diagnosi pianta — flusso operativo v3.2")
     pdf._bullet([
-        "1. Acquisizione frame dalla Pi Camera (o immagine da cartella input_images/)",
-        "2. Rilevamento organo: foglia (modalita leaf-only v3.0 attiva di default)",
-        "3. Pre-processing: ridimensionamento a 224×224, normalizzazione",
-        "4. Segmentazione foglia tramite filtro HSV verde (o GrabCut) e selezione backend attivo",
-        "5. Inferenza AI: top-1, top-3, confidenza, fallback Classe_NonClassificato e spiegazione opzionale",
-        "6. Lettura sensori ambientali (temperatura, umidita, luce, CO2, pH, EC) o input manuale guidato",
-        "7. Applicazione 21 regole agronomiche -> attivazione regole + livello rischio",
-        "8. Oracolo Quantistico di Grover -> Quantum Risk Score [0,1]",
-        "9. Revisione contestuale LLM e Q&A follow-up se la diagnosi richiede approfondimento",
-        "10. Generazione raccomandazioni pratiche per l'operatore",
-        "11. Output Telegram/CLI/API con overlay LayerCAM quando la explainability e disponibile; in v3.2 puo essere generata da EfficientFormer anche se la classificazione attiva resta sul backend generale",
-        "12. Salvataggio in SQLite, Excel, memoria diagnostica persistente e log runtime",
+        "1. Acquisizione immagine da Pi Camera, input_images, upload Telegram o foto libera in chat",
+        "2. Se il flusso parte dal menu Telegram: scelta sorgente immagine e raccolta sensori automatici o manuali",
+        "3. Se il flusso parte da foto libera Telegram: instradamento immediato al ramo vision-only, senza wizard guidato",
+        "4. Diagnosi multimodale con VLM Hugging Face: identificazione pianta, esito tecnico, fattori di rischio e azioni operative",
+        "5. Se il VLM non e disponibile: fallback al backend nativo edge con classificazione locale, regole agronomiche e QRS",
+        "6. Explainability LayerCAM e overlay restano disponibili nel ramo nativo/fallback, non nel percorso VLM-first standard",
+        "7. Output finale in Telegram/CLI/API con Quadro sintetico, referto strutturato e foto di riferimento quando previsto",
+        "8. Salvataggio in SQLite, export Excel, memoria diagnostica persistente e log runtime",
     ])
 
     pdf._subsection("5.4a Diagnosi intelligente Telegram — flusso v3.2")
     pdf._body(
-        "In v3.2, il flusso diagnosi su Telegram include una fase di raccolta "
-        "della descrizione utente e, in caso di pianta non riconosciuta, un ciclo di "
-        "domande di approfondimento conversazionale con l'LLM. "
-        "Il flusso si attiva sia dal menu (pulsante Diagnosi) sia inviando liberamente "
-        "una foto in chat senza passare dal menu."
+        "In v3.2 il bot DELTAPLANO usa due percorsi distinti. Il flusso guidato avviato dal "
+        "pulsante 'Effettua una diagnosi della Pianta' raccoglie prima la foto e poi i sensori, "
+        "senza piu richiedere la descrizione testuale della pianta. Il ramo foto-libera, invece, "
+        "usa solo la computer vision multimodale del VLM Hugging Face e restituisce subito la diagnosi. "
+        "Il backend nativo PlantVillage/TFLite non e piu il percorso primario su Telegram: resta come fallback operativo quando il VLM non e disponibile."
     )
     pdf._bullet([
-        "1. Ricezione foto (da menu Diagnosi o invio libero in chat)",
-        "2. DELTA chiede: 'Di che pianta si tratta? Descrivi l'anomalia riscontrata'",
-        "3. L'utente descrive la pianta e il problema (es. 'Pomodoro con macchie gialle sulle foglie')",
-        "4. Scelta sensori: automatici o inserimento manuale passo-passo",
-        "5. Inferenza AI sul modello TFLite (33 classi PlantVillage)",
-        "   - Se confidenza >= 50%: ramo normale (punto 6)",
-        "   - Se confidenza < 50%: ramo fallback conversazionale (punto 7)",
-        "6. Ramo normale — reclassificazione con LLM:",
-        "   • L'LLM verifica se la classe PlantVillage rilevata e coerente con la descrizione utente",
-        "   • Se non lo e, corregge la classe con quella piu appropriata tra le 33 disponibili",
-        "   • Diagnosi strutturata generata con descrizione utente integrata nel prompt",
-        "7. Ramo fallback — follow-up conversazionale:",
-        "   • Avviso: 'Pianta non riconosciuta nel database'",
-        "   • L'LLM genera fino a 5 domande mirate (colore, parte colpita, progressione, ecc.)",
-        "   • Stop anticipato se l'LLM ritiene di avere gia informazioni sufficienti",
-        "   • Diagnosi finale strutturata in 5 blocchi: ipotesi, differenziale, azioni immediate,",
-        "     azioni a breve termine, monitoraggio — con esplicito avviso di incertezza",
-        "8. Risposta inviata in chat con paginazione automatica (/continua se testo lungo)",
-        "9. Voce contestuale: nelle fasi testuali della diagnosi guidata DELTA accetta messaggi vocali, li trascrive e li inoltra allo stesso handler usato per il testo",
-        "   - Fasi supportate: descrizione pianta/anomalia, inserimento manuale sensori, risposte di follow-up",
-        "   - Fasi non supportate: attesa foto, scelta sorgente immagine e pulsanti inline obbligatori",
+        "1. Diagnosi guidata da menu: foto -> scelta sensori -> prompt multimodale VLM -> referto finale",
+        "2. Nessun prompt descrittivo obbligatorio prima della diagnosi: il VLM identifica gia pianta e stato dalla foto",
+        "3. Sensori opzionali ma raccomandati nel flusso guidato: automatici dal dispositivo o manuali passo-passo",
+        "4. Foto libera in chat: diagnosi vision-only immediata, senza sensori e senza procedura guidata",
+        "5. Modello VLM operativo validato: google/gemma-4-31B-it (override possibile via HF_VISION_MODEL_NAME)",
+        "6. Controllo qualita automatico: se il primo output non esplicita il nome della pianta, DELTA esegue un secondo passaggio correttivo",
+        "7. Output finale Telegram: card 'Quadro sintetico' + 5 sezioni (sintesi, rischio, interventi, azioni, monitoraggio)",
+        "8. Dopo la diagnosi il follow-up avviene in chat libera o /chat dedicata usando la memoria persistente condivisa",
+        "9. Voce: pienamente supportata in chat libera; nella diagnosi guidata resta utile solo negli step testuali ancora presenti, come inserimento manuale sensori o eventuale fallback nativo",
     ])
     pdf._kv_table([
-        ("Soglia fallback",          "confidenza < 50% sul modello TFLite reale (configurabile in core/config.py)"),
-        ("Max domande follow-up",    "5 (configurabile tramite MAX_FOLLOWUP_QUESTIONS in telegram_bot.py)"),
-        ("Reclassificazione LLM",    "Attiva solo se l'utente ha fornito una descrizione"),
-        ("Diagnosi conversazionale", "Basata su descrizione + Q&A + dati sensori, senza immagine classificata"),
-        ("Foto libera",              "Stessa procedura del flusso guidato: foto → descrizione → sensori → diagnosi"),
-        ("Voce in diagnosi guidata", "Supportata nelle sole fasi testuali (descrizione, sensori manuali, follow-up); bloccata quando DELTA attende foto o pulsanti"),
-        ("Diagnosi singolo msg",     "v3.2 — la diagnosi è inviata in un solo messaggio (split automatico a 4000 char)"),
-        ("Chiusura conversazione",   "v3.2 — dopo 'Posso fare qualcos'altro per te?' il bot resta in attesa, nessun messaggio non sollecitato"),
-        ("HF max_tokens",            "1500 (override via env HF_MAX_TOKENS); timeout 60s (HF_TIMEOUT)"),
+        ("Flusso guidato",           "Foto -> sensori -> VLM multimodale -> referto strutturato"),
+        ("Foto libera",              "Ramo separato vision-only: foto -> diagnosi immediata, senza sensori"),
+        ("VLM predefinito",          "google/gemma-4-31B-it via HuggingFace Inference API"),
+        ("Fallback nativo",          "Attivato solo se il VLM non risponde o non e disponibile"),
+        ("Output Telegram",          "Quadro sintetico mobile-friendly + 5 sezioni tecniche, singolo messaggio con split automatico se necessario"),
+        ("Voce",                     "Principale in chat libera; nella diagnosi guidata solo negli step testuali ancora presenti"),
+        ("Explainability",           "Overlay LayerCAM disponibile nel ramo nativo/fallback, non nel percorso VLM-first standard"),
+        ("Chiusura conversazione",   "Dopo il referto il bot resta disponibile per approfondimenti in chat libera o /chat"),
     ])
 
     pdf._subsection("5.4b Chat libera Telegram — memoria persistente")
@@ -1006,23 +1045,20 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
 
     pdf._subsection("5.5 Output diagnosi — interpretazione")
     pdf._kv_table([
-        ("Stato pianta",    "Classe fitosanitaria rilevata dal modello AI"),
-        ("Confidenza",      "Percentuale di certezza della classificazione"),
-        ("Simulato",        "Sì se il modello .tflite non è disponibile (output casuale bias-Sano)"),
-        ("Rischio globale", "nessuno / basso / medio / alto / critico"),
-        ("QRS Grover",      "Quantum Risk Score [0,1] + livello calcolato dall'Oracolo"),
-        ("Revisione umana", "Richiesta se confidenza < 50% su modello REALE (non simulato)"),
-        ("Regole attivate", "Lista delle soglie agronomiche violate"),
-        ("Raccomandazioni", "Azioni pratiche suggerite all'operatore"),
+        ("Quadro sintetico", "Card compatta per smartphone con pianta, esito, certezza e stato sensori"),
+        ("Sintesi diagnostica", "Identificazione della pianta, valutazione tecnica e livello di confidenza"),
+        ("Diagnosi e rischio", "Fattori di rischio, sintomi osservati e commento ai sensori se presenti"),
+        ("Interventi immediati", "Azioni operative nelle prime 24 ore"),
+        ("Consigli operativi", "Azioni a breve termine nei 2-7 giorni successivi"),
+        ("Monitoraggio", "Prevenzione, controlli successivi e soglie di attenzione"),
+        ("Fallback nativo", "Se il VLM non e disponibile possono riapparire classe AI, rischio globale, QRS e regole attivate del motore locale"),
+        ("Explainability", "Nel ramo nativo DELTA puo inviare foto originale e overlay LayerCAM come supporto visivo"),
     ])
-    pdf._body("Codice colore rischio nel terminale:")
-    pdf._bullet([
-        "Verde  — nessun rischio rilevato",
-        "Ciano  — rischio basso, monitorare",
-        "Giallo — rischio medio, intervenire a breve",
-        "Rosso chiaro — rischio alto, intervenire subito",
-        "Rosso bold   — rischio critico, intervento urgente",
-    ])
+    pdf._body(
+        "Nel percorso Telegram VLM-first l'operatore vede soprattutto un referto agronomico strutturato. "
+        "Le metriche interne del ramo nativo (classe PlantVillage, QRS, regole attivate) restano importanti per "
+        "il fallback locale, per CLI/API e per i casi in cui DELTA debba degradare su backend edge puro."
+    )
 
     pdf._subsection("5.5a Modalità simulazione — comportamento senza modello")
     pdf._body(
@@ -1189,7 +1225,9 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Lingua operativa: il messaggio /start e sempre presentato in italiano; la selezione Ryan (EN) o Cris (IT) pilota invece sia la voce TTS sia la lingua delle risposte in chat libera.",
         "Modalita voce: /voice on | off | auto controlla se DELTAPLANO deve rispondere anche in vocale; /voice_lang it | en | auto forza il pack voce da usare in chat libera.",
         "Modalita NASA-ISRO/SAR: pulsante inline 'Connettiti a NASA-ISRO/SAR' o comando /nasa_sar per avviare acquisizione GPS automatica via Mini App Telegram oppure invio manuale della posizione.",
-        "Diagnosi spiegabile: il bot puo inviare foto originale, overlay LayerCAM e spiegazione testuale nello stesso flusso diagnostico; l'overlay puo essere generato da EfficientFormer anche se la classificazione attiva resta sul backend generale.",
+        "Diagnosi guidata da menu: foto -> sensori -> VLM multimodale; non viene piu richiesta la descrizione testuale della pianta prima del referto.",
+        "Foto libera in chat: diagnosi vision-only immediata con VLM, separata dal wizard guidato.",
+        "Diagnosi spiegabile: foto originale e overlay LayerCAM restano disponibili soprattutto nel ramo nativo/fallback, non nel percorso VLM-first standard.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
 
@@ -1204,7 +1242,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "La chat libera è disponibile solo se l'orchestrator DELTA è attivo e il bot Telegram è correttamente configurato.",
         "Voce in chat libera: i messaggi vocali vengono trascritti; in modalita auto testo→testo e voce→voce, mentre /voice on e /voice off permettono di forzare il comportamento.",
         "Durante diagnosi guidata, inserimento manuale dei sensori, upload o sessione /chat dedicata, la chat libera viene sospesa automaticamente per evitare interferenze tra i flussi.",
-        "Eccezione guidata: nella diagnosi Telegram i vocali sono comunque ammessi nelle sole fasi testuali (descrizione, sensori manuali, follow-up), ma non durante attesa foto o pulsanti obbligatori.",
+        "Eccezione guidata: nella diagnosi Telegram i vocali sono ammessi solo negli step testuali ancora presenti (sensori manuali ed eventuale fallback nativo), ma non durante attesa foto o pulsanti obbligatori.",
         "Per tornare ai comandi guidati, usa /menu o i pulsanti inline.",
     ])
 
@@ -1216,14 +1254,15 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
     )
     pdf._subsection("Funzionalita principali")
     pdf._bullet([
-        "Diagnosi intelligente con foto da smartphone o immagini in input_images",
-        "  - Descrizione utente raccolta prima dell'inferenza AI",
-        "  - Reclassificazione LLM se la classe non coincide con la descrizione",
-        "  - Follow-up conversazionale (max 5 domande) se la pianta non e nel database",
-        "Invio foto libero in chat: stessa procedura guidata della diagnosi da menu",
+        "Diagnosi guidata VLM-first con foto da smartphone o immagini in input_images",
+        "  - Flusso attuale: sorgente immagine -> foto -> sensori -> referto multimodale",
+        "  - Nessuna descrizione testuale obbligatoria prima della diagnosi",
+        "  - Fallback nativo locale se il VLM non e disponibile",
+        "Invio foto libero in chat: ramo separato vision-only, senza wizard e senza sensori",
         "Upload immagini per acquisizione e diagnosi da archivio input_images",
         "Report, export Excel e storico diagnosi direttamente in chat",
-        "Academy, preflight AI e dati sensori disponibili via Telegram",
+        "Academy, preflight AI, dati sensori e dashboard NASA-ISRO/SAR disponibili via Telegram",
+        "Chat libera, /chat dedicata e voce con memoria persistente condivisa post-diagnosi",
         "Interfaccia con pulsanti inline per ridurre errori di input",
     ])
     pdf._subsection("Installazione e attivazione")
@@ -4129,26 +4168,26 @@ def _add_license_appendix(pdf: "ManualePDF"):
 
 
 def _add_hf_llm_chat(pdf: ManualePDF):
-    """Sezione 14b: HuggingFace LLM — Chat AI con Llama 3 e pulsante 'Chiedi a DELTA'."""
+    """Sezione 14b: HuggingFace LLM — Chat AI con Qwen3 e pulsante 'Chiedi a DELTA'."""
     pdf.add_page()
     pdf._section_title("14b. CHAT AI — HUGGINGFACE LLM E PULSANTE «CHIEDI A DELTA»")
 
     pdf._body(
         "DELTA Plant integra un motore di chat AI basato su modelli linguistici di grandi "
         "dimensioni (LLM) via HuggingFace Inference API. L'utente può conversare liberamente "
-        "con un esperto agronomico virtuale basato su Llama 3.1 8B Instruct, sia dal bot "
+        "con un esperto agronomico virtuale basato su Qwen3-14B, sia dal bot "
         "Telegram sia dalla CLI locale, senza bisogno di eseguire il modello in locale."
     )
 
     pdf._subsection("14b.1 Architettura")
     pdf._kv_table([
-        ("Modello primario",       "meta-llama/Llama-3.1-8B-Instruct (HuggingFace InferenceClient)"),
+        ("Modello primario",       "Qwen/Qwen3-14B (HuggingFace InferenceClient)"),
         ("Fallback secondario",    "Ollama locale (solo orchestrator, se configurato)"),
         ("Fallback finale",        "Messaggio di errore controllato (nessun backend disponibile)"),
         ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
         ("Motore di chat",         "chat/chat_engine.py — ChatEngine"),
         ("Contesto manuale",       "knowledge_base_delta.md caricata automaticamente per domande operative su manuale, Excel, Telegram, NASA/SAR, API e troubleshooting"),
-        ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o 🗑 Reset)"),
+        ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o Reset conversazione)"),
         ("System prompt",         "Esperto agronomico italiano: diagnosi piante, sensori DELTA, consigli"),
         ("Token HuggingFace",     "DELTA_HF_TOKEN nel file .env — verificato all'avvio"),
         ("Validazione token",     "HfApi.whoami() — log: 'Token HF valido — utente: <username>'"),
@@ -4161,14 +4200,14 @@ def _add_hf_llm_chat(pdf: ManualePDF):
 
     pdf._subsection("14b.2 Configurazione token HuggingFace")
     pdf._body(
-        "Per usare il modello Llama-3.1-8B-Instruct è necessario un token HuggingFace "
-        "con accesso al modello abilitato (richiesta accettazione termini su hf.co/meta-llama). "
+        "Per usare il modello Qwen/Qwen3-14B è necessario un token HuggingFace "
+        "con permesso 'Make calls to Inference Providers'. "
         "Il token va inserito nel file .env:"
     )
     pdf._code_block(
         "# Nel file .env nella directory del progetto\n"
         "HF_API_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
-        "HF_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct\n\n"
+        "HF_MODEL_NAME=Qwen/Qwen3-14B\n\n"
         "# Il sistema valida il token all'avvio:\n"
         "# [INFO] delta.huggingface_llm: Token HF valido — utente: TuoNomeHF\n\n"
         "# Se il token non è valido o assente, ChatEngine segnala backend non disponibile.",
@@ -4176,15 +4215,15 @@ def _add_hf_llm_chat(pdf: ManualePDF):
     )
     pdf._body("Modello HuggingFace configurato (senza rotazione automatica):")
     pdf._bullet([
-        "meta-llama/Llama-3.1-8B-Instruct (default consigliato)",
+        "Qwen/Qwen3-14B (default consigliato)",
         "Modificabile via variabile ambiente HF_MODEL_NAME",
+        "Thinking mode Qwen disabilitato via API per mantenere formato risposta compatibile con DELTA",
     ])
     pdf._info_box(
-        "ACCESSO AL MODELLO LLAMA",
-        "meta-llama/Llama-3.1-8B-Instruct richiede accettazione dei termini Meta su HuggingFace. "
-        "Visitare: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct "
-        "e accettare la licenza con l'account collegato al token. "
-        "Senza accesso il sistema segnala che il backend configurato non e disponibile.",
+        "ACCESSO AL MODELLO QWEN",
+        "Qwen/Qwen3-14B usa la distribuzione HuggingFace pubblica del modello Qwen3 e non dipende "
+        "dalla licenza gated Meta di Llama. E comunque necessario un token con permesso 'Make calls to Inference Providers' "
+        "e un provider HF disponibile per il modello configurato. Pagina modello: https://huggingface.co/Qwen/Qwen3-14B",
         color=BLUE_MID,
     )
 

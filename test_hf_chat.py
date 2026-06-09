@@ -201,7 +201,7 @@ def main():
         sys.exit(1)
 
     print(f"\nToken: {token[:8]}...{token[-4:]}")
-    print(f"Modello target: {os.environ.get('HF_MODEL_NAME', 'meta-llama/Llama-3.1-8B-Instruct')}")
+    print(f"Modello target: {os.environ.get('HF_MODEL_NAME', 'Qwen/Qwen3-14B')}")
 
     results = {}
 
