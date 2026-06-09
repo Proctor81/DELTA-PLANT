@@ -999,6 +999,8 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Report remoto protetto: il pannello admin firma un bearer JWT con scope admin:analytics:read verso /api/analytics/report; se la chiamata fallisce, il monitor mostra il motivo del fallback e puo aprire la voce [6] Diagnostica report remoto.",
         "Autorita del consenso: l'endpoint /api/analytics/events accetta eventi solo se la categoria analytics risulta abilitata lato server nella registry cifrata del consenso.",
         "Bootstrap consenso: dopo redeploy o reset dello storage runtime, il frontend risincronizza il consenso analytics lato server prima di inviare nuovi eventi.",
+        "Operativita sul sito: su viewport larghi il consenso puo comparire come banner Privacy & cookies; su viewport compatti o mobile puo apparire invece il pulsante Privacy che apre lo stesso Preference Center. In entrambi i casi e necessario abilitare analytics per alimentare il monitor.",
+        "Verifica pratica: dopo l'accettazione analytics dalla landing live, il report remoto puo mostrare subito eventi come privacy_update, session_start e page_view senza dover riavviare il backend o l'admin panel.",
         "Uso operativo: il monitor e pensato per il controllo interno dell'efficacia del sito e per verificare quali pagine o call-to-action generano piu interesse, senza pubblicare i dati raccolti.",
     ])
 
@@ -1333,7 +1335,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         ("Fallback web",          "Se il backend live non e disponibile, la pagina resta utilizzabile in modalita demo locale senza bloccare la navigazione del sito"),
         ("Discovery web",         "La landing pubblica espone metadati strutturati (Open Graph, Twitter Card, JSON-LD), canonical, sitemap.xml, robots.txt e llms.txt per facilitare indicizzazione su motori generalisti, discovery tecnologica/scientifica e retrieval su sistemi LLM/RAG"),
         ("Ottimizzazione mobile", "La DEMO NASA e stata compattata e verificata su viewport classe iPhone 14 Pro e Samsung Galaxy S22+, con input a 16 px, controlli touch >= 48 px, supporto safe-area e assenza di overflow orizzontale"),
-        ("Privacy analytics",     "Gli eventi del sito e della hero demo vengono inviati al monitor visitatori solo dopo consenso analytics esplicito; la demo NASA resta consultabile anche senza tracking"),
+        ("Privacy analytics",     "Gli eventi del sito e della hero demo vengono inviati al monitor visitatori solo dopo consenso analytics esplicito; su mobile o viewport compatti l'accesso al consenso puo avvenire tramite pulsante Privacy invece del banner esteso. La demo NASA resta consultabile anche senza tracking"),
     ])
     pdf._bullet([
         "La landing e il bot Telegram condividono le stesse regole di lettura del rischio fungino e la stessa logica di presentazione del giorno piu recente disponibile.",
@@ -1341,6 +1343,7 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
         "Il file pubblico llms.txt fornisce a crawler semantici e pipeline RAG una sintesi canonica di DELTA Plant, DELTAPLANO, benchmark, URL preferiti e vincoli di interpretazione del dashboard NASA/SAR.",
         "Le pagine privacy, cookie e termini del sito espongono ora anch'esse metadati Open Graph, Twitter Card e JSON-LD coerenti con la landing, mentre la pagina di redirect privacy e marcata noindex per evitare duplicazione nei crawler.",
         "Il monitor visitatori first-party puo registrare anche l'avvio della hero dashboard, ma soltanto dopo consenso analytics valido lato server.",
+        "Dopo l'abilitazione analytics dal Privacy Center della landing, il monitor remoto puo popolarsi immediatamente con privacy_update, session_start e page_view generati dalla stessa sessione web.",
     ])
     pdf._subsection("Learning-by-Doing (upload + metadati)")
     lbd_dir = cfg.get("LEARNING_BY_DOING_DIR", "datasets/learning_by_doing")
@@ -3601,7 +3604,8 @@ def _add_security(pdf: ManualePDF):
             "recenti a 24h/7g/30g, leggendo prima il report live protetto dell'API "
             "pubblica e usando il fallback SQLite locale solo se necessario. Include "
             "export JSON e diagnostica del report remoto. I dati sono raccolti solo "
-            "dopo consenso analytics."),
+            "dopo consenso analytics; sul sito pubblico il consenso puo essere dato dal "
+            "banner Privacy & cookies o, su mobile/viewport compatti, dal pulsante Privacy."),
     ])
 
     pdf._subsection("15.4 Cambio Password")
