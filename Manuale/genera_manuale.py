@@ -180,6 +180,37 @@ AMBER      = (180, 105,   0)
 AMBER_LIGHT= (255, 246, 212)
 
 
+PDF_TEXT_TRANSLATION = str.maketrans({
+    "₀": "0",
+    "₁": "1",
+    "₂": "2",
+    "₃": "3",
+    "₄": "4",
+    "₅": "5",
+    "₆": "6",
+    "₇": "7",
+    "₈": "8",
+    "₉": "9",
+    "₊": "+",
+    "₋": "-",
+    "₌": "=",
+    "₍": "(",
+    "₎": ")",
+    "ₐ": "a",
+    "ₑ": "e",
+    "ₒ": "o",
+    "ₓ": "x",
+    "ₕ": "h",
+    "ₖ": "k",
+    "ₗ": "l",
+    "ₘ": "m",
+    "ₙ": "n",
+    "ₚ": "p",
+    "ₛ": "s",
+    "ₜ": "t",
+})
+
+
 
 class ManualePDF(FPDF):
 
@@ -192,6 +223,31 @@ class ManualePDF(FPDF):
         self.add_font("Arial", style="I",  fname=FONT_ITALIC)
         self.add_font("Arial", style="BI", fname=FONT_BOLDITALIC)
         self.add_font("ACode", style="",   fname=FONT_REGULAR)  # fallback monospace
+
+    def _sanitize_pdf_text(self, text):
+        if not isinstance(text, str):
+            return text
+        return text.translate(PDF_TEXT_TRANSLATION)
+
+    def cell(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = self._sanitize_pdf_text(kwargs["text"])
+        elif "txt" in kwargs:
+            kwargs["txt"] = self._sanitize_pdf_text(kwargs["txt"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = self._sanitize_pdf_text(args[2])
+        return super().cell(*args, **kwargs)
+
+    def multi_cell(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = self._sanitize_pdf_text(kwargs["text"])
+        elif "txt" in kwargs:
+            kwargs["txt"] = self._sanitize_pdf_text(kwargs["txt"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = self._sanitize_pdf_text(args[2])
+        return super().multi_cell(*args, **kwargs)
 
     def _warning_box(self, text: str):
         self._info_box("[!] ATTENZIONE", text, color=RED)
