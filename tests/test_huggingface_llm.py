@@ -169,3 +169,21 @@ def test_huggingface_llm_strips_qwen_think_block(monkeypatch):
 
     assert response == "Risposta finale"
     assert model == "Qwen/Qwen3-14B"
+
+
+def test_huggingface_llm_chat_with_image_builds_multimodal_payload(tmp_path, monkeypatch):
+    image_path = tmp_path / "leaf.png"
+    image_path.write_bytes(b"fake-image")
+
+    llm = HuggingFaceLLM(api_token="hf_test", model_name="google/gemma-4-31B-it")
+    fake_client = _FakeClient(["Diagnosi visiva"])
+    monkeypatch.setattr(llm, "_get_client", lambda: fake_client)
+
+    response, model = llm.chat_with_image("Analizza questa pianta.", str(image_path))
+
+    assert response == "Diagnosi visiva"
+    assert model == "google/gemma-4-31B-it"
+    messages = fake_client.completions.kwargs_history[0]["messages"]
+    assert messages[1]["content"][0] == {"type": "text", "text": "Analizza questa pianta."}
+    assert messages[1]["content"][1]["type"] == "image_url"
+    assert messages[1]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")

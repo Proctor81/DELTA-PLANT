@@ -151,6 +151,7 @@ logger = logging.getLogger("delta.interface.telegram")
 
 _FREE_CHAT_TRANSIENT_MARKERS = (
     "sensor_index",
+    "diag_waiting_for_photo",
     "diag_image_path",
     "diag_fallback_record",
     "diag_followup_qa",
@@ -870,6 +871,8 @@ async def _generate_free_chat_response(
 
     response_language = _voice_language_mode(context)
     chat_seed_context = str(context.user_data.pop("chat_seed_context", "") or "").strip()
+    chart_request_mode = _free_chat_chart_request_mode(user_text)
+    table_requested = _free_chat_requests_table(user_text)
     engine = _get_chat_engine(context)
 
     # --- PATCH: reset contesto LLM se nuova pianta menzionata ---
@@ -886,21 +889,39 @@ async def _generate_free_chat_response(
 
     # Solo se non è stato già gestito un return (es. dashboard NASA), prosegui con LLM
     try:
-        composed_prompt = user_text
+        base_prompt = user_text
         if chat_seed_context:
             seed_prefix = "User question" if response_language == VOICE_LANGUAGE_EN else "Domanda utente"
-            composed_prompt = f"{chat_seed_context}\n\n{seed_prefix}: {user_text}"
+            base_prompt = f"{chat_seed_context}\n\n{seed_prefix}: {user_text}"
+        visual_prompt_suffix = _build_free_chat_visual_prompt_suffix(
+            response_language=response_language,
+            chart_request_mode=chart_request_mode,
+            table_requested=table_requested,
+        )
 
         def _ask():
             chat_method = getattr(engine, "chat", None)
             if callable(chat_method):
                 return chat_method(
                     user_id,
-                    composed_prompt,
+                    base_prompt,
                     response_language=response_language,
+                    system_prompt_suffix=visual_prompt_suffix,
                 )
-            return engine.chat_internal(composed_prompt)
+            return engine.chat_internal(
+                base_prompt,
+                response_language=response_language,
+                system_prompt_suffix=visual_prompt_suffix,
+            )
         response = await asyncio.to_thread(_ask)
+        response = await _repair_free_chat_visual_response(
+            engine,
+            base_prompt=base_prompt,
+            response_text=response,
+            response_language=response_language,
+            chart_request_mode=chart_request_mode,
+            table_requested=table_requested,
+        )
     except Exception as exc:
         logger.error("Errore chat LLM: %s", exc, exc_info=True)
         # Fallback: chat/voice sempre disponibili
@@ -931,9 +952,33 @@ _FREE_CHAT_CHART_NEGATION_RE = re.compile(
 )
 _FREE_CHAT_ADVANCED_CHART_REQUEST_RE = re.compile(
     r"(grafico\s+avanzat|grafici\s+avanzat|grafico\s+premium|grafico\s+evolut|"
+    r"grafico\s+profession\w*|grafici\s+profession\w*|"
     r"alto\s+impatto\s+grafico|grafico\s+ad\s+alto\s+impatto|"
-    r"advanced\s+(?:chart|graph|visual)|high[- ]impact\s+(?:chart|graphic))",
+    r"advanced\s+(?:chart|graph|visual)|professional\s+(?:chart|graph|visual)|"
+    r"high[- ]impact\s+(?:chart|graphic))",
     re.IGNORECASE,
+)
+_FREE_CHAT_TABLE_REQUEST_RE = re.compile(
+    r"((?:fammi|crea|genera|mostra|mostrami|organizza|formatta|riassumi).{0,24}(?:tabella|tabelle)|"
+    r"(?:show|make|create|generate|organize|format|summari[sz]e).{0,24}(?:table|tables)|"
+    r"(?:in|come|con)\s+(?:una\s+)?(?:tabella|table)\b|"
+    r"(?:as|into|with)\s+(?:a\s+)?table\b|"
+    r"(?:tabella|tabelle)\s+(?:ben\s+organizzat\w*|riassuntiv\w*|comparativ\w*|ordinat\w*)|"
+    r"(?:table|tables)\s+(?:well[- ]organized|summary|comparative|organized))",
+    re.IGNORECASE,
+)
+_FREE_CHAT_TABLE_NEGATION_RE = re.compile(
+    r"(senza\s+(?:alcun\w*\s+)?(?:tabella|tabelle)|"
+    r"non\s+(?:voglio|generare|mostrare|inviare|formattare).{0,24}(?:tabella|tabelle|table|tables)|"
+    r"\bno\s+(?:tabella|tabelle|table|tables)\b|"
+    r"without\s+(?:any\s+)?(?:table|tables))",
+    re.IGNORECASE,
+)
+_FREE_CHAT_VISUAL_REFUSAL_RE = re.compile(
+    r"(non\s+posso.{0,48}(?:grafic|chart|plot|tabell)|"
+    r"non\s+sono\s+in\s+grado.{0,48}(?:grafic|chart|plot|tabell)|"
+    r"(?:can(?:not|'t)|unable\s+to).{0,48}(?:chart|graph|plot|table|tables?))",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -1011,6 +1056,10 @@ def _extract_free_chat_metric_rows(line: str) -> List[Tuple[str, str]]:
     return [single] if single else []
 
 
+def _count_free_chat_metric_rows(response_text: str) -> int:
+    return sum(len(_extract_free_chat_metric_rows(line)) for line in str(response_text or "").splitlines())
+
+
 def _free_chat_metric_strength(value: str) -> float:
     raw_value = str(value or "").strip().lower()
     percent_match = re.search(r"(\d{1,3})(?:[.,]\d+)?\s*%", raw_value)
@@ -1079,6 +1128,127 @@ def _free_chat_requests_chart(user_text: str) -> bool:
     return _free_chat_chart_request_mode(user_text) != "none"
 
 
+def _free_chat_requests_table(user_text: str) -> bool:
+    raw = str(user_text or "")
+    if _FREE_CHAT_TABLE_NEGATION_RE.search(raw):
+        return False
+    return bool(_FREE_CHAT_TABLE_REQUEST_RE.search(raw))
+
+
+def _build_free_chat_visual_prompt_suffix(
+    *,
+    response_language: str,
+    chart_request_mode: str,
+    table_requested: bool,
+    force_structured_output: bool = False,
+) -> str:
+    if chart_request_mode == "none" and not table_requested:
+        return ""
+
+    normalized_language = (response_language or "auto").strip().lower()
+    advanced_requested = chart_request_mode == "advanced"
+    metric_count = 5 if advanced_requested else 4
+    chart_line_it = (
+        f"- Se l'utente chiede un grafico professionale o avanzato, fornisci almeno {metric_count} indicatori confrontabili per il renderer del grafico."
+        if chart_request_mode != "none"
+        else ""
+    )
+    chart_line_en = (
+        f"- If the user asked for a professional or advanced chart, provide at least {metric_count} comparable indicators for the chart renderer."
+        if chart_request_mode != "none"
+        else ""
+    )
+    table_line_it = (
+        "- Se l'utente chiede una tabella, mantieni queste righe ordinate e una metrica per riga cosi Telegram puo formattarle in una tabella compatta."
+        if table_requested
+        else ""
+    )
+    table_line_en = (
+        "- If the user asked for a table, keep those lines clean and one metric per line so Telegram can format a compact table."
+        if table_requested
+        else ""
+    )
+
+    if normalized_language == VOICE_LANGUAGE_EN:
+        instruction_lines = [
+            "TELEGRAM VISUAL RENDERING INSTRUCTIONS:",
+            "- DELTA can generate professional charts and well-organized tables from the structured indicators in your reply.",
+            "- Do not say that you cannot create charts, graphs, tables, or visuals.",
+            "- Start with a short operational summary of 2-4 lines.",
+            "- Then add the heading '### Visual indicators'.",
+            "- Under that heading write 4-6 lines exactly in the format 'Label: value'.",
+            "- Keep labels short, max 24 characters; use comparable numeric, percentage, or qualitative values such as Low, Medium, High, Critical.",
+            chart_line_en,
+            table_line_en,
+            "- Do not use JSON, markdown column tables, or code fences for the metrics block.",
+        ]
+        if force_structured_output:
+            instruction_lines.append("- Rewrite the final answer from scratch without inability disclaimers and without code fences.")
+    else:
+        instruction_lines = [
+            "ISTRUZIONI DI RENDERING TELEGRAM:",
+            "- DELTA puo generare grafici professionali e tabelle ben organizzate partendo dagli indicatori strutturati della tua risposta.",
+            "- Non dire che non puoi creare grafici, tabelle o visualizzazioni.",
+            "- Inizia con una sintesi operativa breve di 2-4 righe.",
+            "- Poi aggiungi il titolo '### Indicatori visuali'.",
+            "- Sotto il titolo scrivi 4-6 righe esattamente nel formato 'Etichetta: valore'.",
+            "- Mantieni etichette brevi, max 24 caratteri; usa valori numerici, percentuali o qualitativi confrontabili come Basso, Medio, Alto, Critico.",
+            chart_line_it,
+            table_line_it,
+            "- Non usare JSON, tabelle markdown a colonne o blocchi di codice per il blocco metriche.",
+        ]
+        if force_structured_output:
+            instruction_lines.append("- Riscrivi la risposta finale da zero senza frasi di impossibilita e senza blocchi di codice.")
+
+    filtered_lines = [line for line in instruction_lines if line]
+    return "\n".join(filtered_lines)
+
+
+async def _repair_free_chat_visual_response(
+    engine: Any,
+    *,
+    base_prompt: str,
+    response_text: str,
+    response_language: str,
+    chart_request_mode: str,
+    table_requested: bool,
+) -> str:
+    if chart_request_mode == "none" and not table_requested:
+        return response_text
+    if _count_free_chat_metric_rows(response_text) >= 3:
+        return response_text
+    if not _FREE_CHAT_VISUAL_REFUSAL_RE.search(str(response_text or "")):
+        return response_text
+
+    chat_internal = getattr(engine, "chat_internal", None)
+    if not callable(chat_internal):
+        return response_text
+
+    repair_prompt_suffix = _build_free_chat_visual_prompt_suffix(
+        response_language=response_language,
+        chart_request_mode=chart_request_mode,
+        table_requested=table_requested,
+        force_structured_output=True,
+    )
+    logger.info(
+        "free_chat_visual_repair: retrying structured response (chart=%s, table=%s)",
+        chart_request_mode,
+        table_requested,
+    )
+    repaired = await asyncio.to_thread(
+        chat_internal,
+        base_prompt,
+        response_language=response_language,
+        system_prompt_suffix=repair_prompt_suffix,
+    )
+    repaired_text = str(repaired or "").strip()
+    if not repaired_text:
+        return response_text
+    if _FREE_CHAT_VISUAL_REFUSAL_RE.search(repaired_text) and _count_free_chat_metric_rows(repaired_text) < 3:
+        return response_text
+    return repaired_text
+
+
 def _collect_free_chat_chart_metrics(response_text: str) -> List[Tuple[str, str, float]]:
     lines = str(response_text or "").splitlines()
     blocks: List[List[Tuple[str, str]]] = []
@@ -1136,6 +1306,25 @@ def _draw_free_chat_text_centered(draw, box: Tuple[int, int, int, int], text: st
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def _truncate_free_chat_chart_text(draw, text: str, *, font, max_width: int) -> str:
+    rendered = str(text or "").strip()
+    if not rendered or max_width <= 0:
+        return rendered
+    text_box = draw.textbbox((0, 0), rendered, font=font)
+    if text_box[2] - text_box[0] <= max_width:
+        return rendered
+
+    ellipsis = "..."
+    truncated = rendered
+    while truncated:
+        candidate = truncated.rstrip() + ellipsis
+        candidate_box = draw.textbbox((0, 0), candidate, font=font)
+        if candidate_box[2] - candidate_box[0] <= max_width:
+            return candidate
+        truncated = truncated[:-1]
+    return ellipsis
+
+
 def _build_free_chat_metric_chart(
     context: Optional["ContextTypes.DEFAULT_TYPE"],
     response_text: str,
@@ -1147,29 +1336,83 @@ def _build_free_chat_metric_chart(
     if len(positive_metrics) < 2:
         return None
 
+    def _metric_accent(score: float) -> Tuple[int, int, int]:
+        if score >= 80:
+            return (14, 165, 233)
+        if score >= 55:
+            return (45, 212, 191)
+        if score >= 35:
+            return (249, 115, 22)
+        return (99, 102, 241)
+
     max_score = max(score for _, _, score in positive_metrics) or 1.0
-    width = 900
-    height = 120 + len(positive_metrics) * 72
-    image = Image.new("RGB", (width, height), color=(247, 250, 252))
-    draw = ImageDraw.Draw(image)
-    title_font = ImageFont.load_default()
-    text_font = ImageFont.load_default()
-    bar_left = 260
-    bar_right = width - 80
-    bar_width = bar_right - bar_left
+    width = 980
+    row_height = 82
+    row_gap = 18
+    rows_top = 164
+    footer_height = 56
+    height = rows_top + len(positive_metrics) * row_height + max(0, len(positive_metrics) - 1) * row_gap + footer_height + 58
+    image = Image.new("RGBA", (width, height), color=(245, 248, 252, 255))
+    _draw_free_chat_vertical_gradient(image, (246, 250, 255), (233, 240, 248))
+    draw = ImageDraw.Draw(image, "RGBA")
+    draw.ellipse((width - 220, -60, width + 20, 170), fill=(14, 165, 233, 34))
+    draw.rounded_rectangle((28, 24, width - 28, height - 24), radius=30, fill=(255, 255, 255, 236), outline=(203, 213, 225, 180), width=2)
+
+    title_font = _load_free_chat_chart_font(28, bold=True)
+    subtitle_font = _load_free_chat_chart_font(16)
+    label_font = _load_free_chat_chart_font(20, bold=True)
+    value_font = _load_free_chat_chart_font(18, bold=True)
+    micro_font = _load_free_chat_chart_font(14)
+
+    label_left = 56
+    track_left = 338
     title = _ui_text(context, "DELTA mini-grafico indicatori", "DELTA mini-chart metrics")
     subtitle = _ui_text(context, "Generato solo su richiesta esplicita", "Generated only on explicit request")
-    draw.text((40, 24), title, fill=(25, 36, 52), font=title_font)
-    draw.text((40, 52), subtitle, fill=(90, 103, 116), font=text_font)
+    draw.text((56, 48), title, fill=(15, 23, 42, 255), font=title_font)
+    draw.text((56, 88), subtitle, fill=(71, 85, 105, 255), font=subtitle_font)
+
+    badge_box = (width - 232, 44, width - 60, 84)
+    badge_label = _ui_text(context, "Mini render locale", "Local mini render")
+    draw.rounded_rectangle(badge_box, radius=18, fill=(14, 165, 233, 26), outline=(14, 165, 233, 80), width=2)
+    _draw_free_chat_text_centered(draw, badge_box, badge_label, font=micro_font, fill=(8, 47, 73, 255))
 
     for index, (label, value, score) in enumerate(positive_metrics):
-        top = 100 + index * 72
-        normalized = max(0.08, score / max_score)
-        current_bar_width = int(bar_width * normalized)
-        draw.text((40, top), str(label), fill=(31, 41, 55), font=text_font)
-        draw.text((40, top + 24), str(value), fill=(100, 116, 139), font=text_font)
-        draw.rounded_rectangle((bar_left, top + 8, bar_right, top + 34), radius=10, fill=(226, 232, 240))
-        draw.rounded_rectangle((bar_left, top + 8, bar_left + current_bar_width, top + 34), radius=10, fill=(14, 116, 144))
+        top = rows_top + index * (row_height + row_gap)
+        accent = _metric_accent(score)
+        score_text = f"{int(round(score))}%"
+        value_text = _truncate_free_chat_chart_text(draw, str(value), font=value_font, max_width=132)
+        value_box_raw = draw.textbbox((0, 0), value_text, font=value_font)
+        value_box_width = max(116, value_box_raw[2] - value_box_raw[0] + 34)
+        value_left = width - 66 - value_box_width
+        track_right = value_left - 24
+        track_width = max(120, track_right - track_left)
+        normalized = max(0.10, score / max_score)
+        current_bar_width = int(track_width * normalized)
+        label_text = _truncate_free_chat_chart_text(draw, str(label), font=label_font, max_width=track_left - label_left - 18)
+
+        draw.rounded_rectangle((46, top, width - 46, top + row_height), radius=24, fill=(248, 250, 252, 246), outline=(226, 232, 240, 255), width=2)
+        draw.rounded_rectangle((46, top, 58, top + row_height), radius=12, fill=accent + (255,))
+        draw.text((label_left, top + 16), label_text, fill=(30, 41, 59, 255), font=label_font)
+        draw.text((label_left, top + 46), score_text, fill=(100, 116, 139, 255), font=micro_font)
+
+        value_box = (value_left, top + 14, width - 66, top + 48)
+        draw.rounded_rectangle(value_box, radius=17, fill=accent + (34,), outline=accent + (90,), width=2)
+        _draw_free_chat_text_centered(draw, value_box, value_text, font=value_font, fill=(15, 23, 42, 255))
+
+        draw.rounded_rectangle((track_left, top + 34, track_right, top + 50), radius=9, fill=(226, 232, 240, 255))
+        draw.rounded_rectangle((track_left, top + 34, track_left + current_bar_width, top + 50), radius=9, fill=accent + (255,))
+        draw.text((track_left, top + 58), _ui_text(context, "Livello relativo", "Relative level"), fill=(100, 116, 139, 255), font=micro_font)
+
+    footer_top = height - footer_height - 34
+    footer_box = (46, footer_top, width - 46, footer_top + footer_height)
+    footer = _ui_text(
+        context,
+        "Visualizzazione compatta locale per Telegram, ottimizzata per lettura rapida.",
+        "Compact local visualization for Telegram, optimized for quick reading.",
+    )
+    footer_text = _truncate_free_chat_chart_text(draw, footer, font=micro_font, max_width=footer_box[2] - footer_box[0] - 34)
+    draw.rounded_rectangle(footer_box, radius=22, fill=(241, 245, 249, 235), outline=(203, 213, 225, 200), width=2)
+    draw.text((64, footer_top + 20), footer_text, fill=(71, 85, 105, 255), font=micro_font)
 
     payload = BytesIO()
     image.save(payload, format="PNG")
@@ -1186,11 +1429,18 @@ def _build_free_chat_advanced_chart(
         return None
 
     metrics = _collect_free_chat_chart_metrics(response_text)
-    if len(metrics) < 2:
+    visible_metrics = metrics[:5]
+    if len(visible_metrics) < 2:
         return None
 
     width = 1280
-    height = max(780, 320 + len(metrics) * 108)
+    card_height = 84
+    card_gap = 22
+    cards_top = 238
+    cards_bottom = cards_top + len(visible_metrics) * card_height + max(0, len(visible_metrics) - 1) * card_gap
+    footer_top = cards_bottom + 38
+    footer_height = 74
+    height = max(920, footer_top + footer_height + 74)
     image = Image.new("RGBA", (width, height), (9, 18, 38, 255))
     _draw_free_chat_vertical_gradient(image, (8, 20, 43), (10, 92, 122))
     draw = ImageDraw.Draw(image, "RGBA")
@@ -1216,14 +1466,21 @@ def _build_free_chat_advanced_chart(
     draw.text((110, 104), title, font=title_font, fill=(15, 23, 42, 255))
     draw.text((112, 160), subtitle, font=subtitle_font, fill=(71, 85, 105, 255))
 
-    summary_score = sum(score for _, _, score in metrics) / max(1, len(metrics))
-    gauge_box = (118, 240, 394, 516)
-    draw.rounded_rectangle((94, 214, 418, 548), radius=30, fill=(15, 23, 42, 235))
-    draw.text((132, 244), _ui_text(context, "Sintesi trend", "Trend summary"), font=heading_font, fill=(226, 232, 240, 255))
+    badge_text = _ui_text(context, "Render Telegram locale", "Local Telegram render")
+    badge_box = (width - 304, 104, width - 112, 146)
+    draw.rounded_rectangle(badge_box, radius=18, fill=(14, 165, 233, 28), outline=(14, 165, 233, 90), width=2)
+    _draw_free_chat_text_centered(draw, badge_box, badge_text, font=micro_font, fill=(8, 47, 73, 255))
+
+    summary_score = sum(score for _, _, score in visible_metrics) / max(1, len(visible_metrics))
+    gauge_panel = (94, 214, 418, footer_top - 28)
+    gauge_box = (118, gauge_panel[1] + 92, 394, gauge_panel[1] + 368)
+    draw.rounded_rectangle(gauge_panel, radius=30, fill=(15, 23, 42, 235))
+    draw.text((132, gauge_panel[1] + 34), _ui_text(context, "Sintesi trend", "Trend summary"), font=heading_font, fill=(226, 232, 240, 255))
+    draw.text((132, gauge_panel[1] + 72), _ui_text(context, "Score medio dei driver", "Average driver score"), font=micro_font, fill=(148, 163, 184, 255))
     draw.arc(gauge_box, start=140, end=400, fill=(51, 65, 85, 255), width=22)
     draw.arc(gauge_box, start=140, end=140 + int(260 * (summary_score / 100.0)), fill=(34, 197, 94, 255), width=22)
     _draw_free_chat_text_centered(draw, gauge_box, f"{int(round(summary_score))}%", font=value_font, fill=(248, 250, 252, 255))
-    draw.text((160, 476), _ui_text(context, "Impatto sintetico", "Visual impact"), font=label_font, fill=(148, 163, 184, 255))
+    draw.text((150, gauge_panel[3] - 74), _ui_text(context, "Impatto sintetico", "Visual impact"), font=label_font, fill=(148, 163, 184, 255))
 
     palette = [
         (14, 165, 233, 255),
@@ -1232,31 +1489,49 @@ def _build_free_chat_advanced_chart(
         (236, 72, 153, 255),
         (168, 85, 247, 255),
     ]
-    max_score = max(score for _, _, score in metrics) or 1.0
+    max_score = max(score for _, _, score in visible_metrics) or 1.0
     card_left = 472
     card_right = width - 110
     bar_left = card_left + 26
-    bar_right = card_right - 150
-    bar_width = bar_right - bar_left
 
-    for index, (label, value, score) in enumerate(metrics[:5]):
-        top = 238 + index * 108
+    for index, (label, value, score) in enumerate(visible_metrics):
+        top = cards_top + index * (card_height + card_gap)
         accent = palette[index % len(palette)]
-        draw.rounded_rectangle((card_left, top, card_right, top + 84), radius=26, fill=(15, 23, 42, 238))
-        draw.rounded_rectangle((card_left, top, card_left + 14, top + 84), radius=14, fill=accent)
-        draw.text((bar_left, top + 18), str(label), font=heading_font, fill=(248, 250, 252, 255))
-        draw.text((card_right - 120, top + 18), str(value), font=heading_font, fill=(191, 219, 254, 255))
-        draw.rounded_rectangle((bar_left, top + 56, bar_right, top + 68), radius=8, fill=(51, 65, 85, 255))
-        current_bar = int(bar_width * max(0.12, score / max_score))
+        score_text = f"{int(round(score))}%"
+        score_box = draw.textbbox((0, 0), score_text, font=micro_font)
+        score_width = score_box[2] - score_box[0]
+        value_text = _truncate_free_chat_chart_text(draw, str(value), font=heading_font, max_width=116)
+        value_box = draw.textbbox((0, 0), value_text, font=heading_font)
+        value_width = value_box[2] - value_box[0]
+        value_x = card_right - 30 - value_width
+        score_x = card_right - 30 - score_width
+        current_bar_right = score_x - 24
+        current_bar_width_max = max(140, current_bar_right - bar_left)
+        label_text = _truncate_free_chat_chart_text(
+            draw,
+            str(label),
+            font=heading_font,
+            max_width=max(120, value_x - bar_left - 24),
+        )
+
+        draw.rounded_rectangle((card_left, top, card_right, top + card_height), radius=26, fill=(15, 23, 42, 238))
+        draw.rounded_rectangle((card_left, top, card_left + 14, top + card_height), radius=14, fill=accent)
+        draw.text((bar_left, top + 18), label_text, font=heading_font, fill=(248, 250, 252, 255))
+        draw.text((value_x, top + 18), value_text, font=heading_font, fill=(191, 219, 254, 255))
+        draw.rounded_rectangle((bar_left, top + 56, current_bar_right, top + 68), radius=8, fill=(51, 65, 85, 255))
+        current_bar = int(current_bar_width_max * max(0.12, score / max_score))
         draw.rounded_rectangle((bar_left, top + 56, bar_left + current_bar, top + 68), radius=8, fill=accent)
-        draw.text((bar_right + 18, top + 48), f"{int(round(score))}%", font=micro_font, fill=(148, 163, 184, 255))
+        draw.text((score_x, top + 48), score_text, font=micro_font, fill=(148, 163, 184, 255))
 
     footer = _ui_text(
         context,
         "DELTA usa una visualizzazione locale PIL: nessuna chiamata LLM aggiuntiva per il grafico.",
         "DELTA uses a local PIL visualization: no extra LLM call for the chart.",
     )
-    draw.text((112, height - 118), footer, font=micro_font, fill=(71, 85, 105, 255))
+    footer_box = (94, footer_top, width - 94, footer_top + footer_height)
+    draw.rounded_rectangle(footer_box, radius=24, fill=(241, 245, 249, 224), outline=(148, 163, 184, 80), width=2)
+    footer_text = _truncate_free_chat_chart_text(draw, footer, font=micro_font, max_width=footer_box[2] - footer_box[0] - 44)
+    draw.text((116, footer_top + 24), footer_text, font=micro_font, fill=(71, 85, 105, 255))
 
     payload = BytesIO()
     image.save(payload, format="PNG")
@@ -1304,23 +1579,52 @@ def _render_free_chat_metric_table(
     context: Optional["ContextTypes.DEFAULT_TYPE"],
     rows: List[Tuple[str, str]],
 ) -> str:
-    label_header = _ui_text(context, "Voce", "Item")
-    value_header = _ui_text(context, "Valore", "Value")
-    bar_header = _ui_text(context, "Trend", "Trend")
-    label_width = max(len(label_header), min(18, max(len(label) for label, _ in rows)))
-    value_width = max(len(value_header), min(16, max(len(value) for _, value in rows)))
-    rendered_rows = [(label[:label_width], value[:value_width], _free_chat_metric_bar(value)) for label, value in rows]
-    has_bars = any(bar for _, _, bar in rendered_rows)
+    def _truncate_metric_cell(text: str, width: int) -> str:
+        rendered = str(text or "").strip()
+        if len(rendered) <= width:
+            return rendered
+        if width <= 3:
+            return rendered[:width]
+        return rendered[: width - 3].rstrip() + "..."
 
-    table_lines = [
-        f"{label_header:<{label_width}}  {value_header:<{value_width}}" + (f"  {bar_header}" if has_bars else ""),
-        f"{'-' * label_width}  {'-' * value_width}" + (f"  {'-' * len(bar_header)}" if has_bars else ""),
+    def _metric_icon(raw_value: str) -> str:
+        strength = _free_chat_metric_strength(raw_value)
+        if strength >= 80:
+            return "🔴"
+        if strength >= 60:
+            return "🟠"
+        if strength >= 35:
+            return "🟡"
+        if strength > 0:
+            return "🟢"
+        return "⚪"
+
+    section_label = _ui_text(context, "Indicatori compatti", "Compact metrics")
+    label_width = max(10, min(16, max(len(label) for label, _ in rows)))
+    value_width = max(7, min(10, max(len(value) for _, value in rows)))
+    rendered_rows = [
+        (
+            _metric_icon(value),
+            _truncate_metric_cell(label, label_width),
+            _truncate_metric_cell(value, value_width),
+            _free_chat_metric_bar(value),
+        )
+        for label, value in rows
     ]
-    for label, value, bar in rendered_rows:
-        line = f"{label:<{label_width}}  {value:<{value_width}}"
+    has_bars = any(bar for _, _, _, bar in rendered_rows)
+    bar_width = 8 if has_bars else 0
+    content_width = label_width + value_width + bar_width + (7 if has_bars else 4)
+    inner_width = max(content_width, len(section_label) + 2)
+
+    top_rule = f"╭ {section_label} " + ("─" * max(0, inner_width - len(section_label) - 2)) + "╮"
+    bottom_rule = "╰" + ("─" * (inner_width + 2)) + "╯"
+    table_lines = [top_rule]
+    for icon, label, value, bar in rendered_rows:
+        line = f"{icon} {label:<{label_width}}  {value:>{value_width}}"
         if has_bars:
-            line += f"  {bar or '-'}"
-        table_lines.append(line)
+            line += f"  {(bar or '░░░░░░░░'): <{bar_width}}"
+        table_lines.append(f"│ {line:<{inner_width}} │")
+    table_lines.append(bottom_rule)
     return f"<pre>{html.escape(chr(10).join(table_lines), quote=False)}</pre>"
 
 
@@ -1333,7 +1637,7 @@ def _format_free_chat_for_telegram(
         return text, None
 
     lines = text.splitlines()
-    metric_row_count = sum(len(_extract_free_chat_metric_rows(line)) for line in lines)
+    metric_row_count = _count_free_chat_metric_rows(text)
     should_format = (
         "###" in text
         or "**" in text
@@ -3524,6 +3828,443 @@ def _get_chat_engine(context: ContextTypes.DEFAULT_TYPE):
     return engine
 
 
+def _get_hf_vision_llm(context: ContextTypes.DEFAULT_TYPE):
+    """Restituisce il VLM Hugging Face condiviso per la sola diagnosi foto-diretta."""
+    vision_llm = context.application.bot_data.get("hf_vision_llm")
+    if vision_llm is None:
+        from llm.huggingface_llm import HF_DEFAULT_VISION_MODEL, HuggingFaceLLM
+
+        vision_llm = HuggingFaceLLM(
+            model_name=os.environ.get("HF_VISION_MODEL_NAME", HF_DEFAULT_VISION_MODEL),
+            max_tokens=int(os.environ.get("HF_VISION_MAX_TOKENS", "1400")),
+            temperature=float(os.environ.get("HF_VISION_TEMPERATURE", "0.2")),
+            timeout=int(os.environ.get("HF_VISION_TIMEOUT", os.environ.get("HF_TIMEOUT", "60"))),
+        )
+        context.application.bot_data["hf_vision_llm"] = vision_llm
+        logger.info("HF Vision LLM inizializzato (%s)", vision_llm.model_name)
+    return vision_llm
+
+
+def _hf_system_prompt_for_language(response_language: str = VOICE_LANGUAGE_IT) -> str:
+    from llm.huggingface_llm import DELTA_SYSTEM_PROMPT
+
+    if response_language == VOICE_LANGUAGE_EN:
+        return DELTA_SYSTEM_PROMPT.replace(
+            "Rispondi SEMPRE in italiano, anche se la domanda è in un'altra lingua.",
+            "Respond ALWAYS in English, even if the question is in another language.",
+        )
+    return DELTA_SYSTEM_PROMPT
+
+
+def _build_multimodal_vision_diagnosis_prompt(
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
+    if response_language == VOICE_LANGUAGE_EN:
+        return (
+            "You are DELTA Plant in multimodal visual diagnosis mode.\n"
+            "Analyze ONLY the attached plant photo.\n"
+            "Mandatory constraints:\n"
+            "- Use only visual evidence from the image.\n"
+            "- Do not use sensor data, PlantVillage classes, local classifiers, or any external hidden result.\n"
+            "- Do not ask the user to send another photo: image acquisition is already complete.\n"
+            "- If plant species or disease are uncertain, state that uncertainty clearly.\n"
+            "- Do not invent details that are not visually supported.\n"
+            "- The first block must explicitly state the most probable plant name or crop name visible in the image; if useful, also add the botanical/Latin name.\n"
+            "Provide one professional agronomic answer in 6 blocks:\n"
+            "1) Most probable plant name and confidence level\n"
+            "2) Visual finding\n"
+            "3) Main diagnostic hypothesis and confidence level\n"
+            "4) Immediate actions (0-24h)\n"
+            "5) Short-term actions (2-7 days)\n"
+            "6) Monitoring and prevention\n"
+            "In each relevant block, mention which visible cues support your conclusion.\n"
+            "Keep the tone technical, practical, and concise."
+        )
+
+    return (
+        "Sei DELTA Plant in modalità diagnostica visiva multimodale.\n"
+        "Analizza SOLO la foto allegata della pianta.\n"
+        "Vincoli obbligatori:\n"
+        "- Usa esclusivamente ciò che è visibile nell'immagine.\n"
+        "- Non usare dati sensore, classi PlantVillage, classificatori locali o risultati esterni nascosti.\n"
+        "- Non chiedere un'altra foto: l'acquisizione immagine è già completa.\n"
+        "- Se specie vegetale o patologia sono incerte, dichiaralo esplicitamente.\n"
+        "- Non inventare dettagli non supportati visivamente.\n"
+        "- Nel primo blocco devi indicare esplicitamente il nome piu probabile della pianta o della coltura visibile; se utile aggiungi anche il nome botanico/latino.\n"
+        "Fornisci un'unica risposta professionale da agronomo in 6 blocchi:\n"
+        "1) Nome probabile della pianta e grado di certezza\n"
+        "2) Esito visivo\n"
+        "3) Ipotesi diagnostica principale e grado di certezza\n"
+        "4) Azioni immediate (0-24h)\n"
+        "5) Azioni a breve termine (2-7 giorni)\n"
+        "6) Monitoraggio e prevenzione\n"
+        "In ogni blocco pertinente cita i segnali visivi che sostengono la conclusione.\n"
+        "Mantieni tono tecnico, concreto e sintetico."
+    )
+
+
+def _build_multimodal_vision_name_retry_prompt(
+    previous_opinion: str,
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
+    previous_excerpt = _collapse_whitespace(previous_opinion)[:1200]
+    if response_language == VOICE_LANGUAGE_EN:
+        return (
+            "Mandatory quality-control retry: in the previous answer you did not clearly state the plant name.\n"
+            "Reanalyze ONLY the same image.\n"
+            "The first line must explicitly follow this structure:\n"
+            "1) Plant name: <most probable common name>; Botanical name: <Latin name or 'not determinable from the image alone'>; Confidence: <high/medium/low>.\n"
+            "If the plant cannot be identified from the image alone, explicitly say that in the first line.\n"
+            "Then provide the remaining 5 diagnostic blocks with concise agronomic language.\n"
+            "Previous answer to correct:\n"
+            f"{previous_excerpt}"
+        )
+
+    return (
+        "Controllo qualita obbligatorio: nella risposta precedente non hai indicato chiaramente il nome della pianta.\n"
+        "Rianalizza SOLO la stessa immagine.\n"
+        "La prima riga deve seguire esplicitamente questa struttura:\n"
+        "1) Nome della pianta: <nome comune piu probabile>; Nome botanico: <nome latino oppure 'non determinabile dalla sola immagine'>; Grado di certezza: <alto/medio/basso>.\n"
+        "Se la pianta non e identificabile dalla sola immagine, dichiaralo esplicitamente nella prima riga.\n"
+        "Poi fornisci gli altri 5 blocchi diagnostici in linguaggio agronomico sintetico.\n"
+        "Risposta precedente da correggere:\n"
+        f"{previous_excerpt}"
+    )
+
+
+def _format_sensor_text_for_language(
+    sensor_data: Optional[Dict[str, Any]],
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
+    cleaned = {
+        key: value
+        for key, value in (sensor_data or {}).items()
+        if value is not None and key != "source"
+    }
+    if not cleaned:
+        return ""
+
+    english_labels = {
+        "temperature_c": "Temperature (C)",
+        "humidity_pct": "Humidity (%)",
+        "pressure_hpa": "Pressure (hPa)",
+        "light_lux": "Light (lux)",
+        "co2_ppm": "CO2 (ppm)",
+        "ph": "pH",
+        "ec_ms_cm": "EC (mS/cm)",
+    }
+    lines = []
+    for key, italian_label in SENSOR_FIELDS:
+        value = cleaned.get(key)
+        if value is None:
+            continue
+        label = english_labels.get(key, italian_label) if response_language == VOICE_LANGUAGE_EN else italian_label
+        lines.append(f"- {label}: {value}")
+
+    if not lines:
+        return ""
+
+    header = "Available environmental sensor data:" if response_language == VOICE_LANGUAGE_EN else "Dati ambientali disponibili:"
+    return f"{header}\n" + "\n".join(lines)
+
+
+def _build_guided_multimodal_diagnosis_prompt(
+    user_description: str,
+    sensor_data: Optional[Dict[str, Any]],
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
+    description = _collapse_whitespace(user_description)
+    sensor_block = _format_sensor_text_for_language(sensor_data, response_language=response_language)
+
+    if response_language == VOICE_LANGUAGE_EN:
+        prompt = [
+            "You are DELTA Plant in guided multimodal diagnosis mode.",
+            "Analyze ONLY the attached plant photo together with any available environmental sensor values.",
+            "Mandatory constraints:",
+            "- Use the photo as the primary source and the sensor context as supporting evidence.",
+            "- If optional operator notes are available, use them only as secondary context when they are coherent with the image.",
+            "- Do not use PlantVillage classes, local classifiers, hidden native AI outputs, or explainability overlays.",
+            "- Do not ask for another photo: image acquisition is already complete.",
+            "- If the plant name, pathology, or severity are uncertain, state that uncertainty clearly.",
+            "- Do not invent symptoms that are not visible in the image or unsupported by sensor data.",
+        ]
+        if description:
+            prompt.extend([
+                "Optional operator notes:",
+                f"- {description}",
+            ])
+        if sensor_block:
+            prompt.append(sensor_block)
+        else:
+            prompt.append("No environmental sensor data are available for this diagnosis.")
+        prompt.extend([
+            "Output requirement:",
+            "- Write directly the diagnosis with no introductory sentence and no markdown-heavy formatting.",
+            "- Use exactly 5 numbered blocks in this order:",
+            "1) Diagnostic summary",
+            "- Plant: ...",
+            "- Technical assessment: ...",
+            "- Confidence: ...",
+            "2) Diagnosis and risk",
+            "- ...",
+            "3) Immediate control actions (0-24h)",
+            "- ...",
+            "4) Practical short-term actions (2-7 days)",
+            "- ...",
+            "5) Monitoring and prevention",
+            "- ...",
+            "If sensor data are available, comment on them explicitly inside the relevant blocks.",
+            "Keep the tone technical, practical, and concise.",
+        ])
+        return "\n".join(prompt)
+
+    prompt = [
+        "Sei DELTA Plant in modalità diagnostica guidata multimodale.",
+        "Analizza SOLO la foto allegata della pianta insieme agli eventuali dati ambientali disponibili.",
+        "Vincoli obbligatori:",
+        "- Usa la foto come fonte primaria e il contesto sensori come supporto diagnostico.",
+        "- Se sono presenti note operatore opzionali, usale solo come contesto secondario quando sono coerenti con l'immagine.",
+        "- Non usare classi PlantVillage, classificatori locali, output nascosti dell'AI nativa o overlay di explainability.",
+        "- Non chiedere un'altra foto: l'acquisizione immagine è già completa.",
+        "- Se nome della pianta, patologia o gravità sono incerti, dichiaralo esplicitamente.",
+        "- Non inventare sintomi non visibili nell'immagine o non supportati dai dati sensore.",
+    ]
+    if description:
+        prompt.extend([
+            "Note operatore opzionali:",
+            f"- {description}",
+        ])
+    if sensor_block:
+        prompt.append(sensor_block)
+    else:
+        prompt.append("Nessun dato ambientale disponibile per questa diagnosi.")
+    prompt.extend([
+        "Formato di output obbligatorio:",
+        "- Scrivi direttamente la diagnosi, senza frase introduttiva e senza markdown pesante.",
+        "- Usa esattamente 5 blocchi numerati in questo ordine:",
+        "1) Sintesi diagnostica",
+        "- Pianta: ...",
+        "- Esito tecnico: ...",
+        "- Certezza: ...",
+        "2) Diagnosi e rischio",
+        "- ...",
+        "3) Interventi immediati (0-24h)",
+        "- ...",
+        "4) Consigli operativi a breve termine (2-7 giorni)",
+        "- ...",
+        "5) Monitoraggio e prevenzione",
+        "- ...",
+        "Se sono disponibili dati sensore, commentali esplicitamente nei blocchi pertinenti.",
+        "Mantieni tono tecnico, concreto e sintetico.",
+    ])
+    return "\n".join(prompt)
+
+
+def _build_guided_multimodal_name_retry_prompt(
+    previous_opinion: str,
+    user_description: str,
+    sensor_data: Optional[Dict[str, Any]],
+    response_language: str = VOICE_LANGUAGE_IT,
+) -> str:
+    base_prompt = _build_guided_multimodal_diagnosis_prompt(
+        user_description,
+        sensor_data,
+        response_language=response_language,
+    )
+    previous_excerpt = _collapse_whitespace(previous_opinion)[:1200]
+    if response_language == VOICE_LANGUAGE_EN:
+        return (
+            base_prompt
+            + "\n\nQuality control: the previous answer did not clearly state the plant name."
+            + "\nIn block 1 you must explicitly name the most probable plant and, if possible, also the botanical/Latin name."
+            + "\nIf the plant cannot be identified from the image alone, say so explicitly in block 1."
+            + "\nPrevious answer to correct:\n"
+            + previous_excerpt
+        )
+
+    return (
+        base_prompt
+        + "\n\nControllo qualità: la risposta precedente non ha indicato chiaramente il nome della pianta."
+        + "\nNel blocco 1 devi nominare esplicitamente la pianta più probabile e, se possibile, anche il nome botanico/latino."
+        + "\nSe la pianta non è identificabile dalla sola immagine, dichiaralo esplicitamente nel blocco 1."
+        + "\nRisposta precedente da correggere:\n"
+        + previous_excerpt
+    )
+
+
+def _build_guided_diagnosis_result_message(
+    context: Optional["ContextTypes.DEFAULT_TYPE"],
+    opinion: str,
+    *,
+    response_language: str = VOICE_LANGUAGE_IT,
+    has_sensor_data: bool = False,
+) -> Tuple[str, str]:
+    section_titles = {
+        VOICE_LANGUAGE_EN: {
+            1: "Diagnostic summary",
+            2: "Diagnosis and risk",
+            3: "Immediate control actions",
+            4: "Practical short-term actions",
+            5: "Monitoring and prevention",
+        },
+        VOICE_LANGUAGE_IT: {
+            1: "Sintesi diagnostica",
+            2: "Diagnosi e rischio",
+            3: "Interventi immediati",
+            4: "Consigli operativi",
+            5: "Monitoraggio e prevenzione",
+        },
+    }
+    normalized = str(opinion or "").replace("\r\n", "\n").strip()
+    normalized = re.sub(r"(?<!^)(?<!\n)\s+(?=(?:\*\*)?[1-5]\)\s)", "\n", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+
+    block_re = re.compile(
+        r"(?:^|\n)\s*(?:\*\*)?([1-5])\)\s*(.*?)(?=(?:\n\s*(?:\*\*)?[1-5]\)\s)|\Z)",
+        re.DOTALL,
+    )
+    blocks = {
+        int(match.group(1)): match.group(2).strip()
+        for match in block_re.finditer(normalized)
+    }
+
+    def _render_summary_card(summary_lines: List[str]) -> str:
+        def _find_value(candidates: Tuple[str, ...]) -> str:
+            for raw_line in summary_lines:
+                cleaned = raw_line.lstrip("- ").strip()
+                if ":" not in cleaned:
+                    continue
+                label, value = cleaned.split(":", 1)
+                normalized_label = re.sub(r"\s+", " ", label).strip().lower()
+                if normalized_label in candidates or any(candidate in normalized_label for candidate in candidates):
+                    return value.strip()
+            return ""
+
+        def _truncate(value: str, width: int = 88) -> str:
+            compact = re.sub(r"\s+", " ", str(value or "")).strip()
+            if len(compact) <= width:
+                return compact
+            if width <= 3:
+                return compact[:width]
+            return compact[: width - 3].rstrip() + "..."
+
+        plant_value = _find_value(("nome pianta", "pianta", "plant name", "plant"))
+        botanical_value = _find_value(("nome botanico", "nome latino", "botanical name", "latin name", "scientific name"))
+        assessment_value = _find_value(("esito tecnico", "stato tecnico", "technical assessment", "technical outcome", "assessment", "esito"))
+        confidence_value = _find_value(("certezza", "grado di certezza", "confidence", "confidence level"))
+        sensor_value = _ui_text(
+            context,
+            "Integrati" if has_sensor_data else "Non disponibili",
+            "Integrated" if has_sensor_data else "Not available",
+        )
+
+        fallback_values = [
+            re.sub(r"^[\-*•]\s*", "", line).strip()
+            for line in summary_lines
+            if line.strip()
+        ]
+        if not plant_value and fallback_values:
+            plant_value = fallback_values[0]
+        if not assessment_value and len(fallback_values) > 1:
+            assessment_value = fallback_values[1]
+        if not confidence_value and len(fallback_values) > 2:
+            confidence_value = fallback_values[2]
+
+        if botanical_value and plant_value and botanical_value.lower() not in plant_value.lower():
+            plant_value = f"{plant_value} ({botanical_value})"
+
+        rows = [
+            ("🪴", _ui_text(context, "Pianta", "Plant"), plant_value or _ui_text(context, "Non determinata", "Undetermined")),
+            ("🩺", _ui_text(context, "Esito", "Assessment"), assessment_value or _ui_text(context, "Da confermare", "To confirm")),
+            ("🎯", _ui_text(context, "Certezza", "Confidence"), confidence_value or _ui_text(context, "Da stimare", "To estimate")),
+            ("🌡️", _ui_text(context, "Sensori", "Sensors"), sensor_value),
+        ]
+
+        section_label = _ui_text(context, "🔎 <b>Quadro sintetico</b>", "🔎 <b>Diagnostic snapshot</b>")
+        rendered_rows = [section_label]
+        for icon, label, value in rows:
+            rendered_rows.append(
+                f"{icon} <b>{html.escape(label, quote=False)}:</b> {html.escape(_truncate(value), quote=False)}"
+            )
+        return "\n".join(rendered_rows)
+
+    def _block_to_lines(raw_block: str) -> List[str]:
+        block_text = str(raw_block or "").strip()
+        block_text = re.sub(r"\s+\*\s+", "\n- ", block_text)
+        block_text = re.sub(r"\n\s*\*\s+", "\n- ", block_text)
+        block_text = re.sub(r"\n{3,}", "\n\n", block_text)
+        raw_lines = [line.strip() for line in block_text.splitlines() if line.strip()]
+        if raw_lines:
+            first_line_clean = re.sub(r"[`*_]+", "", raw_lines[0]).strip(" :-")
+            if first_line_clean.lower().startswith(("ecco l'analisi", "here is the analysis", "here is the technical analysis")):
+                raw_lines = raw_lines[1:]
+        if len(raw_lines) > 1:
+            first_line_clean = re.sub(r"[`*_]+", "", raw_lines[0]).strip(" :-")
+            if first_line_clean and ":" not in first_line_clean and len(first_line_clean.split()) <= 8:
+                raw_lines = raw_lines[1:]
+
+        lines: List[str] = []
+        source_lines = raw_lines or [block_text]
+        for raw_line in source_lines:
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            segments = [segment.strip() for segment in stripped.split("|") if segment.strip()]
+            if len(segments) > 1:
+                for segment in segments:
+                    lines.append(f"- {segment.lstrip('-*• ').strip()}")
+                continue
+            if stripped.startswith(("- ", "* ", "• ")):
+                lines.append(f"- {stripped[2:].strip()}")
+                continue
+            lines.append(f"- {stripped}")
+        return [line for line in lines if line.strip("- ")]
+
+    rendered_sections: List[str] = []
+    title_map = section_titles.get(response_language, section_titles[VOICE_LANGUAGE_IT])
+    for block_number in range(1, 6):
+        block_body = blocks.get(block_number)
+        if not block_body:
+            continue
+        rendered_sections.append(f"## {title_map[block_number]}")
+        rendered_sections.extend(_block_to_lines(block_body))
+        rendered_sections.append("")
+
+    if rendered_sections:
+        formatted_body, _ = _format_free_chat_for_telegram(context, "\n".join(rendered_sections).strip())
+    else:
+        fallback_heading = _ui_text(context, "## Sintesi diagnostica", "## Diagnostic summary")
+        fallback_lines = [fallback_heading]
+        fallback_lines.extend(_block_to_lines(normalized))
+        formatted_body, _ = _format_free_chat_for_telegram(context, "\n".join(fallback_lines).strip())
+
+    title = _ui_text(
+        context,
+        "🩺 <b>RISULTATO DIAGNOSI DELTA Plant</b>",
+        "🩺 <b>DELTA Plant DIAGNOSIS RESULT</b>",
+    )
+    subtitle = (
+        _ui_text(
+            context,
+            "Analisi visiva multimodale con dati ambientali integrati.",
+            "Multimodal visual analysis with integrated environmental data.",
+        )
+        if has_sensor_data
+        else _ui_text(
+            context,
+            "Analisi visiva multimodale della pianta.",
+            "Multimodal visual plant analysis.",
+        )
+    )
+    summary_lines = _block_to_lines(blocks.get(1, "")) if blocks.get(1) else []
+    summary_card = _render_summary_card(summary_lines) if summary_lines else ""
+    message_parts = [title, f"<i>{html.escape(subtitle, quote=False)}</i>"]
+    if summary_card:
+        message_parts.append(summary_card)
+    message_parts.append(formatted_body)
+    return "\n\n".join(part for part in message_parts if part), "HTML"
+
+
 async def chat_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Avvia la sessione di chat intelligente."""
     if not await _guard(update):
@@ -3873,6 +4614,111 @@ _GENERIC_PLANT_NAME_TOKENS = {
     "ramo", "rami", "stelo", "steli", "pianta",
 }
 
+_VISION_UNKNOWN_PLANT_MARKERS = (
+    "non determinabile dalla sola immagine",
+    "non determinabile dalla sola foto",
+    "non determinabile",
+    "non identificabile dalla sola immagine",
+    "non identificabile dalla sola foto",
+    "non identificabile",
+    "not determinable from the image alone",
+    "not identifiable from the image alone",
+    "unable to determine the plant",
+    "cannot determine the plant",
+)
+
+_VISION_COMMON_PLANT_KEYWORDS = tuple(
+    sorted(
+        {
+            *{value.lower() for value in _PLANT_COMMON_NAMES_BY_GENUS.values()},
+            "peperoncino",
+            "capsicum",
+            "ficus",
+            "dipladenia",
+            "mandevilla",
+            "orchidea",
+            "rosa",
+            "basilico",
+            "limone",
+            "dracena",
+            "cactus",
+            "geranio",
+            "begonia",
+            "anturio",
+            "ciclamino",
+            "azalea",
+            "gelsomino",
+            "oleandro",
+        },
+        key=len,
+        reverse=True,
+    )
+)
+
+_VISION_LATIN_BINOMIAL_RE = re.compile(r"\b([A-Z][a-z]{2,}\s+[a-z][a-z-]{2,})\b")
+_VISION_PLANT_LABEL_RE = re.compile(
+    r"(?:^|[\n\r])\s*(?:\d+[).:-]?\s*)?(?:\*\*\s*)?"
+    r"(?:pianta|plant|coltura|crop|specie|species)"
+    r"(?:\s*\*\*)?\s*[:\-]\s*([^\n]+)",
+    re.IGNORECASE,
+)
+
+_VISION_LATIN_BINOMIAL_STOPWORDS = {
+    "esito",
+    "nome",
+    "grado",
+    "azioni",
+    "monitoraggio",
+    "diagnosi",
+    "ipotesi",
+    "visual",
+    "finding",
+    "main",
+    "immediate",
+    "short",
+    "plant",
+    "confidence",
+}
+
+
+def _normalize_vision_opinion_text(opinion: str) -> str:
+    cleaned = re.sub(r"[*_`#>]", " ", str(opinion or ""))
+    return _collapse_whitespace(cleaned)
+
+
+def _vision_opinion_mentions_plant_name(opinion: str) -> bool:
+    text = _normalize_vision_opinion_text(opinion)
+    if not text:
+        return False
+
+    lowered = text.lower()
+    if any(marker in lowered for marker in _VISION_UNKNOWN_PLANT_MARKERS):
+        return True
+
+    latin_match = _VISION_LATIN_BINOMIAL_RE.search(text)
+    if latin_match:
+        genus, species = latin_match.group(1).split(" ", 1)
+        if genus.lower() not in _VISION_LATIN_BINOMIAL_STOPWORDS and species.lower() not in _VISION_LATIN_BINOMIAL_STOPWORDS:
+            return True
+
+    label_match = _VISION_PLANT_LABEL_RE.search(text)
+    if label_match:
+        candidate = re.split(
+            r"\b(?:grado di certezza|livello di certezza|certezza|confidence)\b",
+            label_match.group(1),
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0].strip(" .,:;|-")
+        if candidate and not any(marker in candidate.lower() for marker in _VISION_UNKNOWN_PLANT_MARKERS):
+            words = re.findall(r"\b[\w'/-]+\b", candidate)
+            if words and words[0].lower() not in _GENERIC_PLANT_NAME_TOKENS:
+                return True
+
+    return any(
+        re.search(rf"\b{re.escape(token)}\b", lowered)
+        for token in _VISION_COMMON_PLANT_KEYWORDS
+    )
+
 
 def _plant_name_from_class(class_name: str) -> Optional[str]:
     if not class_name:
@@ -3960,6 +4806,8 @@ def _build_diagnosis_memory_turn(
         request_lines.append("Modalità: diagnosi interattiva per mismatch tra classe AI e descrizione operatore.")
     elif followup_mode == "fallback":
         request_lines.append("Modalità: diagnosi conversazionale per pianta non riconosciuta dal database.")
+    elif followup_mode == "vision_llm":
+        request_lines.append("Modalità: diagnosi visiva multimodale da foto inviata direttamente in chat.")
 
     if record:
         ai_result = record.get("ai_result") or {}
@@ -4079,6 +4927,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
         return ConversationHandler.END
     await _answer_callback_query_safe(query)
     if query.data == DIAG_IMAGE_UPLOAD:
+        context.user_data["diag_waiting_for_photo"] = True
         await _send(update, _ui_text(context, "Invia una foto (o un file immagine) per la diagnosi.", "Send a photo, or an image file, for the diagnosis."))
         return STATE_DIAG_WAIT_PHOTO
     if query.data == DIAG_IMAGE_LAST:
@@ -4088,7 +4937,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
             await _send(update, _ui_text(context, "Nessuna immagine in input_images. Usa 'Invia foto'.", "No image found in input_images. Use 'Send photo'."))
             return ConversationHandler.END
         context.user_data["diag_image_path"] = str(latest)
-        return await _ask_user_description(update, context)
+        return await _advance_guided_diagnosis_after_image(update, context)
     if query.data == DIAG_IMAGE_CAMERA:
         agent = _get_agent(context)
         if not agent or agent.camera._backend is None:
@@ -4096,7 +4945,7 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
             await _send(update, _ui_text(context, "Camera locale non disponibile. Usa 'Invia foto'.", "Local camera unavailable. Use 'Send photo'."))
             return ConversationHandler.END
         context.user_data["diag_image_path"] = ""
-        return await _ask_user_description(update, context)
+        return await _advance_guided_diagnosis_after_image(update, context)
     _clear_diagnosis_state(context)
     await _send(update, _ui_text(context, "Scelta non valida.", "Invalid choice."))
     return ConversationHandler.END
@@ -4115,7 +4964,16 @@ async def receive_diag_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _send(update, _ui_text(context, "Immagine non valida.", "Invalid image."))
         return STATE_DIAG_WAIT_PHOTO
     context.user_data["diag_image_path"] = str(saved)
-    return await _ask_user_description(update, context)
+    return await _advance_guided_diagnosis_after_image(update, context)
+
+
+async def _advance_guided_diagnosis_after_image(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    context.user_data.pop("diag_waiting_for_photo", None)
+    context.user_data.pop("diag_user_description", None)
+    return await _ask_sensor_mode(update, context)
 
 
 async def _ask_user_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4304,6 +5162,14 @@ def _build_diagnosis_prompt(
     raw_report = re.sub(r"<[^>]+>", "", _format_diagnosis_full(record))
 
     corrected_class = record.get("_corrected_class", "")
+    has_operator_description = bool((user_description or "").strip())
+    has_confirmed_class = not bool(ai.get("fallback", False)) and ai_class not in {
+        "",
+        "N/D",
+        "Classe_NonClassificato",
+        "errore",
+        "non_disponibile",
+    }
     class_note = ""
     if corrected_class and corrected_class != ai_class:
         class_note = (
@@ -4319,9 +5185,9 @@ def _build_diagnosis_prompt(
                 f"\nNOTE: the original PlantVillage class ({ai_class}) was corrected "
                 f"to '{corrected_class}' based on the operator description.\n"
             )
+
         description_block = ""
-        description_constraints = ""
-        if user_description:
+        if has_operator_description:
             description_block = (
                 f"\nOPERATOR DESCRIPTION (primary source to prioritize):\n"
                 f"  \"{user_description}\"\n"
@@ -4330,6 +5196,22 @@ def _build_diagnosis_prompt(
                 "- The operator description is the primary source: use the symptoms, affected part, and context described by the operator to personalize every block of the reply. Do not treat it as a marginal note.\n"
                 f"- In block 1 (Technical outcome), explicitly explain why the detected PlantVillage class is consistent, or only partially consistent, with '{user_description}'.\n"
                 "- If the description mentions specific symptoms, such as color, affected zone, or progression, cite them and connect them to the identified pathology.\n"
+            )
+        else:
+            description_constraints = (
+                "- No operator description is available in this case: do not invent symptoms, crop context, or observations not present in the technical report.\n"
+                "- Base the reply only on the visual diagnosis report and on the technical data returned by DELTA.\n"
+            )
+
+        if has_confirmed_class:
+            if has_operator_description:
+                class_constraint = "- Explicitly cite the confirmed PlantVillage class and explain why it is consistent with the operator description.\n"
+            else:
+                class_constraint = "- Explicitly cite the PlantVillage class proposed by the visual backend and explain which technical and visual elements of the report support it.\n"
+        else:
+            class_constraint = (
+                "- Do not present any PlantVillage class as confirmed: the visual backend returned an uncertain or unclassified result. "
+                "State the uncertainty clearly and formulate only prudent hypotheses based on the available visual signals.\n"
             )
 
         return (
@@ -4341,7 +5223,7 @@ def _build_diagnosis_prompt(
             "- Do not use metalinguistic phrasing, for example 'It seems you are asking'.\n"
             "- Do not repeat the report title.\n"
             "- If the raw report contains Italian fragments, translate them: the final user-facing answer must be fully in English, except for PlantVillage class names or fixed technical labels.\n"
-            "- Explicitly cite the confirmed PlantVillage class and explain why it is consistent with the operator description.\n"
+            f"{class_constraint}"
             "- Explicitly include the Grover Quantum Oracle risk analysis: explain in a simple operational way what it represents, namely a tool that amplifies the most significant plant-risk signals, with QRS from 0 meaning no risk to 1 meaning maximum risk, then report QRS, level, dominant event, and amplification.\n"
             f"{description_constraints}"
             "- Always analyze and comment on the environmental sensor data available in the report: connect temperature, humidity, pH, EC, CO₂, and light to the detected pathological condition.\n"
@@ -4358,8 +5240,7 @@ def _build_diagnosis_prompt(
         )
 
     description_block = ""
-    description_constraints = ""
-    if user_description:
+    if has_operator_description:
         description_block = (
             f"\nDESCRIZIONE OPERATORE (fonte primaria da valorizzare):\n"
             f"  \"{user_description}\"\n"
@@ -4373,6 +5254,22 @@ def _build_diagnosis_prompt(
             "- Se la descrizione menziona sintomi specifici (colore, zona, progressione), "
             "citali e correlali alla patologia identificata.\n"
         )
+    else:
+        description_constraints = (
+            "- In questo caso non è disponibile alcuna descrizione dell'operatore: non inventare sintomi, coltura o osservazioni non presenti nel report tecnico.\n"
+            "- Basa la risposta solo sul report di diagnosi visiva e sui dati tecnici restituiti da DELTA.\n"
+        )
+
+    if has_confirmed_class:
+        if has_operator_description:
+            class_constraint = "- Cita esplicitamente la classe PlantVillage confermata e motiva la coerenza con la descrizione dell'operatore.\n"
+        else:
+            class_constraint = "- Cita esplicitamente la classe PlantVillage proposta dal backend visivo e spiega quali elementi tecnici e visivi del report la supportano.\n"
+    else:
+        class_constraint = (
+            "- Non presentare alcuna classe PlantVillage come confermata: il backend visivo ha restituito un esito incerto o non classificato. "
+            "Esplicita chiaramente l'incertezza e formula solo ipotesi prudenti basate sui segnali visivi disponibili.\n"
+        )
 
     return (
         "Trasforma il report seguente in un UNICO messaggio finale per l'utente, "
@@ -4383,7 +5280,7 @@ def _build_diagnosis_prompt(
         "Vincoli obbligatori:\n"
         "- Non usare frasi metalinguistiche (es: 'Sembra che tu stia chiedendo').\n"
         "- Non ripetere il titolo del report.\n"
-        "- Cita esplicitamente la classe PlantVillage confermata e motiva la coerenza con la descrizione dell'operatore.\n"
+        f"{class_constraint}"
         "- Includi esplicitamente l'analisi del rischio con Oracolo Quantistico di Grover: "
         "spiega in modo semplice e operativo cosa rappresenta (strumento che amplifica i segnali "
         "di rischio più significativi tra i dati della pianta, con QRS da 0=nessun rischio a 1=rischio massimo), "
@@ -5051,10 +5948,158 @@ async def _send_ai_diagnosis_opinion(
     return ConversationHandler.END
 
 
-async def _run_diagnosis(
+def _collect_guided_sensor_data(
+    context: ContextTypes.DEFAULT_TYPE,
+    sensor_data: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    cleaned_input = {
+        key: value
+        for key, value in (sensor_data or {}).items()
+        if value is not None and key != "source"
+    }
+    if cleaned_input:
+        context.user_data["sensor_data"] = cleaned_input
+        return cleaned_input
+
+    current_data = {
+        key: value
+        for key, value in (context.user_data.get("sensor_data") or {}).items()
+        if value is not None and key != "source"
+    }
+    if current_data:
+        return current_data
+
+    agent = _get_agent(context)
+    if not agent or not hasattr(agent, "get_latest_sensor_data"):
+        return {}
+
+    try:
+        latest_data = agent.get_latest_sensor_data() or {}
+    except Exception as exc:
+        logger.warning("Lettura sensori per diagnosi VLM guidata fallita: %s", exc)
+        return {}
+
+    cleaned_latest = {
+        key: value
+        for key, value in latest_data.items()
+        if value is not None and key != "source"
+    }
+    if cleaned_latest:
+        context.user_data["sensor_data"] = cleaned_latest
+    return cleaned_latest
+
+
+async def _run_guided_llm_diagnosis(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     sensor_data: Optional[Dict[str, Any]],
+) -> Optional[int]:
+    image_path = str(context.user_data.get("diag_image_path") or "").strip()
+    if not image_path:
+        return None
+
+    try:
+        vision_llm = _get_hf_vision_llm(context)
+    except Exception as exc:
+        logger.warning("VLM guidato non disponibile, fallback al backend nativo: %s", exc)
+        return None
+
+    response_language = _ui_language(context)
+    user_description = str(context.user_data.get("diag_user_description") or "").strip()
+    effective_sensor_data = _collect_guided_sensor_data(context, sensor_data)
+
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    prompt = _build_guided_multimodal_diagnosis_prompt(
+        user_description,
+        effective_sensor_data,
+        response_language=response_language,
+    )
+    system_prompt = _hf_system_prompt_for_language(response_language)
+
+    def _ask(prompt_text: str):
+        return vision_llm.chat_with_image(
+            prompt_text,
+            image_path,
+            system_prompt=system_prompt,
+        )
+
+    try:
+        opinion, model_used = await asyncio.to_thread(_ask, prompt)
+    except Exception as exc:
+        logger.warning("Diagnosi guidata VLM fallita, fallback al backend nativo: %s", exc)
+        return None
+
+    opinion = (opinion or "").strip()
+    if not opinion or model_used == "none" or opinion.startswith("[DELTA]") or opinion.startswith("⚠️"):
+        logger.warning("Diagnosi guidata VLM non disponibile, fallback al backend nativo")
+        return None
+
+    if not _vision_opinion_mentions_plant_name(opinion):
+        retry_prompt = _build_guided_multimodal_name_retry_prompt(
+            opinion,
+            user_description,
+            effective_sensor_data,
+            response_language=response_language,
+        )
+        logger.info("Diagnosi guidata VLM senza nome pianta esplicito, eseguo un secondo controllo automatico")
+        try:
+            retry_opinion, retry_model = await asyncio.to_thread(_ask, retry_prompt)
+        except Exception as exc:
+            logger.warning("Secondo controllo VLM guidato fallito: %s", exc)
+        else:
+            retry_opinion = (retry_opinion or "").strip()
+            if retry_opinion and not retry_opinion.startswith("[DELTA]") and not retry_opinion.startswith("⚠️"):
+                opinion = retry_opinion
+                if retry_model and retry_model != "none":
+                    model_used = retry_model
+
+    opinion = _sanitize_diagnosis_opinion(opinion, response_language=response_language)
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    memory_request, memory_response = _build_diagnosis_memory_turn(
+        user_description=user_description,
+        opinion=opinion,
+        followup_mode="guided_vision_llm",
+        sensor_data=effective_sensor_data,
+    )
+    if model_used and model_used != "none":
+        memory_request += f"\nModello vision HF guidato: {model_used}."
+
+    rendered_message, rendered_parse_mode = _build_guided_diagnosis_result_message(
+        context,
+        opinion,
+        response_language=response_language,
+        has_sensor_data=bool(effective_sensor_data),
+    )
+
+    try:
+        await _send_diagnosis_visuals(update, context, {})
+        await _send_diagnosis_paginated(
+            update,
+            context,
+            rendered_message,
+            parse_mode=rendered_parse_mode,
+        )
+        engine.remember_turn(user_id, memory_request, memory_response)
+        context.user_data["chat_seed_context"] = (
+            "Contesto della piu recente diagnosi DELTA Plant:\n\n"
+            f"{opinion}"
+        )
+    finally:
+        _clear_diagnosis_state(context)
+    return ConversationHandler.END
+
+
+async def _run_native_diagnosis(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    sensor_data: Optional[Dict[str, Any]],
+    allow_followup: bool = True,
 ):
     # Restituisce un ConversationHandler state (END o STATE_DIAG_FOLLOWUP)
     agent = _get_agent(context)
@@ -5087,11 +6132,131 @@ async def _run_diagnosis(
             context.user_data["sensor_data"] = populated
 
     # Pianta non riconosciuta → modalità follow-up conversazionale
-    if record.get("ai_result", {}).get("fallback", False):
+    if allow_followup and record.get("ai_result", {}).get("fallback", False):
         return await _start_followup_questioning(update, context, record, mode="fallback")
 
     # Match pieno classe -> diagnosi completa; mismatch -> follow-up interattivo
     return await _send_ai_diagnosis_opinion(update, context, record)
+
+
+async def _run_diagnosis(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    sensor_data: Optional[Dict[str, Any]],
+    allow_followup: bool = True,
+):
+    guided_result = await _run_guided_llm_diagnosis(update, context, sensor_data)
+    if guided_result is not None:
+        return guided_result
+    return await _run_native_diagnosis(update, context, sensor_data, allow_followup=allow_followup)
+
+
+async def _run_llm_vision_diagnosis(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    image_path = str(context.user_data.get("diag_image_path") or "").strip()
+    if not image_path:
+        _clear_diagnosis_state(context)
+        await _send(update, _ui_text(context, "Immagine non disponibile.", "Image unavailable."))
+        return ConversationHandler.END
+
+    response_language = _ui_language(context)
+    vision_llm = _get_hf_vision_llm(context)
+
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    prompt = _build_multimodal_vision_diagnosis_prompt(response_language)
+    system_prompt = _hf_system_prompt_for_language(response_language)
+
+    def _ask(prompt_text: str):
+        return vision_llm.chat_with_image(
+            prompt_text,
+            image_path,
+            system_prompt=system_prompt,
+        )
+
+    try:
+        opinion, model_used = await asyncio.to_thread(_ask, prompt)
+    except Exception as exc:
+        logger.warning("Errore diagnosi multimodale HF: %s", exc)
+        _clear_diagnosis_state(context)
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "❌ Errore durante la diagnosi multimodale. La chat è nuovamente disponibile.",
+                "❌ Error during the multimodal diagnosis. Chat is available again.",
+            ),
+        )
+        return ConversationHandler.END
+
+    opinion = (opinion or "").strip()
+    if not opinion:
+        _clear_diagnosis_state(context)
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "❌ Il modello vision non ha restituito una diagnosi utile.",
+                "❌ The vision model did not return a usable diagnosis.",
+            ),
+        )
+        return ConversationHandler.END
+
+    if opinion.startswith("[DELTA]") or opinion.startswith("⚠️"):
+        _clear_diagnosis_state(context)
+        await _send(update, opinion)
+        return ConversationHandler.END
+
+    if not _vision_opinion_mentions_plant_name(opinion):
+        logger.info("Diagnosi vision senza nome pianta esplicito, eseguo un secondo controllo automatico")
+        retry_prompt = _build_multimodal_vision_name_retry_prompt(opinion, response_language=response_language)
+        try:
+            retry_opinion, retry_model = await asyncio.to_thread(_ask, retry_prompt)
+        except Exception as exc:
+            logger.warning("Secondo controllo vision HF fallito: %s", exc)
+        else:
+            retry_opinion = (retry_opinion or "").strip()
+            if (
+                retry_opinion
+                and not retry_opinion.startswith("[DELTA]")
+                and not retry_opinion.startswith("⚠️")
+                and _vision_opinion_mentions_plant_name(retry_opinion)
+            ):
+                opinion = retry_opinion
+                if retry_model and retry_model != "none":
+                    model_used = retry_model
+
+    opinion = _sanitize_diagnosis_opinion(opinion, response_language=response_language)
+
+    engine = _get_chat_engine(context)
+    user_id = str(update.effective_user.id if update.effective_user else "0")
+    memory_request, memory_response = _build_diagnosis_memory_turn(
+        opinion=opinion,
+        followup_mode="vision_llm",
+    )
+    if model_used and model_used != "none":
+        memory_request += f"\nModello vision HF: {model_used}."
+
+    try:
+        await _send_diagnosis_paginated(
+            update,
+            context,
+            f"{_ui_text(context, '🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>', '🩺 <b>DELTA Plant DIAGNOSIS RESULT:</b>')}\n\n{opinion}",
+            parse_mode="HTML",
+        )
+        engine.remember_turn(user_id, memory_request, memory_response)
+        context.user_data["chat_seed_context"] = (
+            "Contesto della piu recente diagnosi DELTA Plant:\n\n"
+            f"{opinion}"
+        )
+    finally:
+        _clear_diagnosis_state(context)
+    return ConversationHandler.END
 
 
 def _labels_keyboard(prefix: str, labels: List[str]) -> InlineKeyboardMarkup:
@@ -5144,18 +6309,28 @@ async def pending_label_name_router(update: Update, context: ContextTypes.DEFAUL
 async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    if context.user_data.get("diag_waiting_for_photo"):
+        return await receive_diag_photo(update, context)
     _clear_diagnosis_state(context)
     context.user_data["diagnosis_active"] = True
     context.user_data.pop("diag_user_description", None)
-    # Salva la foto e poi chiede la descrizione utente (stesso flusso della diagnosi guidata)
+    # Le foto inviate fuori dal percorso guidato vanno in diagnosi automatica
+    # solo-vision, senza chiedere descrizione o sensori.
     saved = await _download_telegram_image(update)
     if not saved:
         _clear_diagnosis_state(context)
         await _send(update, _ui_text(context, "Immagine non valida.", "Invalid image."))
         return ConversationHandler.END
     context.user_data["diag_image_path"] = str(saved)
-    await _send(update, _ui_text(context, "📷 Foto ricevuta.", "📷 Photo received."))
-    return await _ask_user_description(update, context)
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "📷 Foto ricevuta. Avvio una diagnosi automatica con computer vision AI...",
+            "📷 Photo received. Starting an automatic AI computer-vision diagnosis...",
+        ),
+    )
+    return await _run_llm_vision_diagnosis(update, context)
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -5825,7 +7000,6 @@ def run_telegram_bot(agent=None):
             CommandHandler("nuovo", start_diagnosis),
             CommandHandler("diagnosi", start_diagnosis),
             CallbackQueryHandler(start_diagnosis, pattern=f"^{CMD_DIAGNOSE}$"),
-            MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo),
         ],
         states={
             STATE_DIAG_IMAGE_SOURCE: [
@@ -5940,6 +7114,7 @@ def run_telegram_bot(agent=None):
     application.add_handler(diagnosis_handler)
     application.add_handler(upload_handler)
     application.add_handler(chat_conv_handler)
+    application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
     application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_nasa_sar_web_app_data), group=9)

@@ -1030,6 +1030,7 @@ def test_format_free_chat_for_telegram_builds_html_and_metric_table():
     assert "<b>🔎 Sintesi</b>" in text
     assert "<b>Peronospora probabile</b> su vite." in text
     assert "<pre>" in text
+    assert "Indicatori compatti" in text
     assert "Temperatura" in text
     assert "68%" in text
     assert "█" in text
@@ -1044,6 +1045,7 @@ def test_format_free_chat_for_telegram_builds_table_from_inline_pipe_metrics():
 
     assert parse_mode == "HTML"
     assert "<pre>" in text
+    assert "╭" in text
     assert "Temperatura" in text
     assert "Umidita" in text
     assert "Rischio" in text
@@ -1110,8 +1112,17 @@ def test_free_chat_requests_chart_detects_explicit_visual_prompt():
 def test_free_chat_chart_request_mode_detects_advanced_prompt():
     assert tg._free_chat_chart_request_mode("Fammi un grafico avanzato ad alto impatto") == "advanced"
     assert tg._free_chat_chart_request_mode("Show me an advanced chart") == "advanced"
+    assert tg._free_chat_chart_request_mode("Fammi un grafico professionale del rischio") == "advanced"
     assert tg._free_chat_chart_request_mode("Fammi un grafico") == "basic"
     assert tg._free_chat_chart_request_mode("No chart, text only") == "none"
+
+
+def test_free_chat_requests_table_detects_explicit_prompt():
+    assert tg._free_chat_requests_table("Fammi una tabella ben organizzata") is True
+    assert tg._free_chat_requests_table("Show me a compact table") is True
+    assert tg._free_chat_requests_table("Rispondi senza tabelle") is False
+    assert tg._free_chat_requests_table("Spiegami il rischio") is False
+    assert tg._free_chat_requests_table("Spiegami la tabella diagnoses del database") is False
 
 
 def test_respond_free_chat_output_sends_chart_only_when_requested(monkeypatch):
@@ -1190,6 +1201,24 @@ def test_build_free_chat_metric_chart_accepts_inline_pipe_metrics():
     assert payload is not None
 
 
+def test_build_free_chat_metric_chart_uses_refined_canvas_dimensions():
+    context = types.SimpleNamespace(user_data={})
+
+    payload = tg._build_free_chat_metric_chart(
+        context,
+        "Temperatura fogliare: 24 C\n"
+        "Umidita relativa: 82%\n"
+        "Pioggia 7 giorni: 21 mm\n"
+        "Rischio fungino: Alto\n"
+        "Pressione sporale: Medio",
+    )
+
+    assert payload is not None
+    image = tg.Image.open(BytesIO(payload.getvalue()))
+    assert image.width >= 960
+    assert image.height >= 650
+
+
 def test_build_free_chat_advanced_chart_accepts_inline_pipe_metrics():
     context = types.SimpleNamespace(user_data={})
 
@@ -1199,6 +1228,23 @@ def test_build_free_chat_advanced_chart_accepts_inline_pipe_metrics():
     )
 
     assert payload is not None
+
+
+def test_build_free_chat_advanced_chart_reserves_footer_space_for_five_metrics():
+    context = types.SimpleNamespace(user_data={})
+
+    payload = tg._build_free_chat_advanced_chart(
+        context,
+        "Rischio peronospora: Medio\n"
+        "Rischio oidio: Alto\n"
+        "Rischio muffa grigia: Basso\n"
+        "Rischio alternaria: Medio\n"
+        "Rischio ruggine: Basso",
+    )
+
+    assert payload is not None
+    image = tg.Image.open(BytesIO(payload.getvalue()))
+    assert image.height >= 920
 
 
 def test_continue_diagnosis_message_uses_chat_pending_when_no_diag(monkeypatch):
@@ -1401,8 +1447,8 @@ def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
         return None
 
     class FakeEngine:
-        def chat(self, user_id, prompt, response_language=None):
-            prompts.append((user_id, prompt, response_language))
+        def chat(self, user_id, prompt, response_language=None, system_prompt_suffix=""):
+            prompts.append((user_id, prompt, response_language, system_prompt_suffix))
             return "risposta contestuale"
 
     monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
@@ -1432,8 +1478,8 @@ def test_generate_free_chat_response_localizes_seed_context_prefix_in_english(mo
         return None
 
     class FakeEngine:
-        def chat(self, user_id, prompt, response_language=None):
-            prompts.append((user_id, prompt, response_language))
+        def chat(self, user_id, prompt, response_language=None, system_prompt_suffix=""):
+            prompts.append((user_id, prompt, response_language, system_prompt_suffix))
             return "english contextual reply"
 
     monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
@@ -1468,8 +1514,8 @@ def test_generate_free_chat_response_passes_english_override_to_engine(monkeypat
         return None
 
     class FakeEngine:
-        def chat(self, user_id, prompt, response_language=None):
-            prompts.append((user_id, prompt, response_language))
+        def chat(self, user_id, prompt, response_language=None, system_prompt_suffix=""):
+            prompts.append((user_id, prompt, response_language, system_prompt_suffix))
             return "english reply"
 
     monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
@@ -1489,6 +1535,95 @@ def test_generate_free_chat_response_passes_english_override_to_engine(monkeypat
     assert prompts[0][0] == "7"
     assert prompts[0][1] == "How are you?"
     assert prompts[0][2] == tg.VOICE_LANGUAGE_EN
+
+
+def test_generate_free_chat_response_augments_prompt_for_visual_requests(monkeypatch):
+    prompts = []
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat(self, user_id, prompt, response_language=None, system_prompt_suffix=""):
+            prompts.append((user_id, prompt, response_language, system_prompt_suffix))
+            return "### Sintesi\nRischio: 74%\nUmidita': 82%\nPioggia: 21 mm\nTemperatura: 24 C\nPressione: Media"
+
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=18),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(
+        tg._generate_free_chat_response(
+            update,
+            context,
+            "Fammi un grafico professionale con tabella ben organizzata sul rischio fungino del vigneto",
+        )
+    )
+
+    assert result.startswith("### Sintesi")
+    assert prompts[0][0] == "18"
+    assert prompts[0][1] == "Fammi un grafico professionale con tabella ben organizzata sul rischio fungino del vigneto"
+    assert "Non dire che non puoi creare grafici, tabelle o visualizzazioni." in prompts[0][3]
+    assert "### Indicatori visuali" in prompts[0][3]
+    assert "Etichetta: valore" in prompts[0][3]
+    assert "almeno 5 indicatori confrontabili" in prompts[0][3]
+
+
+def test_generate_free_chat_response_repairs_visual_refusal(monkeypatch):
+    repair_prompts = []
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeEngine:
+        def chat(self, user_id, prompt, response_language=None, system_prompt_suffix=""):
+            return "Non posso generare grafici o tabelle direttamente in questa chat."
+
+        def chat_internal(self, prompt, response_language="auto", system_prompt_suffix=""):
+            repair_prompts.append((prompt, response_language, system_prompt_suffix))
+            return (
+                "### Sintesi\n"
+                "- Scenario da monitorare con attenzione.\n\n"
+                "### Indicatori\n"
+                "Rischio fungino: Alto\n"
+                "Umidita relativa: 84%\n"
+                "Temperatura fogliare: 24 C\n"
+                "Supporto pioggia: Medio\n\n"
+                "### Lettura professionale\n"
+                "- La pressione resta gestibile ma richiede follow-up ravvicinato."
+            )
+
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=27),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(
+        tg._generate_free_chat_response(
+            update,
+            context,
+            "Fammi un grafico professionale con tabella del rischio fungino",
+        )
+    )
+
+    assert repair_prompts
+    assert "### Indicatori" in result
+    assert "non posso generare grafici" not in result.lower()
+    assert repair_prompts[0][0] == "Fammi un grafico professionale con tabella del rischio fungino"
+    assert "Non dire che non puoi creare grafici, tabelle o visualizzazioni." in repair_prompts[0][2]
 
 
 def test_generate_free_chat_response_nasa_sends_photos(monkeypatch, tmp_path):
@@ -1835,6 +1970,502 @@ def test_build_diagnosis_prompt_uses_english_when_requested(monkeypatch):
     assert "RAW DELTA DIAGNOSIS REPORT" in prompt
     assert "Technical outcome" in prompt
     assert "in italiano" not in prompt
+
+
+def test_build_diagnosis_prompt_without_operator_description_uses_vision_only_constraints(monkeypatch):
+    monkeypatch.setattr(tg, "_format_diagnosis_full", lambda record: "Detailed diagnosis report")
+
+    record = {
+        "diagnosis": {
+            "overall_risk": "medium",
+            "plant_status": "to monitor",
+            "explanation": "Leaf lesions detected",
+            "quantum_risk": {"quantum_risk_score": 0.42, "dominant_description": "humidity_spike"},
+        },
+        "ai_result": {"class": "Tomato_Early_blight", "confidence": 0.91, "fallback": False},
+        "recommendations": [{"category": "action", "action": "Improve airflow"}],
+        "sensor_snapshot": {},
+    }
+
+    prompt = tg._build_diagnosis_prompt(record, "", response_language=tg.VOICE_LANGUAGE_IT)
+
+    assert "non è disponibile alcuna descrizione dell'operatore" in prompt
+    assert "classe PlantVillage proposta dal backend visivo" in prompt
+    assert "coerenza con la descrizione dell'operatore" not in prompt
+
+
+def test_build_diagnosis_prompt_with_fallback_class_marks_uncertainty(monkeypatch):
+    monkeypatch.setattr(tg, "_format_diagnosis_full", lambda record: "Detailed diagnosis report")
+
+    record = {
+        "diagnosis": {
+            "overall_risk": "medium",
+            "plant_status": "to monitor",
+            "explanation": "Leaf lesions detected",
+            "quantum_risk": {"quantum_risk_score": 0.42, "dominant_description": "humidity_spike"},
+        },
+        "ai_result": {"class": "Classe_NonClassificato", "confidence": 0.31, "fallback": True},
+        "recommendations": [{"category": "action", "action": "Improve airflow"}],
+        "sensor_snapshot": {},
+    }
+
+    prompt = tg._build_diagnosis_prompt(record, "", response_language=tg.VOICE_LANGUAGE_IT)
+
+    assert "Non presentare alcuna classe PlantVillage come confermata" in prompt
+    assert "esito incerto o non classificato" in prompt
+
+
+def test_run_diagnosis_starts_followup_on_fallback_by_default(monkeypatch):
+    calls = []
+
+    class FakeAgent:
+        def run_diagnosis(self, sensor_data=None, image=None):
+            assert sensor_data is None
+            assert image == "decoded-image"
+            return {"ai_result": {"fallback": True}, "diagnosis": {}}
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_followup(update, context, record, mode="fallback"):
+        calls.append(("followup", mode, record))
+        return 701
+
+    async def fake_send_ai_diagnosis_opinion(update, context, record):
+        calls.append(("send", record))
+        return 702
+
+    async def fake_guided_vlm(update, context, sensor_data):
+        return None
+
+    monkeypatch.setattr(tg, "_get_agent", lambda context: FakeAgent())
+    monkeypatch.setattr(tg, "_load_image_from_path", lambda path: "decoded-image")
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(tg, "_start_followup_questioning", fake_followup)
+    monkeypatch.setattr(tg, "_send_ai_diagnosis_opinion", fake_send_ai_diagnosis_opinion)
+    monkeypatch.setattr(tg, "_run_guided_llm_diagnosis", fake_guided_vlm)
+
+    context = types.SimpleNamespace(user_data={"diag_image_path": "input_images/foglia.jpg"})
+
+    result = asyncio.run(tg._run_diagnosis(types.SimpleNamespace(), context, None))
+
+    assert result == 701
+    assert calls == [("followup", "fallback", {"ai_result": {"fallback": True}, "diagnosis": {}})]
+
+
+def test_run_diagnosis_skips_followup_when_disabled(monkeypatch):
+    calls = []
+
+    class FakeAgent:
+        def run_diagnosis(self, sensor_data=None, image=None):
+            assert sensor_data is None
+            assert image == "decoded-image"
+            return {"ai_result": {"fallback": True}, "diagnosis": {}}
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_followup(update, context, record, mode="fallback"):
+        calls.append(("followup", mode, record))
+        return 701
+
+    async def fake_send_ai_diagnosis_opinion(update, context, record):
+        calls.append(("send", record))
+        return 702
+
+    async def fake_guided_vlm(update, context, sensor_data):
+        return None
+
+    monkeypatch.setattr(tg, "_get_agent", lambda context: FakeAgent())
+    monkeypatch.setattr(tg, "_load_image_from_path", lambda path: "decoded-image")
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(tg, "_start_followup_questioning", fake_followup)
+    monkeypatch.setattr(tg, "_send_ai_diagnosis_opinion", fake_send_ai_diagnosis_opinion)
+    monkeypatch.setattr(tg, "_run_guided_llm_diagnosis", fake_guided_vlm)
+
+    context = types.SimpleNamespace(user_data={"diag_image_path": "input_images/foglia.jpg"})
+
+    result = asyncio.run(tg._run_diagnosis(types.SimpleNamespace(), context, None, allow_followup=False))
+
+    assert result == 702
+    assert calls == [("send", {"ai_result": {"fallback": True}, "diagnosis": {}})]
+
+
+def test_run_diagnosis_prefers_guided_vlm_when_available(monkeypatch):
+    calls = []
+
+    async def fake_guided_vlm(update, context, sensor_data):
+        calls.append(("guided", sensor_data))
+        return 703
+
+    async def fake_native(update, context, sensor_data, allow_followup=True):
+        calls.append(("native", sensor_data, allow_followup))
+        return 702
+
+    monkeypatch.setattr(tg, "_run_guided_llm_diagnosis", fake_guided_vlm)
+    monkeypatch.setattr(tg, "_run_native_diagnosis", fake_native)
+
+    result = asyncio.run(tg._run_diagnosis(types.SimpleNamespace(), types.SimpleNamespace(), {"temperature_c": 24.2}))
+
+    assert result == 703
+    assert calls == [("guided", {"temperature_c": 24.2})]
+
+
+def test_run_guided_llm_diagnosis_uses_hf_multimodal_model(monkeypatch):
+    sends = []
+    visuals = []
+    remembered = []
+    prompts = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_send_diagnosis_visuals(update, context, record):
+        visuals.append(record)
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeVisionLLM:
+        def chat_with_image(self, prompt, image_source, system_prompt=None):
+            prompts.append((prompt, image_source, system_prompt))
+            return (
+                "1) Nome pianta: pomodoro | Nome botanico: Solanum lycopersicum | Certezza: alta\n"
+                "2) Diagnosi: quadro fogliare compatibile con lieve stress.",
+                "google/gemma-4-31B-it",
+            )
+
+    class FakeEngine:
+        def remember_turn(self, user_id, user_input, response):
+            remembered.append((user_id, user_input, response))
+
+    monkeypatch.setattr(tg, "_get_hf_vision_llm", lambda context: FakeVisionLLM())
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(tg, "_send_diagnosis_visuals", fake_send_diagnosis_visuals)
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=77),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_image_path": "input_images/foglia.jpg",
+            "diagnosis_active": True,
+        },
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._run_guided_llm_diagnosis(update, context, {"temperature_c": 24.5, "humidity_pct": 61.0}))
+
+    assert result == tg.ConversationHandler.END
+    assert prompts[0][1] == "input_images/foglia.jpg"
+    assert "Descrizione operatore" not in prompts[0][0]
+    assert "Note operatore opzionali" not in prompts[0][0]
+    assert "Dati ambientali disponibili" in prompts[0][0]
+    assert "Temperatura (°C): 24.5" in prompts[0][0]
+    assert visuals == [{}]
+    assert len(sends) == 1
+    assert sends[0][1] == "HTML"
+    assert "🩺 <b>RISULTATO DIAGNOSI DELTA Plant</b>" in sends[0][0]
+    assert "<i>Analisi visiva multimodale con dati ambientali integrati.</i>" in sends[0][0]
+    assert "<b>Quadro sintetico</b>" in sends[0][0]
+    assert "🪴 <b>Pianta:</b> pomodoro (Solanum lycopersicum)" in sends[0][0]
+    assert "🎯 <b>Certezza:</b> alta" in sends[0][0]
+    assert "🌡️ <b>Sensori:</b> Integrati" in sends[0][0]
+    assert "<pre>" not in sends[0][0]
+    assert "<b>🔎 Sintesi diagnostica</b>" in sends[0][0]
+    assert "• Nome pianta: pomodoro" in sends[0][0]
+    assert "• Nome botanico: Solanum lycopersicum" in sends[0][0]
+    assert "<b>📊 Diagnosi e rischio</b>" in sends[0][0]
+    assert "• Diagnosi: quadro fogliare compatibile con lieve stress." in sends[0][0]
+    assert remembered == [(
+        "77",
+        remembered[0][1],
+        "1) Nome pianta: pomodoro | Nome botanico: Solanum lycopersicum | Certezza: alta\n2) Diagnosi: quadro fogliare compatibile con lieve stress.",
+    )]
+    assert "Modello vision HF guidato: google/gemma-4-31B-it." in remembered[0][1]
+    assert context.user_data["diagnosis_active"] is False
+    assert "diag_image_path" not in context.user_data
+
+
+def test_receive_diag_photo_skips_description_and_routes_to_sensor_mode(monkeypatch, tmp_path):
+    saved = tmp_path / "guided-photo.jpg"
+    sensor_calls = []
+    description_calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_download(update):
+        return saved
+
+    async def fake_ask_sensor_mode(update, context):
+        sensor_calls.append(
+            {
+                "diag_image_path": context.user_data.get("diag_image_path"),
+                "diag_waiting_for_photo": context.user_data.get("diag_waiting_for_photo"),
+                "diag_user_description": context.user_data.get("diag_user_description"),
+            }
+        )
+        return tg.STATE_DIAG_SENSOR_MODE
+
+    async def fake_ask_user_description(update, context):
+        description_calls.append(True)
+        return tg.STATE_DIAG_USER_DESCRIPTION
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_download_telegram_image", fake_download)
+    monkeypatch.setattr(tg, "_ask_sensor_mode", fake_ask_sensor_mode)
+    monkeypatch.setattr(tg, "_ask_user_description", fake_ask_user_description)
+
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_waiting_for_photo": True,
+            "diag_user_description": "vecchia descrizione",
+            "diagnosis_active": True,
+        }
+    )
+
+    result = asyncio.run(tg.receive_diag_photo(types.SimpleNamespace(), context))
+
+    assert result == tg.STATE_DIAG_SENSOR_MODE
+    assert sensor_calls == [
+        {
+            "diag_image_path": str(saved),
+            "diag_waiting_for_photo": None,
+            "diag_user_description": None,
+        }
+    ]
+    assert description_calls == []
+
+
+def test_run_llm_vision_diagnosis_uses_hf_multimodal_model(monkeypatch):
+    sends = []
+    remembered = []
+    prompts = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeVisionLLM:
+        def chat_with_image(self, prompt, image_source, system_prompt=None):
+            prompts.append((prompt, image_source, system_prompt))
+            return "1) Pianta: Ficus benjamina. Diagnosi visiva multimodale", "google/gemma-4-31B-it"
+
+    class FakeEngine:
+        def remember_turn(self, user_id, user_input, response):
+            remembered.append((user_id, user_input, response))
+
+    monkeypatch.setattr(tg, "_get_hf_vision_llm", lambda context: FakeVisionLLM())
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=77),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_image_path": "input_images/foglia.jpg",
+            "diagnosis_active": True,
+        },
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._run_llm_vision_diagnosis(update, context))
+
+    assert result == tg.ConversationHandler.END
+    assert len(prompts) == 1
+    assert prompts[0][1] == "input_images/foglia.jpg"
+    assert "Analizza SOLO la foto allegata della pianta" in prompts[0][0]
+    assert "Nome probabile della pianta e grado di certezza" in prompts[0][0]
+    assert "nome piu probabile della pianta" in prompts[0][0]
+    assert "Respond ALWAYS in English" not in prompts[0][2]
+    assert sends == [
+        ("🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n1) Pianta: Ficus benjamina. Diagnosi visiva multimodale", "HTML")
+    ]
+    assert remembered == [("77", remembered[0][1], "1) Pianta: Ficus benjamina. Diagnosi visiva multimodale")]
+    assert "Ho chiesto una diagnosi della pianta." in remembered[0][1]
+    assert "diagnosi visiva multimodale da foto inviata direttamente in chat" in remembered[0][1]
+    assert "Modello vision HF: google/gemma-4-31B-it." in remembered[0][1]
+    assert context.user_data["diagnosis_active"] is False
+    assert "diag_image_path" not in context.user_data
+
+
+def test_run_llm_vision_diagnosis_retries_when_plant_name_is_missing(monkeypatch):
+    sends = []
+    prompts = []
+
+    async def fake_send_diagnosis_paginated(update, context, text, parse_mode=None):
+        sends.append((text, parse_mode))
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    class FakeVisionLLM:
+        def __init__(self):
+            self.calls = 0
+
+        def chat_with_image(self, prompt, image_source, system_prompt=None):
+            prompts.append((prompt, image_source, system_prompt))
+            self.calls += 1
+            if self.calls == 1:
+                return "Esito visivo: fogliame sano e fioritura regolare.", "google/gemma-4-31B-it"
+            return (
+                "1) Nome della pianta: Dipladenia; Nome botanico: Mandevilla sanderi; Grado di certezza: alto.\n"
+                "2) Esito visivo: fogliame sano e fioritura regolare.",
+                "google/gemma-4-31B-it",
+            )
+
+    class FakeEngine:
+        def remember_turn(self, user_id, user_input, response):
+            return None
+
+    monkeypatch.setattr(tg, "_get_hf_vision_llm", lambda context: FakeVisionLLM())
+    monkeypatch.setattr(tg, "_get_chat_engine", lambda context: FakeEngine())
+    monkeypatch.setattr(tg, "_send_diagnosis_paginated", fake_send_diagnosis_paginated)
+    monkeypatch.setattr(
+        tg,
+        "_sanitize_diagnosis_opinion",
+        lambda opinion, response_language=tg.VOICE_LANGUAGE_IT: opinion,
+    )
+    monkeypatch.setattr(tg.asyncio, "to_thread", fake_to_thread)
+
+    update = types.SimpleNamespace(
+        effective_user=types.SimpleNamespace(id=88),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"diag_image_path": "input_images/foglia.jpg", "diagnosis_active": True},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+
+    result = asyncio.run(tg._run_llm_vision_diagnosis(update, context))
+
+    assert result == tg.ConversationHandler.END
+    assert len(prompts) == 2
+    assert "Analizza SOLO la foto allegata della pianta" in prompts[0][0]
+    assert "non hai indicato chiaramente il nome della pianta" in prompts[1][0]
+    assert sends == [
+        (
+            "🩺 <b>RISULTATO DIAGNOSI DELTA Plant:</b>\n\n"
+            "1) Nome della pianta: Dipladenia; Nome botanico: Mandevilla sanderi; Grado di certezza: alto.\n"
+            "2) Esito visivo: fogliame sano e fioritura regolare.",
+            "HTML",
+        )
+    ]
+
+
+def test_handle_unprompted_photo_starts_automatic_vision_diagnosis(monkeypatch, tmp_path):
+    sends = []
+    saved = tmp_path / "photo.jpg"
+    run_calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_download(update):
+        return saved
+
+    async def fake_send(update, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    async def fake_run(update, context):
+        run_calls.append(
+            {
+                "diag_image_path": context.user_data.get("diag_image_path"),
+                "diagnosis_active": context.user_data.get("diagnosis_active"),
+                "has_description": "diag_user_description" in context.user_data,
+            }
+        )
+        return 703
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "_download_telegram_image", fake_download)
+    monkeypatch.setattr(tg, "_send", fake_send)
+    monkeypatch.setattr(tg, "_run_llm_vision_diagnosis", fake_run)
+
+    context = types.SimpleNamespace(user_data={"diag_user_description": "vecchia descrizione"})
+
+    result = asyncio.run(tg.handle_unprompted_photo(types.SimpleNamespace(), context))
+
+    assert result == 703
+    assert sends == ["📷 Foto ricevuta. Avvio una diagnosi automatica con computer vision AI..."]
+    assert run_calls == [
+        {
+            "diag_image_path": str(saved),
+            "diagnosis_active": True,
+            "has_description": False,
+        }
+    ]
+
+
+def test_handle_unprompted_photo_routes_to_guided_flow_when_waiting_for_photo(monkeypatch):
+    run_calls = []
+    receive_calls = []
+
+    async def fake_guard(update):
+        return True
+
+    async def fake_receive(update, context):
+        receive_calls.append(
+            {
+                "diag_waiting_for_photo": context.user_data.get("diag_waiting_for_photo"),
+                "diagnosis_active": context.user_data.get("diagnosis_active"),
+            }
+        )
+        return 811
+
+    async def fake_run(update, context):
+        run_calls.append(True)
+        return 999
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(tg, "receive_diag_photo", fake_receive)
+    monkeypatch.setattr(tg, "_run_llm_vision_diagnosis", fake_run)
+
+    context = types.SimpleNamespace(
+        user_data={
+            "diag_waiting_for_photo": True,
+            "diagnosis_active": True,
+        }
+    )
+
+    result = asyncio.run(tg.handle_unprompted_photo(types.SimpleNamespace(), context))
+
+    assert result == 811
+    assert receive_calls == [
+        {
+            "diag_waiting_for_photo": True,
+            "diagnosis_active": True,
+        }
+    ]
+    assert run_calls == []
 
 
 def test_sanitize_diagnosis_opinion_translates_known_labels_in_english_mode():

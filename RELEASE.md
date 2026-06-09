@@ -1,5 +1,24 @@
 # Release v3.2 — 13 maggio 2026
 
+## 🚀 Upgrade Manuale Operativo e Telegram VLM-first
+
+Questa revisione riallinea in profondita la documentazione operativa di DELTA Plant al runtime reale attuale. Il Manuale PDF e la guida tecnica non descrivono piu il vecchio percorso Telegram basato su descrizione obbligatoria, follow-up a domande multiple e classificatore PlantVillage come strada primaria.
+
+Da ora la documentazione GitHub evidenzia con chiarezza che:
+
+- la diagnosi guidata Telegram e VLM-first: foto -> sensori -> referto multimodale
+- la foto inviata liberamente in chat usa un percorso separato vision-only, senza wizard
+- il backend nativo edge resta disponibile come fallback operativo e per explainability LayerCAM
+- il referto Telegram moderno apre con un Quadro sintetico mobile-friendly e continua con sezioni tecniche strutturate
+- NASA-ISRO/SAR, memoria persistente, chat libera e voce sono descritti come parte integrante del runtime avanzato corrente
+
+Contenuti rimossi o declassati dalla documentazione corrente:
+
+- richiesta obbligatoria di descrizione pianta prima della diagnosi guidata
+- equivalenza tra foto-libera e procedura guidata da menu
+- follow-up a 5 domande come percorso diagnostico principale
+- classificazione PlantVillage/TFLite come ramo principale della diagnosi Telegram
+
 ## 🚀 DELTA Plant riallinea la documentazione benchmark: EfficientFormer stimato documentale = Generale +4%
 
 Questa iterazione della release v3.2 riallinea le superfici documentali GitHub a una proiezione dichiarata per EfficientFormerV2-S1, calcolata come `+4%` rispetto ai valori misurati del modello `generale` sul benchmark pubblico a 600 immagini. I file JSON/CSV sotto `logs/vision_eval/public_600_dual/` restano invece i risultati raw misurati sul campione indipendente.

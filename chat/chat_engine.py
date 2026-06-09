@@ -138,6 +138,13 @@ def _system_prompt_for_language(base_prompt: str, response_language: str = "auto
     return base_prompt
 
 
+def _append_system_prompt_suffix(system_prompt: str, system_prompt_suffix: str = "") -> str:
+    suffix = str(system_prompt_suffix or "").strip()
+    if not suffix:
+        return system_prompt
+    return f"{system_prompt}\n\n{suffix}"
+
+
 def _load_manual_knowledge_base(limit_chars: int | None = 2000) -> str:
     kb_path = Path(__file__).resolve().parent.parent / "llm" / "knowledge_base_delta.md"
     try:
@@ -325,7 +332,12 @@ class ChatEngine:
         )
         return anchored_user_input, anchored_system_prompt
 
-    def chat_internal(self, prompt: str, response_language: str = "auto") -> str:
+    def chat_internal(
+        self,
+        prompt: str,
+        response_language: str = "auto",
+        system_prompt_suffix: str = "",
+    ) -> str:
         """
         Chiamata stateless all'LLM: nessuna memoria letta o scritta.
         Usata per chiamate interne (generazione domande, classificazioni binarie)
@@ -338,14 +350,23 @@ class ChatEngine:
             response, _ = self._hf_llm.chat(
                 user_message=prompt,
                 history=[],
-                system_prompt=_system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language),
+                system_prompt=_append_system_prompt_suffix(
+                    _system_prompt_for_language(DELTA_SYSTEM_PROMPT, response_language),
+                    system_prompt_suffix,
+                ),
             )
             return response or ""
         except Exception as exc:
             logger.warning("chat_internal error: %s", exc)
             return ""
 
-    def chat(self, user_id: str, user_input: str, response_language: str = "auto") -> str:
+    def chat(
+        self,
+        user_id: str,
+        user_input: str,
+        response_language: str = "auto",
+        system_prompt_suffix: str = "",
+    ) -> str:
         """
         Elabora un messaggio utente e restituisce la risposta DELTA.
 
@@ -371,6 +392,7 @@ class ChatEngine:
                 + kb_text
                 + "\n---\nISTRUZIONI SPECIALI: Se la domanda richiede una formula, una definizione o una spiegazione presente nel Manuale, COPIA ESATTAMENTE il testo, la formula o il paragrafo corrispondente dal Manuale qui sopra, senza sintetizzare, modificare o astrarre. Se la domanda non è coperta, rispondi: 'Consulta il manuale PDF o chiedi supporto all’amministratore.'"
             )
+            system_prompt = _append_system_prompt_suffix(system_prompt, system_prompt_suffix)
             llm_user_input = user_input
         else:
             llm_user_input, system_prompt = self._prepare_turn_prompt(
@@ -378,6 +400,7 @@ class ChatEngine:
                 history,
                 response_language=response_language,
             )
+            system_prompt = _append_system_prompt_suffix(system_prompt, system_prompt_suffix)
 
         # ── Backend unico: HuggingFace cloud ─────────────────────────────────
         if self._hf_available:
