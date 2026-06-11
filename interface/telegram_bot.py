@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # --- PATCH: blocco LLM/voce solo se step obbligatorio attivo ---
 MANDATORY_GUIDED_STEPS = [
-    "diag_sensor_mode", "diag_wait_photo", "diag_user_description", "diag_temp", "diag_hum", "diag_press", "diag_light", "diag_co2", "diag_ph", "diag_ec",
+    "diag_waiting_for_photo", "diag_waiting_for_location", "diag_user_description",
     "upload_wait_photo", "upload_plant", "upload_organ", "upload_label"
 ]
 
@@ -17,10 +17,10 @@ def mandatory_step_block_message(context: Optional["ContextTypes.DEFAULT_TYPE"] 
     return _ui_text(
         context,
         "⏳ È in corso una diagnosi guidata o upload con step obbligatorio. "
-        "Completa prima la diagnosi (es. scegli sensori o invia foto), poi puoi usare la chat libera o la modalità vocale. "
+        "Completa prima la diagnosi (invia foto e posizione GPS), poi puoi usare la chat libera o la modalità vocale. "
         "Usa /annulla per interrompere la diagnosi.",
         "⏳ A guided diagnosis or upload with a required step is in progress. "
-        "Complete the diagnosis first, for example choose sensors or send a photo, then you can use free chat or voice mode. "
+        "Complete the diagnosis first by sending a photo and GPS position, then you can use free chat or voice mode. "
         "Use /annulla to interrupt the diagnosis.",
     )
  
@@ -64,6 +64,20 @@ except ImportError:
     ImageDraw = None
     ImageFont = None
     PIL_AVAILABLE = False
+
+try:
+    import pytesseract
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    pytesseract = None
+    PYTESSERACT_AVAILABLE = False
+
+try:
+    from pypdf import PdfReader
+    PYPDF_AVAILABLE = True
+except ImportError:
+    PdfReader = None
+    PYPDF_AVAILABLE = False
 
 from core.config import (
     TELEGRAM_CONFIG,
@@ -150,8 +164,8 @@ except ImportError:
 logger = logging.getLogger("delta.interface.telegram")
 
 _FREE_CHAT_TRANSIENT_MARKERS = (
-    "sensor_index",
     "diag_waiting_for_photo",
+    "diag_waiting_for_location",
     "diag_image_path",
     "diag_fallback_record",
     "diag_followup_qa",
@@ -160,6 +174,8 @@ _FREE_CHAT_TRANSIENT_MARKERS = (
     "diag_user_description",
     "diag_followup_mode",
     "diag_pending_chunks",
+    "diag_environment_context",
+    "sensor_data",
     "awaiting_nasa_sar_location",
 )
 
@@ -190,6 +206,18 @@ _VOICE_FREE_CHAT_ONLY_REJECT = (
     "In questo flusso usa messaggi di testo."
 )
 
+_AGRONOMIC_REFINEMENT_RE = re.compile(
+    r"\b("
+    r"ph|p\.?h\.?|ec|e\.?c\.?|conducibilit[aà]|conductivity|electrical\s+conductivity|"
+    r"salinit[aà]|salinity|substrat\w*|substrate|suolo|soil|terreno|"
+    r"fertilizz\w*|fertili[sz]\w*|concim\w*|nutrient\w*|nutrienti|"
+    r"azoto|nitrogen|fosforo|phosphorus|potassio|potassium|calcio|calcium|magnesio|magnesium|"
+    r"irrig\w*|irrigation|acqua|water|drenaggio|drainage|"
+    r"temperatura|temperature|umidit[aà]|humidity|lux|luce|light|co2|co₂"
+    r")\b",
+    re.IGNORECASE,
+)
+
 
 def _clear_user_data_keys(context: "ContextTypes.DEFAULT_TYPE", *keys: str) -> None:
     for key in keys:
@@ -206,9 +234,71 @@ def _clear_diagnosis_state(context: "ContextTypes.DEFAULT_TYPE") -> None:
     context.user_data["diagnosis_active"] = False
 
 
+def _store_latest_diagnosis_context(
+    context: "ContextTypes.DEFAULT_TYPE",
+    opinion: str,
+    *,
+    record: Optional[Dict[str, Any]] = None,
+    sensor_data: Optional[Dict[str, Any]] = None,
+    model_used: str = "",
+) -> None:
+    context.user_data["last_diagnosis_context"] = {
+        "opinion": str(opinion or "").strip(),
+        "record": record or {},
+        "sensor_data": sensor_data or {},
+        "model_used": str(model_used or "").strip(),
+        "language": _ui_language(context),
+        "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+
+
+def _looks_like_agronomic_refinement_request(user_text: str) -> bool:
+    return bool(_AGRONOMIC_REFINEMENT_RE.search(str(user_text or "")))
+
+
+def _build_agronomic_refinement_prompt(
+    context: "ContextTypes.DEFAULT_TYPE",
+    user_text: str,
+    diagnosis_context: Dict[str, Any],
+    response_language: str,
+) -> str:
+    previous_opinion = str(diagnosis_context.get("opinion") or "").strip()
+    previous_sensor_data = diagnosis_context.get("sensor_data") or {}
+    previous_sensor_text = _format_sensor_text_for_language(
+        previous_sensor_data,
+        response_language=response_language,
+    )
+    if response_language == VOICE_LANGUAGE_EN:
+        parts = [
+            "You are DELTA Plant. The user has provided new agronomic parameters after the latest diagnosis.",
+            "Reassess the previous diagnosis in light of the new values. Do not restart from scratch and do not ask for another photo.",
+            "Explicitly state which parts of the diagnosis change, which remain unchanged, and why.",
+            "Consider pH, electrical conductivity, salinity, substrate/soil, irrigation, fertilization, nutrients, temperature, humidity, light/LUX, and CO2 when present.",
+            "Return a concise professional agronomic update in 5 blocks: 1) Updated interpretation, 2) Impact of new parameters, 3) Revised risk, 4) Corrective actions, 5) Monitoring.",
+            "Previous DELTA Plant diagnosis:",
+            previous_opinion or "Not available.",
+        ]
+        if previous_sensor_text:
+            parts.extend(["Previous environmental context:", previous_sensor_text])
+        parts.extend(["New agronomic parameters supplied by the user:", str(user_text or "").strip()])
+        return "\n\n".join(parts)
+
+    parts = [
+        "Sei DELTA Plant. L'utente ha fornito nuovi parametri agronomici dopo l'ultima diagnosi.",
+        "Rimodula la diagnosi precedente alla luce dei nuovi valori. Non ripartire da zero e non chiedere un'altra foto.",
+        "Indica esplicitamente cosa cambia nella diagnosi, cosa resta invariato e perche'.",
+        "Considera pH, conducibilita' elettrica/EC, salinita', substrato/suolo, irrigazione, concimazione, nutrienti, temperatura, umidita', luce/LUX e CO2 quando presenti.",
+        "Restituisci un aggiornamento agronomico professionale e sintetico in 5 blocchi: 1) Interpretazione aggiornata, 2) Impatto dei nuovi parametri, 3) Rischio rimodulato, 4) Azioni correttive, 5) Monitoraggio.",
+        "Diagnosi DELTA Plant precedente:",
+        previous_opinion or "Non disponibile.",
+    ]
+    if previous_sensor_text:
+        parts.extend(["Contesto ambientale precedente:", previous_sensor_text])
+    parts.extend(["Nuovi parametri agronomici forniti dall'utente:", str(user_text or "").strip()])
+    return "\n\n".join(parts)
+
+
 def _free_chat_block_reason(context: "ContextTypes.DEFAULT_TYPE") -> str:
-    if context.user_data.get("diagnosis_active"):
-        return "diagnosis_active"
     if context.user_data.get("diag_qa_active"):
         return "diag_qa_active"
     if context.user_data.get("chat_mode_active"):
@@ -218,6 +308,8 @@ def _free_chat_block_reason(context: "ContextTypes.DEFAULT_TYPE") -> str:
     for key in _FREE_CHAT_TRANSIENT_MARKERS:
         if key in context.user_data:
             return key
+    if context.user_data.get("diagnosis_active"):
+        return "diagnosis_active"
     return ""
 
 
@@ -226,6 +318,10 @@ def _free_chat_block_message(block_reason: str) -> str:
         return "💬 La chat con DELTAPLANO è già attiva. Scrivi il tuo messaggio in chat oppure usa /chiudi per uscire."
     if block_reason == "upload_active":
         return "📤 È in corso un upload guidato. Invia la foto richiesta oppure usa /annulla per uscire dal flusso."
+    if block_reason == "diag_waiting_for_photo":
+        return "📷 Diagnosi in corso: invia una foto o un'immagine dal telefono, oppure usa /annulla per uscire."
+    if block_reason == "diag_waiting_for_location":
+        return "📍 Diagnosi in corso: condividi la posizione GPS dal telefono per acquisire NASA-ISRO/SAR e LUX, oppure usa /annulla per uscire."
     return "⏳ È in corso un flusso guidato di DELTA Plant. Completa i passaggi richiesti oppure usa /annulla per tornare al menu."
 
 
@@ -259,8 +355,6 @@ def _is_voice_free_chat_context(context: "ContextTypes.DEFAULT_TYPE") -> bool:
 
 def _guided_diagnosis_voice_supported(context: "ContextTypes.DEFAULT_TYPE") -> bool:
     if context.user_data.get("diag_qa_active") or context.user_data.get("diag_followup_last_question"):
-        return True
-    if "sensor_index" in context.user_data:
         return True
     if context.user_data.get("diag_image_path") and not context.user_data.get("diag_user_description"):
         return True
@@ -793,6 +887,27 @@ async def _send_voice(
     await chat.send_voice(**reply_args)
 
 
+def _build_free_chat_language_prompt_suffix(response_language: str) -> str:
+    normalized = (response_language or VOICE_LANGUAGE_DEFAULT).strip().lower()
+    if normalized == VOICE_LANGUAGE_EN:
+        return (
+            "LANGUAGE OVERRIDE FOR THIS TURN:\n"
+            "- Respond only in English.\n"
+            "- If the user message or voice transcription is in Italian, understand it but translate your answer into English.\n"
+            "- Do not include Italian sentences unless the user explicitly asks for a translation example."
+        )
+    return (
+        "VINCOLO LINGUA PER QUESTO TURNO:\n"
+        "- Rispondi solo in italiano.\n"
+        "- Se il messaggio o la trascrizione vocale dell'utente e' in inglese, comprendila ma formula la risposta in italiano.\n"
+        "- Non includere frasi in inglese salvo richiesta esplicita di traduzione."
+    )
+
+
+def _join_system_prompt_suffixes(*parts: str) -> str:
+    return "\n\n".join(str(part or "").strip() for part in parts if str(part or "").strip())
+
+
 async def _generate_free_chat_response(
     update: Update,
     context: "ContextTypes.DEFAULT_TYPE",
@@ -874,6 +989,11 @@ async def _generate_free_chat_response(
     chart_request_mode = _free_chat_chart_request_mode(user_text)
     table_requested = _free_chat_requests_table(user_text)
     engine = _get_chat_engine(context)
+    diagnosis_context = context.user_data.get("last_diagnosis_context")
+    refinement_requested = (
+        isinstance(diagnosis_context, dict)
+        and _looks_like_agronomic_refinement_request(user_text)
+    )
 
     # --- PATCH: reset contesto LLM se nuova pianta menzionata ---
     def extract_plant_name(text):
@@ -890,7 +1010,14 @@ async def _generate_free_chat_response(
     # Solo se non è stato già gestito un return (es. dashboard NASA), prosegui con LLM
     try:
         base_prompt = user_text
-        if chat_seed_context:
+        if refinement_requested:
+            base_prompt = _build_agronomic_refinement_prompt(
+                context,
+                user_text,
+                diagnosis_context,
+                response_language,
+            )
+        elif chat_seed_context:
             seed_prefix = "User question" if response_language == VOICE_LANGUAGE_EN else "Domanda utente"
             base_prompt = f"{chat_seed_context}\n\n{seed_prefix}: {user_text}"
         visual_prompt_suffix = _build_free_chat_visual_prompt_suffix(
@@ -898,20 +1025,30 @@ async def _generate_free_chat_response(
             chart_request_mode=chart_request_mode,
             table_requested=table_requested,
         )
+        system_prompt_suffix = _join_system_prompt_suffixes(
+            _build_free_chat_language_prompt_suffix(response_language),
+            visual_prompt_suffix,
+        )
 
         def _ask():
+            if refinement_requested:
+                return engine.chat_internal(
+                    base_prompt,
+                    response_language=response_language,
+                    system_prompt_suffix=system_prompt_suffix,
+                )
             chat_method = getattr(engine, "chat", None)
             if callable(chat_method):
                 return chat_method(
                     user_id,
                     base_prompt,
                     response_language=response_language,
-                    system_prompt_suffix=visual_prompt_suffix,
+                    system_prompt_suffix=system_prompt_suffix,
                 )
             return engine.chat_internal(
                 base_prompt,
                 response_language=response_language,
-                system_prompt_suffix=visual_prompt_suffix,
+                system_prompt_suffix=system_prompt_suffix,
             )
         response = await asyncio.to_thread(_ask)
         response = await _repair_free_chat_visual_response(
@@ -921,6 +1058,11 @@ async def _generate_free_chat_response(
             response_language=response_language,
             chart_request_mode=chart_request_mode,
             table_requested=table_requested,
+        )
+        response = await _repair_free_chat_language_response(
+            engine,
+            response_text=response,
+            response_language=response_language,
         )
     except Exception as exc:
         logger.error("Errore chat LLM: %s", exc, exc_info=True)
@@ -1245,6 +1387,79 @@ async def _repair_free_chat_visual_response(
     if not repaired_text:
         return response_text
     if _FREE_CHAT_VISUAL_REFUSAL_RE.search(repaired_text) and _count_free_chat_metric_rows(repaired_text) < 3:
+        return response_text
+    return repaired_text
+
+
+_ITALIAN_LANGUAGE_MARKERS = {
+    "ciao", "sono", "posso", "puoi", "come", "cosa", "perche", "perchè", "perché",
+    "diagnosi", "pianta", "foglie", "malattia", "rischio", "umidita", "umidità",
+    "terreno", "vaso", "luce", "acqua", "concimazione", "trattamento", "risposta",
+    "aggiornamento", "interpretazione", "azione", "azioni", "monitoraggio",
+}
+
+_ENGLISH_LANGUAGE_MARKERS = {
+    "hello", "i", "you", "can", "what", "why", "because", "diagnosis", "plant",
+    "leaves", "disease", "risk", "humidity", "soil", "pot", "light", "water",
+    "fertilization", "treatment", "answer", "update", "interpretation", "action",
+    "actions", "monitoring", "recommend", "provide", "should", "would",
+}
+
+
+def _language_marker_score(text: str, markers: Set[str]) -> int:
+    words = set(re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ']+", str(text or "").lower()))
+    return sum(1 for marker in markers if marker in words)
+
+
+def _free_chat_response_needs_language_repair(response_text: str, response_language: str) -> bool:
+    normalized_language = (response_language or "auto").strip().lower()
+    if normalized_language not in {VOICE_LANGUAGE_IT, VOICE_LANGUAGE_EN}:
+        return False
+
+    italian_score = _language_marker_score(response_text, _ITALIAN_LANGUAGE_MARKERS)
+    english_score = _language_marker_score(response_text, _ENGLISH_LANGUAGE_MARKERS)
+    if normalized_language == VOICE_LANGUAGE_EN:
+        return italian_score >= 2 and italian_score > english_score
+    return english_score >= 3 and english_score > italian_score
+
+
+async def _repair_free_chat_language_response(
+    engine: Any,
+    *,
+    response_text: str,
+    response_language: str,
+) -> str:
+    if not _free_chat_response_needs_language_repair(response_text, response_language):
+        return response_text
+
+    chat_internal = getattr(engine, "chat_internal", None)
+    if not callable(chat_internal):
+        return response_text
+
+    if response_language == VOICE_LANGUAGE_EN:
+        repair_prompt = (
+            "Rewrite the following DELTA Plant answer entirely in English. Preserve all agronomic meaning, values, "
+            "plant names, pH/EC units, and recommendations. Do not add Italian sentences.\n\n"
+            f"Answer to rewrite:\n{response_text}"
+        )
+    else:
+        repair_prompt = (
+            "Riscrivi la seguente risposta DELTA Plant interamente in italiano. Conserva significato agronomico, valori, "
+            "nomi delle piante, unita' pH/EC e raccomandazioni. Non aggiungere frasi in inglese.\n\n"
+            f"Risposta da riscrivere:\n{response_text}"
+        )
+
+    logger.info("free_chat_language_repair: retrying response_language=%s", response_language)
+    repaired = await asyncio.to_thread(
+        chat_internal,
+        repair_prompt,
+        response_language=response_language,
+        system_prompt_suffix=_build_free_chat_language_prompt_suffix(response_language),
+    )
+    repaired_text = str(repaired or "").strip()
+    if not repaired_text:
+        return response_text
+    if _free_chat_response_needs_language_repair(repaired_text, response_language):
         return response_text
     return repaired_text
 
@@ -1849,6 +2064,13 @@ async def _set_voice_language(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     context.user_data["voice_language_override"] = requested
+    _clear_user_data_keys(context, "chat_seed_context", "chat_pending_chunks", "chat_pending_parse_mode")
+    try:
+        user_id = str(update.effective_user.id if update.effective_user else "0")
+        _get_chat_engine(context).reset(user_id)
+    except Exception as exc:
+        logger.debug("Reset memoria chat dopo cambio lingua non riuscito: %s", exc)
+
     if requested == VOICE_LANGUAGE_EN:
         await _send(
             update,
@@ -1953,6 +2175,13 @@ async def receive_followup_answer_voice(update: Update, context: ContextTypes.DE
         return STATE_DIAG_FOLLOWUP
     return await receive_followup_answer(_voice_update_with_text(update, transcript), context)
 
+
+def _is_low_signal_free_chat_input(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (text or "").strip())
+    if not normalized:
+        return True
+    return not any(char.isalpha() for char in normalized)
+
 # ──────────────────────────────────────────────────────────────
 # Handler per chat libera (domanda/risposta non strutturata)
 async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
@@ -1973,14 +2202,14 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
         return
     user_text = update.message.text.strip()
     block_reason = _free_chat_block_reason(context)
-    if block_reason == "awaiting_nasa_sar_location" and _is_nasa_sar_manual_location_fallback_text(user_text):
+    if block_reason in {"awaiting_nasa_sar_location", "diag_waiting_for_location"} and _is_nasa_sar_manual_location_fallback_text(user_text):
         logger.info("free_chat_handler: client senza location nativa durante attesa NASA/SAR, invio istruzioni dedicate")
         await _send(
             update,
             _ui_text(
                 context,
-                "📍 Questo client Telegram non ha condiviso una posizione GPS reale. Se stai usando Telegram Web/Desktop, apri DELTAPLANO dal telefono e usa di nuovo Invia GPS manualmente oppure Apri NASA-ISRO/SAR GPS. Qui resto in attesa della posizione; usa /annulla per uscire.",
-                "📍 This Telegram client did not share a real GPS position. If you are using Telegram Web/Desktop, open DELTAPLANO on your phone and use Send GPS manually again or Open NASA-ISRO/SAR GPS. I will keep waiting for the location here; use /annulla to exit.",
+                "📍 Questo client Telegram non ha condiviso una posizione GPS reale. Apri DELTAPLANO dal telefono e usa di nuovo Invia GPS manualmente oppure Apri NASA-ISRO/SAR GPS. Qui resto in attesa della posizione; usa /annulla per uscire.",
+                "📍 This Telegram client did not share a real GPS position. Open DELTAPLANO on your phone and use Send GPS manually again or Open NASA-ISRO/SAR GPS. I will keep waiting for the location here; use /annulla to exit.",
             ),
             reply_markup=_nasa_sar_reply_keyboard(context),
         )
@@ -1988,6 +2217,12 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
     if block_reason:
         logger.info("free_chat_handler: flusso strutturato attivo (%s), invio feedback", block_reason)
         await _send(update, _free_chat_block_message(block_reason))
+        return
+    if context.user_data.get("chat_seed_context") and _is_low_signal_free_chat_input(user_text):
+        logger.info(
+            "free_chat_handler: input low-signal ignorato con chat_seed_context pendente: %r",
+            user_text,
+        )
         return
     user_id = str(update.effective_user.id) if update.effective_user else "0"
     logger.info(f"free_chat_handler: Ricevuto da {user_id}: {user_text}")
@@ -2142,15 +2377,9 @@ def _menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> Inl
             InlineKeyboardButton("🆕 Diagnose a Plant" if english_ui else "🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
         ],
         [
-            InlineKeyboardButton("🌡 Sensors" if english_ui else "🌡 Sensori", callback_data=CMD_SENSORS),
             InlineKeyboardButton("📤 Excel Reports" if english_ui else "📤 Report Excel", callback_data=CMD_EXPORT),
         ],
         [
-            InlineKeyboardButton("🧪 Preflight", callback_data=CMD_PREFLIGHT),
-            InlineKeyboardButton("✅ Health", callback_data=CMD_HEALTH),
-        ],
-        [
-            InlineKeyboardButton("🎓 Academy", callback_data=CMD_ACADEMY),
             InlineKeyboardButton("📄 License" if english_ui else "📄 Licenza", callback_data=CMD_LICENSE),
         ],
         [
@@ -2255,12 +2484,12 @@ def _build_welcome_voice_text(
     if _voice_language_mode(context) == VOICE_LANGUAGE_EN:
         return (
             f"Hello {display_name}, welcome to DELTAPLANO. "
-            "I am ready to help you with plant diagnostics, sensors, reports, and agronomic guidance. "
+            "I am ready to help you with plant diagnostics, reports, and agronomic guidance. "
             "Open the menu and tell me how I can help."
         )
     return (
         f"Ciao {display_name}, benvenuto in DELTAPLANO. "
-        "Sono pronto ad aiutarti con diagnosi delle piante, sensori, report e consigli agronomici. "
+        "Sono pronto ad aiutarti con diagnosi delle piante, report e consigli agronomici. "
         "Apri il menu e dimmi pure come posso aiutarti."
     )
 
@@ -2338,8 +2567,8 @@ async def _send_diagnosis_paginated(
     MAX_DIAG_CHARS = 3500
     closing = _ui_text(
         context,
-        "Posso fare qualcos'altro per te? Sono a tua disposizione 🙂",
-        "Can I help you with anything else? I am here for you 🙂",
+        "Vuoi rimodulare la diagnosi con altri parametri agronomici? Puoi scrivere valori come pH, conducibilita' elettrica/EC, salinita', substrato, irrigazione, concimazione, nutrienti o altri dati di campo, e rielaboro il quadro alla luce dei nuovi parametri.",
+        "Would you like to refine the diagnosis with additional agronomic parameters? You can send values such as pH, electrical conductivity/EC, salinity, substrate, irrigation, fertilization, nutrients, or other field data, and I will reassess the diagnosis using the new parameters.",
     )
 
     # Pulisci eventuale coda residua di vecchie versioni paginate
@@ -2523,6 +2752,207 @@ async def _download_telegram_image(update: Update) -> Optional[Path]:
         target = folder / f"{target.stem}_{ts}{target.suffix}"
     await file_obj.download_to_drive(custom_path=str(target))
     return target
+
+
+_SCIENTIFIC_REPORT_CAPTION_RE = re.compile(
+    r"\b(analisi|referto|laboratorio|lab|report|soil|suolo|water|acqua|acque|frutto|fruit|"
+    r"nickel|nichel|ni\b|metalli|heavy metals|substrato|substrate|conducibilit[aà]|"
+    r"conductivity|ec\b|ph\b|salinit[aà]|salinity|nutrienti|nutrients)\b",
+    re.IGNORECASE,
+)
+
+_SCIENTIFIC_REPORT_ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+}
+
+_SCIENTIFIC_REPORT_ALLOWED_SUFFIXES = {".pdf", ".jpg", ".jpeg", ".png"}
+_SCIENTIFIC_REPORT_MAX_CHARS = 6000
+
+
+def _scientific_report_temp_dir() -> Path:
+    folder = Path(__file__).resolve().parent.parent / "tmp" / "telegram_scientific_reports"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _is_pdf_document_message(update: Update) -> bool:
+    document = getattr(getattr(update, "message", None), "document", None)
+    if document is None:
+        return False
+    mime_type = str(getattr(document, "mime_type", "") or "").lower()
+    file_name = str(getattr(document, "file_name", "") or "").lower()
+    return mime_type == "application/pdf" or file_name.endswith(".pdf")
+
+
+def _is_supported_scientific_attachment(update: Update) -> bool:
+    message = getattr(update, "message", None)
+    if message is None:
+        return False
+    if getattr(message, "photo", None):
+        return True
+    document = getattr(message, "document", None)
+    if document is None:
+        return False
+    mime_type = str(getattr(document, "mime_type", "") or "").lower()
+    file_name = str(getattr(document, "file_name", "") or "")
+    suffix = Path(file_name).suffix.lower()
+    return mime_type in _SCIENTIFIC_REPORT_ALLOWED_MIME_TYPES or suffix in _SCIENTIFIC_REPORT_ALLOWED_SUFFIXES
+
+
+def _scientific_report_requested_by_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if context.user_data.get("awaiting_scientific_report"):
+        return True
+    if _is_pdf_document_message(update):
+        return True
+    caption = str(getattr(getattr(update, "message", None), "caption", "") or "")
+    return bool(_SCIENTIFIC_REPORT_CAPTION_RE.search(caption))
+
+
+async def _download_scientific_report_attachment(update: Update) -> Tuple[Optional[Path], str, str]:
+    message = getattr(update, "message", None)
+    if message is None:
+        return None, "", ""
+
+    file_obj = None
+    file_name = ""
+    mime_type = ""
+    if getattr(message, "photo", None):
+        file_obj = await message.photo[-1].get_file()
+        file_name = f"report_{file_obj.file_unique_id}.jpg"
+        mime_type = "image/jpeg"
+    elif getattr(message, "document", None):
+        document = message.document
+        mime_type = str(getattr(document, "mime_type", "") or "").lower()
+        file_name = str(getattr(document, "file_name", "") or "")
+        if not file_name:
+            extension = ".pdf" if mime_type == "application/pdf" else ".jpg"
+            file_name = f"report_{document.file_unique_id}{extension}"
+        file_obj = await document.get_file()
+    else:
+        return None, "", ""
+
+    suffix = Path(file_name).suffix.lower()
+    if mime_type not in _SCIENTIFIC_REPORT_ALLOWED_MIME_TYPES and suffix not in _SCIENTIFIC_REPORT_ALLOWED_SUFFIXES:
+        return None, file_name, mime_type
+
+    target_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", file_name).strip("._") or "scientific_report"
+    target = _scientific_report_temp_dir() / target_name
+    if target.exists():
+        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+        target = target.with_name(f"{target.stem}_{ts}{target.suffix}")
+    await file_obj.download_to_drive(custom_path=str(target))
+    return target, file_name, mime_type
+
+
+def _extract_text_from_pdf(path: Path) -> Tuple[str, str]:
+    if not PYPDF_AVAILABLE or PdfReader is None:
+        return "", "pypdf non installato"
+    try:
+        reader = PdfReader(str(path))
+        pages = []
+        for index, page in enumerate(reader.pages[:12], start=1):
+            page_text = (page.extract_text() or "").strip()
+            if page_text:
+                pages.append(f"[Pagina {index}]\n{page_text}")
+        return "\n\n".join(pages).strip(), ""
+    except Exception as exc:
+        return "", str(exc)
+
+
+def _extract_text_from_image_ocr(path: Path) -> Tuple[str, str]:
+    if not PIL_AVAILABLE or Image is None:
+        return "", "Pillow non installato"
+    if not PYTESSERACT_AVAILABLE or pytesseract is None:
+        return "", "pytesseract non installato"
+    try:
+        with Image.open(path) as image:
+            text = pytesseract.image_to_string(image)
+        return str(text or "").strip(), ""
+    except Exception as exc:
+        return "", str(exc)
+
+
+def _build_scientific_document_refinement_prompt(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    document_text: str,
+    diagnosis_context: Dict[str, Any],
+    source_name: str,
+    extraction_mode: str,
+    response_language: str,
+) -> str:
+    previous_opinion = str(diagnosis_context.get("opinion") or "").strip()
+    previous_sensor_text = _format_sensor_text_for_language(
+        diagnosis_context.get("sensor_data") or {},
+        response_language=response_language,
+    )
+    clipped_document = str(document_text or "").strip()[:_SCIENTIFIC_REPORT_MAX_CHARS]
+    if response_language == VOICE_LANGUAGE_EN:
+        parts = [
+            "You are DELTA Plant. The user has attached a scientific/agronomic document after the latest diagnosis.",
+            "The document may be a soil analysis, water analysis, fruit analysis, nickel concentration report, lab report, or another agronomic/scientific analysis.",
+            "Reassess and enrich the previous diagnosis using the document. Do not restart from scratch and do not ask for another photo unless the document is unreadable.",
+            "Extract practical agronomic meaning from reported values, units, thresholds, anomalies, risks, and uncertainty. If nickel, salinity, pH, EC, nutrients, metals, water quality, fruit parameters, or substrate values are present, explicitly discuss their diagnostic impact.",
+            "Return a concise professional update in 6 blocks: 1) Document interpreted, 2) Key values and anomalies, 3) Impact on the previous diagnosis, 4) Revised risk and confidence, 5) Corrective actions, 6) Monitoring/follow-up analyses.",
+            f"Document source: {source_name}",
+            f"Extraction mode: {extraction_mode}",
+            "Previous DELTA Plant diagnosis:",
+            previous_opinion or "Not available.",
+        ]
+        if previous_sensor_text:
+            parts.extend(["Previous environmental context:", previous_sensor_text])
+        parts.extend(["Extracted document content:", clipped_document or "No readable text extracted."])
+        return "\n\n".join(parts)
+
+    parts = [
+        "Sei DELTA Plant. L'utente ha allegato un documento scientifico/agronomico dopo l'ultima diagnosi.",
+        "Il documento puo essere un'analisi del suolo, analisi delle acque, analisi del frutto, concentrazione di nichel, referto di laboratorio o altra analisi agronomica/scientifica.",
+        "Rimodula e arricchisci la diagnosi precedente usando il documento. Non ripartire da zero e non chiedere un'altra foto salvo documento illeggibile.",
+        "Estrai il significato agronomico pratico di valori, unita, soglie, anomalie, rischi e incertezze. Se sono presenti nichel, salinita, pH, EC, nutrienti, metalli, qualita dell'acqua, parametri del frutto o substrato, discuti esplicitamente il loro impatto diagnostico.",
+        "Restituisci un aggiornamento professionale conciso in 6 blocchi: 1) Documento interpretato, 2) Valori chiave e anomalie, 3) Impatto sulla diagnosi precedente, 4) Rischio e confidenza rivisti, 5) Azioni correttive, 6) Monitoraggio/analisi successive.",
+        f"Fonte documento: {source_name}",
+        f"Modalita di estrazione: {extraction_mode}",
+        "Diagnosi DELTA Plant precedente:",
+        previous_opinion or "Non disponibile.",
+    ]
+    if previous_sensor_text:
+        parts.extend(["Contesto ambientale precedente:", previous_sensor_text])
+    parts.extend(["Contenuto estratto dal documento:", clipped_document or "Nessun testo leggibile estratto."])
+    return "\n\n".join(parts)
+
+
+async def _analyze_scientific_report_image_with_vlm(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    path: Path,
+    source_name: str,
+) -> Tuple[str, str]:
+    response_language = _ui_language(context)
+    try:
+        vision_llm = _get_hf_vision_llm(context)
+    except Exception as exc:
+        return "", f"VLM non disponibile: {exc}"
+
+    prompt = (
+        "Read this scientific/agronomic report image. Extract all visible values, units, analytes, thresholds, sample names, dates, and abnormal findings. Return only structured extracted content in English."
+        if response_language == VOICE_LANGUAGE_EN
+        else "Leggi questa immagine di referto scientifico/agronomico. Estrai tutti i valori visibili, unita, analiti, soglie, nomi campione, date e anomalie. Restituisci solo contenuto estratto strutturato in italiano."
+    )
+    system_prompt = _hf_system_prompt_for_language(response_language)
+
+    def _ask():
+        return vision_llm.chat_with_image(prompt, str(path), system_prompt=system_prompt)
+
+    try:
+        extracted, model_used = await asyncio.to_thread(_ask)
+    except Exception as exc:
+        return "", str(exc)
+    extracted = str(extracted or "").strip()
+    if not extracted or extracted.startswith("[DELTA]") or extracted.startswith("⚠️"):
+        return "", extracted or "VLM non ha estratto contenuto"
+    return extracted, f"vision LLM {model_used or 'unknown'}"
 
 
 def _load_image_from_path(path: Path):
@@ -3172,6 +3602,149 @@ def _fetch_external_weather_reference(result: Dict[str, Any]) -> Dict[str, Any]:
         return _build_power_weather_reference(result, str(exc))
 
 
+def _fetch_weekly_lux_reference(latitude: float, longitude: float, days: int = 7) -> Dict[str, Any]:
+    """Recupera una stima LUX settimanale da NASA POWER per il punto GPS."""
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=max(days - 1, 0))
+    try:
+        response = requests.get(
+            "https://power.larc.nasa.gov/api/temporal/daily/point",
+            params={
+                "parameters": "ALLSKY_SFC_SW_DWN",
+                "community": "AG",
+                "longitude": f"{float(longitude):.6f}",
+                "latitude": f"{float(latitude):.6f}",
+                "start": start.strftime("%Y%m%d"),
+                "end": end.strftime("%Y%m%d"),
+                "format": "JSON",
+            },
+            headers={"User-Agent": "DELTA Plant/1.0 (+https://deltaplant.ai)"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json() or {}
+        raw_daily = ((payload.get("properties") or {}).get("parameter") or {}).get("ALLSKY_SFC_SW_DWN") or {}
+        daily: List[Dict[str, Any]] = []
+        for raw_day, raw_value in sorted(raw_daily.items()):
+            value = _coerce_float(raw_value)
+            if value is None or value < 0:
+                continue
+            day_text = str(raw_day)
+            day = f"{day_text[:4]}-{day_text[4:6]}-{day_text[6:8]}" if len(day_text) == 8 else day_text
+            mean_w_m2_24h = (float(value) * 1000.0) / 24.0
+            daily.append(
+                {
+                    "day": day,
+                    "solar_kwh_m2_day": round(float(value), 3),
+                    "lux_estimate": round(mean_w_m2_24h * 120.0, 1),
+                }
+            )
+        lux_values = [float(item["lux_estimate"]) for item in daily]
+        return {
+            "source": "NASA POWER ALLSKY_SFC_SW_DWN",
+            "source_url": "https://power.larc.nasa.gov/",
+            "daily": daily,
+            "mean_lux": round(_safe_average(lux_values), 1) if lux_values else None,
+            "today_lux": daily[-1]["lux_estimate"] if daily else None,
+            "conversion_note": "Stima: irradianza solare giornaliera media 24h convertita con 120 lux per W/m2.",
+        }
+    except Exception as exc:
+        logger.info("Stima LUX NASA POWER non disponibile: %s", exc)
+        return {
+            "source": "NASA POWER ALLSKY_SFC_SW_DWN",
+            "source_url": "https://power.larc.nasa.gov/",
+            "daily": [],
+            "mean_lux": None,
+            "today_lux": None,
+            "warning": str(exc),
+        }
+
+
+def _build_diagnosis_environment_payload(
+    *,
+    latitude: float,
+    longitude: float,
+    date_range: Dict[str, str],
+    nasa_result: Optional[Dict[str, Any]],
+    lux_reference: Dict[str, Any],
+    locality_label: Optional[str] = None,
+    error: str = "",
+) -> Dict[str, Any]:
+    dashboard = (nasa_result or {}).get("dashboard", {}) or {}
+    summary = dashboard.get("summary", {}) or {}
+    daily = dashboard.get("dashboard") if isinstance(dashboard.get("dashboard"), list) else []
+    latest_daily = daily[-1] if daily else {}
+    sar_soil = _coerce_float(
+        summary.get("sar_soil_moisture_percent", summary.get("average_soil_moisture_percent", latest_daily.get("soil")))
+    )
+    weekly_risk = _coerce_float(dashboard.get("weekly_risk"))
+    lux_mean = lux_reference.get("mean_lux")
+    lux_today = lux_reference.get("today_lux")
+    payload: Dict[str, Any] = {
+        "source": "gps_nasa_sar_lux",
+        "context_type": "gps_weekly_nasa_sar_lux",
+        "gps_latitude": round(float(latitude), 6),
+        "gps_longitude": round(float(longitude), 6),
+        "period_start": date_range.get("start"),
+        "period_end": date_range.get("end"),
+        "locality_label": locality_label,
+        "sar_soil_moisture_percent": round(sar_soil, 2) if sar_soil is not None else None,
+        "sar_source": summary.get("sar_source"),
+        "sar_product_name": summary.get("sar_product_name"),
+        "sar_acquired_at": summary.get("sar_acquired_at"),
+        "weekly_fungal_risk": round(weekly_risk, 3) if weekly_risk is not None else None,
+        "weekly_fungal_risk_label": dashboard.get("weekly_label"),
+        "lux_mean": lux_mean,
+        "lux_today": lux_today,
+        "light_lux": lux_today if lux_today is not None else lux_mean,
+        "lux_source": lux_reference.get("source"),
+        "lux_source_url": lux_reference.get("source_url"),
+        "lux_conversion_note": lux_reference.get("conversion_note"),
+        "lux_daily": lux_reference.get("daily", []),
+        "nasa_sar_daily": daily[:7],
+        "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+    if error:
+        payload["nasa_sar_warning"] = error
+    if lux_reference.get("warning"):
+        payload["lux_warning"] = lux_reference.get("warning")
+    return {key: value for key, value in payload.items() if value is not None}
+
+
+async def _build_diagnosis_environment_context(
+    context: ContextTypes.DEFAULT_TYPE,
+    latitude: float,
+    longitude: float,
+) -> Dict[str, Any]:
+    geo_payload = _nasa_sar_geo_payload(latitude, longitude)
+    date_range = _nasa_sar_date_range_payload(days=7)
+    orchestrator = _get_nasa_orchestrator(context)
+    nasa_result: Optional[Dict[str, Any]] = None
+    nasa_error = ""
+    try:
+        nasa_result = await orchestrator.analyze_nasa_only(
+            geo_data=geo_payload,
+            date_range=date_range,
+        )
+    except Exception as exc:
+        nasa_error = str(exc)
+        logger.warning("Contesto NASA-ISRO/SAR per diagnosi non disponibile: %s", exc)
+
+    locality_label = await asyncio.to_thread(_reverse_geocode_locality, latitude, longitude)
+    if locality_label and nasa_result:
+        nasa_result.setdefault("geo_summary", {})["locality_label"] = locality_label
+    lux_reference = await asyncio.to_thread(_fetch_weekly_lux_reference, latitude, longitude, 7)
+    return _build_diagnosis_environment_payload(
+        latitude=latitude,
+        longitude=longitude,
+        date_range=date_range,
+        nasa_result=nasa_result,
+        lux_reference=lux_reference,
+        locality_label=locality_label,
+        error=nasa_error,
+    )
+
+
 def _build_nasa_sar_scientific_interpretation(
     result: Dict[str, Any],
     weather_reference: Optional[Dict[str, Any]] = None,
@@ -3614,7 +4187,22 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
     if not await _guard(update):
         return
     location = getattr(getattr(update, "message", None), "location", None)
-    if location is None or not context.user_data.get("awaiting_nasa_sar_location"):
+    if location is None:
+        return
+
+    if context.user_data.get("diag_waiting_for_location"):
+        context.user_data.pop("diag_waiting_for_location", None)
+        context.user_data.pop("awaiting_nasa_sar_location", None)
+        await _run_diagnosis_from_gps(
+            update,
+            context,
+            location.latitude,
+            location.longitude,
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
+
+    if not context.user_data.get("awaiting_nasa_sar_location"):
         return
 
     context.user_data.pop("awaiting_nasa_sar_location", None)
@@ -3636,9 +4224,10 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
     if web_app_data is None:
         return
 
-    # The NASA Web App handoff is terminal for the waiting state even when it
-    # returns an error payload, otherwise free chat and voice stay blocked.
-    context.user_data.pop("awaiting_nasa_sar_location", None)
+    # La Web App GPS puo servire sia la dashboard NASA/SAR sia la diagnosi.
+    # In diagnosi, se il GPS automatico fallisce lasciamo attivo il fallback manuale.
+    diagnosis_location = bool(context.user_data.get("diag_waiting_for_location"))
+    standalone_nasa_sar = bool(context.user_data.get("awaiting_nasa_sar_location"))
 
     try:
         payload = json.loads(web_app_data.data)
@@ -3654,6 +4243,20 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
         return
 
     if payload.get("status") == "error":
+        if diagnosis_location:
+            await _send(
+                update,
+                _ui_text(
+                    context,
+                    "La posizione automatica non e' disponibile. Condividi la posizione con <b>Invia GPS manualmente</b> per completare la diagnosi.",
+                    "Automatic position is unavailable. Share the position with <b>Send GPS manually</b> to complete the diagnosis.",
+                ),
+                reply_markup=_nasa_sar_reply_keyboard(context),
+                parse_mode="HTML",
+            )
+            return
+        if standalone_nasa_sar:
+            context.user_data.pop("awaiting_nasa_sar_location", None)
         await _send(
             update,
             _ui_text(
@@ -3675,6 +4278,15 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
             reply_markup=_menu_keyboard(context),
         )
         return
+
+    if diagnosis_location:
+        context.user_data.pop("diag_waiting_for_location", None)
+        context.user_data.pop("awaiting_nasa_sar_location", None)
+        await _run_diagnosis_from_gps(update, context, latitude, longitude, reply_markup=ReplyKeyboardRemove())
+        return
+
+    if standalone_nasa_sar:
+        context.user_data.pop("awaiting_nasa_sar_location", None)
 
     await _run_nasa_sar_analysis(update, context, latitude, longitude)
 
@@ -3776,30 +4388,39 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
             msg.append(f"      Problema: {rec.get('problem','')}")
             msg.append(f"      Azione:   {rec.get('action','')}")
 
-    # Snapshot sensori
-    if sensor:
+    # Contesto ambientale GPS/SAR/LUX
+    if sensor and sensor.get("context_type") == "gps_weekly_nasa_sar_lux":
         msg.append("")
-        msg.append("<b>Dati sensori:</b>")
-        fields = [
-            ("temperature_c",  "Temperatura",    "°C"),
-            ("humidity_pct",   "Umidità",         "%"),
-            ("pressure_hpa",   "Pressione",       "hPa"),
-            ("light_lux",      "Luminosità",      "lux"),
-            ("co2_ppm",        "CO₂",             "ppm"),
-            ("ph",             "pH",              ""),
-            ("ec_ms_cm",       "EC",              "mS/cm"),
+        msg.append("<b>Contesto GPS/NASA-ISRO/SAR/LUX:</b>")
+        env_fields = [
+            ("gps_latitude", "Latitudine", ""),
+            ("gps_longitude", "Longitudine", ""),
+            ("locality_label", "Localita", ""),
+            ("period_start", "Inizio finestra", ""),
+            ("period_end", "Fine finestra", ""),
+            ("sar_soil_moisture_percent", "Umidita suolo SAR", "%"),
+            ("weekly_fungal_risk", "Rischio fungino", ""),
+            ("weekly_fungal_risk_label", "Classe rischio", ""),
+            ("lux_today", "LUX odierno", " lux"),
+            ("lux_mean", "LUX medio", " lux"),
         ]
-        for key, label, unit in fields:
+        for key, label, unit in env_fields:
             val = sensor.get(key)
+            if val is None:
+                continue
             val_str = fmt(val, unit)
-            msg.append(f"  {label:15s}: {val_str}")
-        source = sensor.get("source", "?")
+            msg.append(f"  {label:20s}: {val_str}")
+        source = sensor.get("source", "gps_nasa_sar_lux")
         ts = sensor.get("timestamp", "?")
         msg.append(f"  Fonte: {source} | Timestamp: {ts}")
-        if anomalies:
-            msg.append(f"  ⚠️ Anomalie: {len(anomalies)}")
-            for a in anomalies:
-                msg.append(f"    • {a}")
+        if sensor.get("lux_source"):
+            msg.append(f"  Fonte LUX: {sensor.get('lux_source')}")
+        if sensor.get("sar_source"):
+            msg.append(f"  Fonte SAR: {sensor.get('sar_source')}")
+        if sensor.get("nasa_sar_warning"):
+            msg.append(f"  Nota NASA/SAR: {sensor.get('nasa_sar_warning')}")
+        if sensor.get("lux_warning"):
+            msg.append(f"  Nota LUX: {sensor.get('lux_warning')}")
 
     msg.append("\n<code>──────────────</code>")
     return "\n".join(msg)
@@ -3939,33 +4560,65 @@ def _format_sensor_text_for_language(
     cleaned = {
         key: value
         for key, value in (sensor_data or {}).items()
-        if value is not None and key != "source"
+        if value is not None
     }
     if not cleaned:
         return ""
 
-    english_labels = {
-        "temperature_c": "Temperature (C)",
-        "humidity_pct": "Humidity (%)",
-        "pressure_hpa": "Pressure (hPa)",
-        "light_lux": "Light (lux)",
-        "co2_ppm": "CO2 (ppm)",
-        "ph": "pH",
-        "ec_ms_cm": "EC (mS/cm)",
-    }
-    lines = []
-    for key, italian_label in SENSOR_FIELDS:
-        value = cleaned.get(key)
-        if value is None:
-            continue
-        label = english_labels.get(key, italian_label) if response_language == VOICE_LANGUAGE_EN else italian_label
-        lines.append(f"- {label}: {value}")
+    if cleaned.get("context_type") == "gps_weekly_nasa_sar_lux":
+        english_ui = response_language == VOICE_LANGUAGE_EN
 
-    if not lines:
-        return ""
+        def label(italian_text: str, english_text: str) -> str:
+            return english_text if english_ui else italian_text
 
-    header = "Available environmental sensor data:" if response_language == VOICE_LANGUAGE_EN else "Dati ambientali disponibili:"
-    return f"{header}\n" + "\n".join(lines)
+        def fmt_number(value: Any, suffix: str = "") -> str:
+            number = _coerce_float(value)
+            if number is None:
+                return str(value)
+            if abs(number) >= 100:
+                return f"{number:.0f}{suffix}"
+            return f"{number:.2f}{suffix}"
+
+        period = ""
+        if cleaned.get("period_start") or cleaned.get("period_end"):
+            period = f"{cleaned.get('period_start', '?')} -> {cleaned.get('period_end', '?')}"
+        gps = f"{float(cleaned.get('gps_latitude', 0.0)):.6f}, {float(cleaned.get('gps_longitude', 0.0)):.6f}"
+        lines = [
+            f"- {label('Coordinate GPS', 'GPS coordinates')}: {gps}",
+        ]
+        if cleaned.get("locality_label"):
+            lines.append(f"- {label('Localita', 'Locality')}: {cleaned['locality_label']}")
+        if period:
+            lines.append(f"- {label('Finestra dati', 'Data window')}: {period} ({label('oggi e 6 giorni precedenti', 'today and previous 6 days')})")
+        if cleaned.get("sar_soil_moisture_percent") is not None:
+            lines.append(f"- {label('Umidita suolo SAR', 'SAR soil moisture')}: {fmt_number(cleaned['sar_soil_moisture_percent'], '%')}")
+        if cleaned.get("weekly_fungal_risk") is not None:
+            risk_pct = float(cleaned["weekly_fungal_risk"]) * 100.0
+            risk_label = cleaned.get("weekly_fungal_risk_label") or label("non classificato", "unclassified")
+            lines.append(f"- {label('Rischio fungino settimanale', 'Weekly fungal risk')}: {risk_pct:.1f}% ({risk_label})")
+        if cleaned.get("lux_today") is not None:
+            lines.append(f"- {label('LUX odierno stimato', 'Estimated current-day LUX')}: {fmt_number(cleaned['lux_today'], ' lux')}")
+        if cleaned.get("lux_mean") is not None:
+            lines.append(f"- {label('LUX medio settimanale stimato', 'Estimated weekly mean LUX')}: {fmt_number(cleaned['lux_mean'], ' lux')}")
+        if cleaned.get("lux_source"):
+            lines.append(f"- {label('Fonte luminosita', 'Light source')}: {cleaned['lux_source']}")
+        if cleaned.get("sar_source"):
+            lines.append(f"- {label('Fonte SAR', 'SAR source')}: {cleaned['sar_source']}")
+        if cleaned.get("lux_conversion_note"):
+            lines.append(f"- {label('Nota LUX', 'LUX note')}: {cleaned['lux_conversion_note']}")
+        if cleaned.get("nasa_sar_warning"):
+            lines.append(f"- {label('Nota NASA-ISRO/SAR', 'NASA-ISRO/SAR note')}: {cleaned['nasa_sar_warning']}")
+        if cleaned.get("lux_warning"):
+            lines.append(f"- {label('Nota LUX', 'LUX note')}: {cleaned['lux_warning']}")
+
+        header = (
+            "GPS/NASA-ISRO/SAR/LUX environmental context available:"
+            if english_ui
+            else "Contesto ambientale GPS/NASA-ISRO/SAR/LUX disponibile:"
+        )
+        return f"{header}\n" + "\n".join(lines)
+
+    return ""
 
 
 def _build_guided_multimodal_diagnosis_prompt(
@@ -3979,14 +4632,14 @@ def _build_guided_multimodal_diagnosis_prompt(
     if response_language == VOICE_LANGUAGE_EN:
         prompt = [
             "You are DELTA Plant in guided multimodal diagnosis mode.",
-            "Analyze ONLY the attached plant photo together with any available environmental sensor values.",
+            "Analyze ONLY the attached plant photo together with any available GPS/NASA-ISRO/SAR/LUX environmental context.",
             "Mandatory constraints:",
-            "- Use the photo as the primary source and the sensor context as supporting evidence.",
+            "- Use the photo as the primary source and the GPS/NASA-ISRO/SAR/LUX context as supporting evidence.",
             "- If optional operator notes are available, use them only as secondary context when they are coherent with the image.",
             "- Do not use PlantVillage classes, local classifiers, hidden native AI outputs, or explainability overlays.",
             "- Do not ask for another photo: image acquisition is already complete.",
             "- If the plant name, pathology, or severity are uncertain, state that uncertainty clearly.",
-            "- Do not invent symptoms that are not visible in the image or unsupported by sensor data.",
+            "- Do not invent symptoms that are not visible in the image or unsupported by the GPS/SAR/LUX context.",
         ]
         if description:
             prompt.extend([
@@ -3996,7 +4649,7 @@ def _build_guided_multimodal_diagnosis_prompt(
         if sensor_block:
             prompt.append(sensor_block)
         else:
-            prompt.append("No environmental sensor data are available for this diagnosis.")
+            prompt.append("No GPS/NASA-ISRO/SAR/LUX environmental context is available for this diagnosis.")
         prompt.extend([
             "Output requirement:",
             "- Write directly the diagnosis with no introductory sentence and no markdown-heavy formatting.",
@@ -4013,7 +4666,7 @@ def _build_guided_multimodal_diagnosis_prompt(
             "- ...",
             "5) Monitoring and prevention",
             "- ...",
-            "If sensor data are available, comment on them explicitly inside the relevant blocks.",
+            "If GPS/NASA-ISRO/SAR/LUX context is available, comment on it explicitly inside the relevant blocks.",
             "Keep the tone technical, practical, and concise.",
         ])
         return "\n".join(prompt)
@@ -4022,12 +4675,12 @@ def _build_guided_multimodal_diagnosis_prompt(
         "Sei DELTA Plant in modalità diagnostica guidata multimodale.",
         "Analizza SOLO la foto allegata della pianta insieme agli eventuali dati ambientali disponibili.",
         "Vincoli obbligatori:",
-        "- Usa la foto come fonte primaria e il contesto sensori come supporto diagnostico.",
+        "- Usa la foto come fonte primaria e il contesto GPS/NASA-ISRO/SAR/LUX come supporto diagnostico.",
         "- Se sono presenti note operatore opzionali, usale solo come contesto secondario quando sono coerenti con l'immagine.",
         "- Non usare classi PlantVillage, classificatori locali, output nascosti dell'AI nativa o overlay di explainability.",
         "- Non chiedere un'altra foto: l'acquisizione immagine è già completa.",
         "- Se nome della pianta, patologia o gravità sono incerti, dichiaralo esplicitamente.",
-        "- Non inventare sintomi non visibili nell'immagine o non supportati dai dati sensore.",
+        "- Non inventare sintomi non visibili nell'immagine o non supportati dal contesto GPS/SAR/LUX.",
     ]
     if description:
         prompt.extend([
@@ -4037,7 +4690,7 @@ def _build_guided_multimodal_diagnosis_prompt(
     if sensor_block:
         prompt.append(sensor_block)
     else:
-        prompt.append("Nessun dato ambientale disponibile per questa diagnosi.")
+        prompt.append("Nessun contesto ambientale GPS/NASA-ISRO/SAR/LUX disponibile per questa diagnosi.")
     prompt.extend([
         "Formato di output obbligatorio:",
         "- Scrivi direttamente la diagnosi, senza frase introduttiva e senza markdown pesante.",
@@ -4054,7 +4707,7 @@ def _build_guided_multimodal_diagnosis_prompt(
         "- ...",
         "5) Monitoraggio e prevenzione",
         "- ...",
-        "Se sono disponibili dati sensore, commentali esplicitamente nei blocchi pertinenti.",
+        "Se e' disponibile il contesto GPS/NASA-ISRO/SAR/LUX, commentalo esplicitamente nei blocchi pertinenti.",
         "Mantieni tono tecnico, concreto e sintetico.",
     ])
     return "\n".join(prompt)
@@ -4152,7 +4805,7 @@ def _build_guided_diagnosis_result_message(
         botanical_value = _find_value(("nome botanico", "nome latino", "botanical name", "latin name", "scientific name"))
         assessment_value = _find_value(("esito tecnico", "stato tecnico", "technical assessment", "technical outcome", "assessment", "esito"))
         confidence_value = _find_value(("certezza", "grado di certezza", "confidence", "confidence level"))
-        sensor_value = _ui_text(
+        environment_value = _ui_text(
             context,
             "Integrati" if has_sensor_data else "Non disponibili",
             "Integrated" if has_sensor_data else "Not available",
@@ -4177,7 +4830,7 @@ def _build_guided_diagnosis_result_message(
             ("🪴", _ui_text(context, "Pianta", "Plant"), plant_value or _ui_text(context, "Non determinata", "Undetermined")),
             ("🩺", _ui_text(context, "Esito", "Assessment"), assessment_value or _ui_text(context, "Da confermare", "To confirm")),
             ("🎯", _ui_text(context, "Certezza", "Confidence"), confidence_value or _ui_text(context, "Da stimare", "To estimate")),
-            ("🌡️", _ui_text(context, "Sensori", "Sensors"), sensor_value),
+            ("🛰️", _ui_text(context, "GPS/SAR/LUX", "GPS/SAR/LUX"), environment_value),
         ]
 
         section_label = _ui_text(context, "🔎 <b>Quadro sintetico</b>", "🔎 <b>Diagnostic snapshot</b>")
@@ -4246,8 +4899,8 @@ def _build_guided_diagnosis_result_message(
     subtitle = (
         _ui_text(
             context,
-            "Analisi visiva multimodale con dati ambientali integrati.",
-            "Multimodal visual analysis with integrated environmental data.",
+            "Analisi visiva multimodale con contesto GPS/NASA-ISRO/SAR/LUX integrato.",
+            "Multimodal visual analysis with integrated GPS/NASA-ISRO/SAR/LUX context.",
         )
         if has_sensor_data
         else _ui_text(
@@ -4388,14 +5041,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         intro = (
             "Welcome to @DELTAPLANO_bot.\n"
             "Here you can interact with DELTA Plant from Telegram to start diagnoses, "
-            "review reports, and read sensor data.\n"
+            "review reports, and open NASA-ISRO/SAR GPS context.\n"
             "Use /menu to view the available actions."
         )
     else:
         intro = (
             "Benvenuto in @DELTAPLANO_bot.\n"
             "Qui puoi interagire con DELTA Plant da Telegram per avviare diagnosi, "
-            "consultare report e leggere i dati sensori.\n"
+            "consultare report e aprire il contesto GPS NASA-ISRO/SAR.\n"
             "Usa /menu per vedere le azioni disponibili."
         )
     await _send(update, intro, reply_markup=_menu_keyboard(context))
@@ -4569,17 +5222,8 @@ SENSOR_FIELDS: List[Tuple[str, str]] = [
 
 
 def _format_sensor_text(sensor_data: dict) -> str:
-    """Restituisce una stringa leggibile dei dati sensore da iniettare nei prompt."""
-    if not sensor_data:
-        return ""
-    lines = []
-    for key, label in SENSOR_FIELDS:
-        val = sensor_data.get(key)
-        if val is not None:
-            lines.append(f"  {label}: {val}")
-    if not lines:
-        return ""
-    return "\nDati ambientali disponibili:\n" + "\n".join(lines)
+    """Restituisce il contesto ambientale consentito per i prompt diagnosi."""
+    return _format_sensor_text_for_language(sensor_data, response_language=VOICE_LANGUAGE_IT)
 
 
 def _collapse_whitespace(text: str) -> str:
@@ -4910,13 +5554,17 @@ async def start_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # v3.1: Set diagnosis_active flag to inhibit chat during manual input
     context.user_data["diagnosis_active"] = True
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(_ui_text(context, "📷 Invia foto", "📷 Send photo"), callback_data=DIAG_IMAGE_UPLOAD)],
-        [InlineKeyboardButton(_ui_text(context, " Camera locale", " Camera device"), callback_data=DIAG_IMAGE_CAMERA)],
-    ])
-    await _send(update, _ui_text(context, "Diagnosi: scegli la fonte immagine.", "Diagnosis: choose the image source."), reply_markup=keyboard)
-    return STATE_DIAG_IMAGE_SOURCE
+    context.user_data["diag_waiting_for_photo"] = True
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "📷 Scatta una foto con la fotocamera del telefono oppure scegli un'immagine dal telefono e inviala qui per la diagnosi.",
+            "📷 Take a photo with the phone camera or choose an image from the phone and send it here for diagnosis.",
+        ),
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    return STATE_DIAG_WAIT_PHOTO
 
 
 async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4930,24 +5578,15 @@ async def choose_diag_image_source(update: Update, context: ContextTypes.DEFAULT
         context.user_data["diag_waiting_for_photo"] = True
         await _send(update, _ui_text(context, "Invia una foto (o un file immagine) per la diagnosi.", "Send a photo, or an image file, for the diagnosis."))
         return STATE_DIAG_WAIT_PHOTO
-    if query.data == DIAG_IMAGE_LAST:
-        latest = _get_latest_input_image()
-        if not latest:
-            _clear_diagnosis_state(context)
-            await _send(update, _ui_text(context, "Nessuna immagine in input_images. Usa 'Invia foto'.", "No image found in input_images. Use 'Send photo'."))
-            return ConversationHandler.END
-        context.user_data["diag_image_path"] = str(latest)
-        return await _advance_guided_diagnosis_after_image(update, context)
-    if query.data == DIAG_IMAGE_CAMERA:
-        agent = _get_agent(context)
-        if not agent or agent.camera._backend is None:
-            _clear_diagnosis_state(context)
-            await _send(update, _ui_text(context, "Camera locale non disponibile. Usa 'Invia foto'.", "Local camera unavailable. Use 'Send photo'."))
-            return ConversationHandler.END
-        context.user_data["diag_image_path"] = ""
-        return await _advance_guided_diagnosis_after_image(update, context)
     _clear_diagnosis_state(context)
-    await _send(update, _ui_text(context, "Scelta non valida.", "Invalid choice."))
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "Questa sorgente immagine non e' piu' disponibile. Usa /diagnosi e invia una foto dal telefono.",
+            "This image source is no longer available. Use /diagnosi and send a photo from the phone.",
+        ),
+    )
     return ConversationHandler.END
 
 
@@ -4973,7 +5612,44 @@ async def _advance_guided_diagnosis_after_image(
 ):
     context.user_data.pop("diag_waiting_for_photo", None)
     context.user_data.pop("diag_user_description", None)
-    return await _ask_sensor_mode(update, context)
+    return await _ask_diagnosis_gps_context(update, context)
+
+
+async def _ask_diagnosis_gps_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["diag_waiting_for_location"] = True
+    context.user_data.pop("awaiting_nasa_sar_location", None)
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "📍 Foto ricevuta. Ora condividi la posizione GPS del telefono. Usero' NASA-ISRO/SAR per oggi e i 6 giorni precedenti, piu' luminosita' LUX da NASA POWER, come contesto della diagnosi.",
+            "📍 Photo received. Now share the phone GPS position. I will use NASA-ISRO/SAR for today and the previous 6 days, plus LUX light data from NASA POWER, as diagnosis context.",
+        ),
+        reply_markup=_nasa_sar_reply_keyboard(context),
+    )
+    return ConversationHandler.END
+
+
+async def _run_diagnosis_from_gps(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    latitude: float,
+    longitude: float,
+    reply_markup: Optional[Any] = None,
+):
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "🛰️ GPS ricevuto. Acquisisco contesto NASA-ISRO/SAR settimanale e luminosita' LUX...",
+            "🛰️ GPS received. Acquiring weekly NASA-ISRO/SAR context and LUX light data...",
+        ),
+        reply_markup=reply_markup,
+    )
+    environmental_context = await _build_diagnosis_environment_context(context, latitude, longitude)
+    context.user_data["diag_environment_context"] = environmental_context
+    context.user_data["sensor_data"] = environmental_context
+    return await _run_diagnosis(update, context, environmental_context)
 
 
 async def _ask_user_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4991,7 +5667,7 @@ async def _ask_user_description(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def receive_user_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Riceve la descrizione testuale utente e procede alla scelta sensori."""
+    """Riceve la descrizione testuale utente e procede alla posizione GPS."""
     if not await _guard(update):
         return ConversationHandler.END
     if not update.message or not update.message.text:
@@ -5002,8 +5678,8 @@ async def receive_user_description(update: Update, context: ContextTypes.DEFAULT
         await _send(update, _ui_text(context, "Descrizione troppo breve. Aggiungi dettagli sulla pianta e sull'anomalia.", "Description too short. Add more details about the plant and the anomaly."))
         return STATE_DIAG_USER_DESCRIPTION
     context.user_data["diag_user_description"] = description
-    await _send(update, _ui_text(context, "Grazie! Ora acquisisco i dati ambientali... 🌱", "Thanks! I am now acquiring environmental data... 🌱"))
-    return await _ask_sensor_mode(update, context)
+    await _send(update, _ui_text(context, "Grazie! Ora acquisisco il contesto GPS NASA-ISRO/SAR e LUX... 🌱", "Thanks! I am now acquiring GPS NASA-ISRO/SAR and LUX context... 🌱"))
+    return await _ask_diagnosis_gps_context(update, context)
 
 
 async def _ask_sensor_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -5226,7 +5902,7 @@ def _build_diagnosis_prompt(
             f"{class_constraint}"
             "- Explicitly include the Grover Quantum Oracle risk analysis: explain in a simple operational way what it represents, namely a tool that amplifies the most significant plant-risk signals, with QRS from 0 meaning no risk to 1 meaning maximum risk, then report QRS, level, dominant event, and amplification.\n"
             f"{description_constraints}"
-            "- Always analyze and comment on the environmental sensor data available in the report: connect temperature, humidity, pH, EC, CO₂, and light to the detected pathological condition.\n"
+            "- Analyze and comment only on GPS/NASA-ISRO/SAR/LUX environmental context available in the report: SAR soil moisture, weekly fungal risk, GPS locality, and LUX light estimate. Ignore legacy physical sensor fields if present.\n"
             "- Structure the answer in 5 blocks: 1) Technical outcome, 2) Short differential diagnosis, 3) Immediate actions (0-24h), 4) Short-term actions (2-7 days), 5) Monitoring and prevention.\n"
             "- Provide concrete and verifiable operational guidance.\n"
             "- When appropriate, mention integrated pest-management and crop hygiene practices.\n"
@@ -5286,7 +5962,7 @@ def _build_diagnosis_prompt(
         "di rischio più significativi tra i dati della pianta, con QRS da 0=nessun rischio a 1=rischio massimo), "
         "poi riporta QRS, livello, evento dominante e amplificazione.\n"
         f"{description_constraints}"
-        "- Analizza e commenta sempre i dati ambientali dei sensori presenti nel report: correla temperatura, umidità, pH, EC, CO₂ e luminosità allo stato patologico rilevato.\n"
+        "- Analizza e commenta solo il contesto ambientale GPS/NASA-ISRO/SAR/LUX presente nel report: umidita' suolo SAR, rischio fungino settimanale, localita' GPS e stima LUX. Ignora eventuali vecchi campi da sensori fisici.\n"
         "- Struttura in 5 blocchi: 1) Esito tecnico, 2) Diagnosi differenziale breve, "
         "3) Azioni immediate (0-24h), 4) Azioni a breve (2-7 giorni), "
         "5) Monitoraggio e prevenzione.\n"
@@ -5801,6 +6477,11 @@ async def _send_conversational_diagnosis(update: Update, context: ContextTypes.D
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        _store_latest_diagnosis_context(
+            context,
+            opinion,
+            sensor_data=sensor_data,
+        )
         context.user_data["chat_seed_context"] = (
             "Contesto della piu recente diagnosi DELTA Plant:\n\n"
             f"{opinion}"
@@ -5937,6 +6618,12 @@ async def _send_ai_diagnosis_opinion(
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        _store_latest_diagnosis_context(
+            context,
+            opinion,
+            record=record,
+            sensor_data=context.user_data.get("sensor_data", {}),
+        )
         context.user_data["chat_seed_context"] = (
             "Contesto della piu recente diagnosi DELTA Plant:\n\n"
             f"{opinion}"
@@ -5955,7 +6642,7 @@ def _collect_guided_sensor_data(
     cleaned_input = {
         key: value
         for key, value in (sensor_data or {}).items()
-        if value is not None and key != "source"
+        if value is not None
     }
     if cleaned_input:
         context.user_data["sensor_data"] = cleaned_input
@@ -5963,30 +6650,16 @@ def _collect_guided_sensor_data(
 
     current_data = {
         key: value
-        for key, value in (context.user_data.get("sensor_data") or {}).items()
-        if value is not None and key != "source"
+        for key, value in (
+            context.user_data.get("diag_environment_context")
+            or context.user_data.get("sensor_data")
+            or {}
+        ).items()
+        if value is not None
     }
     if current_data:
         return current_data
-
-    agent = _get_agent(context)
-    if not agent or not hasattr(agent, "get_latest_sensor_data"):
-        return {}
-
-    try:
-        latest_data = agent.get_latest_sensor_data() or {}
-    except Exception as exc:
-        logger.warning("Lettura sensori per diagnosi VLM guidata fallita: %s", exc)
-        return {}
-
-    cleaned_latest = {
-        key: value
-        for key, value in latest_data.items()
-        if value is not None and key != "source"
-    }
-    if cleaned_latest:
-        context.user_data["sensor_data"] = cleaned_latest
-    return cleaned_latest
+    return {}
 
 
 async def _run_guided_llm_diagnosis(
@@ -6086,6 +6759,12 @@ async def _run_guided_llm_diagnosis(
             parse_mode=rendered_parse_mode,
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        _store_latest_diagnosis_context(
+            context,
+            opinion,
+            sensor_data=effective_sensor_data,
+            model_used=model_used,
+        )
         context.user_data["chat_seed_context"] = (
             "Contesto della piu recente diagnosi DELTA Plant:\n\n"
             f"{opinion}"
@@ -6250,6 +6929,11 @@ async def _run_llm_vision_diagnosis(
             parse_mode="HTML",
         )
         engine.remember_turn(user_id, memory_request, memory_response)
+        _store_latest_diagnosis_context(
+            context,
+            opinion,
+            model_used=model_used,
+        )
         context.user_data["chat_seed_context"] = (
             "Contesto della piu recente diagnosi DELTA Plant:\n\n"
             f"{opinion}"
@@ -6306,9 +6990,173 @@ async def pending_label_name_router(update: Update, context: ContextTypes.DEFAUL
     return
 
 
+async def scientific_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    diagnosis_context = context.user_data.get("last_diagnosis_context")
+    if not isinstance(diagnosis_context, dict) or not str(diagnosis_context.get("opinion") or "").strip():
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Prima serve una diagnosi DELTA Plant. Esegui una diagnosi, poi usa /analisi e allega il referto PDF/JPEG/PNG per rimodularla.",
+                "A DELTA Plant diagnosis is needed first. Run a diagnosis, then use /analysis and attach the PDF/JPEG/PNG report to refine it.",
+            ),
+        )
+        return
+    context.user_data["awaiting_scientific_report"] = True
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "📎 Invia ora un PDF, JPEG o PNG con un referto scientifico/agronomico: analisi del suolo, acque, frutto, nichel, metalli, pH, EC, nutrienti o simili. Lo leggerò e rimodulerò l'ultima diagnosi DELTA Plant.",
+            "📎 Send a PDF, JPEG, or PNG scientific/agronomic report now: soil analysis, water analysis, fruit analysis, nickel/metals, pH, EC, nutrients, or similar. I will read it and refine the latest DELTA Plant diagnosis.",
+        ),
+    )
+
+
+async def handle_scientific_report_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return ConversationHandler.END
+    if not _is_supported_scientific_attachment(update):
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Formato non supportato. Invia un PDF, JPEG o PNG.",
+                "Unsupported format. Send a PDF, JPEG, or PNG.",
+            ),
+        )
+        return ConversationHandler.END
+
+    if not _scientific_report_requested_by_user(update, context):
+        return await handle_unprompted_photo(update, context)
+
+    diagnosis_context = context.user_data.get("last_diagnosis_context")
+    if not isinstance(diagnosis_context, dict) or not str(diagnosis_context.get("opinion") or "").strip():
+        context.user_data.pop("awaiting_scientific_report", None)
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Prima serve una diagnosi DELTA Plant. Esegui una diagnosi, poi invia il referto PDF/JPEG/PNG per rimodularla.",
+                "A DELTA Plant diagnosis is needed first. Run a diagnosis, then send the PDF/JPEG/PNG report to refine it.",
+            ),
+        )
+        return ConversationHandler.END
+
+    path, source_name, mime_type = await _download_scientific_report_attachment(update)
+    if path is None:
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non riesco a leggere questo allegato. Usa PDF, JPEG o PNG.",
+                "I cannot read this attachment. Use PDF, JPEG, or PNG.",
+            ),
+        )
+        return ConversationHandler.END
+
+    context.user_data.pop("awaiting_scientific_report", None)
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:
+        pass
+
+    suffix = path.suffix.lower()
+    document_text = ""
+    extraction_mode = ""
+    extraction_error = ""
+    if suffix == ".pdf" or mime_type == "application/pdf":
+        document_text, extraction_error = await asyncio.to_thread(_extract_text_from_pdf, path)
+        extraction_mode = "PDF text layer via pypdf" if document_text else f"PDF text extraction failed: {extraction_error}"
+    else:
+        document_text, extraction_error = await asyncio.to_thread(_extract_text_from_image_ocr, path)
+        extraction_mode = "local OCR via pytesseract" if document_text else f"local OCR failed: {extraction_error}"
+        if not document_text:
+            document_text, vlm_status = await _analyze_scientific_report_image_with_vlm(update, context, path, source_name)
+            extraction_mode = vlm_status if document_text else f"{extraction_mode}; VLM failed: {vlm_status}"
+
+    if not document_text:
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Non ho estratto testo leggibile dal referto. Se è un PDF scannerizzato, invia una foto/PNG nitida del referto oppure installa OCR/PDF text extraction.",
+                "I could not extract readable text from the report. If it is a scanned PDF, send a clear photo/PNG of the report or install OCR/PDF text extraction.",
+            ),
+        )
+        return ConversationHandler.END
+
+    response_language = _ui_language(context)
+    engine = _get_chat_engine(context)
+    prompt = _build_scientific_document_refinement_prompt(
+        context,
+        document_text=document_text,
+        diagnosis_context=diagnosis_context,
+        source_name=source_name or path.name,
+        extraction_mode=extraction_mode,
+        response_language=response_language,
+    )
+
+    def _ask():
+        return engine.chat_internal(
+            prompt,
+            response_language=response_language,
+            system_prompt_suffix=_build_free_chat_language_prompt_suffix(response_language),
+        )
+
+    try:
+        response = await asyncio.to_thread(_ask)
+        response = await _repair_free_chat_language_response(
+            engine,
+            response_text=response,
+            response_language=response_language,
+        )
+    except Exception as exc:
+        logger.warning("Errore rimodulazione da referto scientifico: %s", exc, exc_info=True)
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Errore durante la lettura/rimodulazione del referto. Riprova tra poco.",
+                "Error while reading/refining the report. Try again shortly.",
+            ),
+        )
+        return ConversationHandler.END
+
+    title = _ui_text(
+        context,
+        "📄 <b>RIMODULAZIONE DELTA Plant DA REFERTO SCIENTIFICO</b>",
+        "📄 <b>DELTA Plant REFINEMENT FROM SCIENTIFIC REPORT</b>",
+    )
+    rendered_text, parse_mode = _format_free_chat_for_telegram(context, f"{title}\n\n{response}")
+    await _send_chat_paginated(update, context, rendered_text, parse_mode=parse_mode)
+
+    _store_latest_diagnosis_context(
+        context,
+        response,
+        record=diagnosis_context.get("record") or {},
+        sensor_data=diagnosis_context.get("sensor_data") or {},
+        model_used=f"scientific_report:{extraction_mode}",
+    )
+    try:
+        user_id = str(update.effective_user.id if update.effective_user else "0")
+        engine.remember_turn(
+            user_id,
+            f"Referto scientifico allegato ({source_name or path.name}) per rimodulare la diagnosi DELTA Plant.",
+            response,
+        )
+    except Exception as exc:
+        logger.debug("Memoria chat referto scientifico non aggiornata: %s", exc)
+    return ConversationHandler.END
+
+
 async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    if _scientific_report_requested_by_user(update, context):
+        return await handle_scientific_report_attachment(update, context)
     if context.user_data.get("diag_waiting_for_photo"):
         return await receive_diag_photo(update, context)
     _clear_diagnosis_state(context)
@@ -6326,11 +7174,11 @@ async def handle_unprompted_photo(update: Update, context: ContextTypes.DEFAULT_
         update,
         _ui_text(
             context,
-            "📷 Foto ricevuta. Avvio una diagnosi automatica con computer vision AI...",
-            "📷 Photo received. Starting an automatic AI computer-vision diagnosis...",
+            "📷 Foto ricevuta. Completo la diagnosi con posizione GPS, NASA-ISRO/SAR settimanale e LUX.",
+            "📷 Photo received. I will complete the diagnosis with GPS position, weekly NASA-ISRO/SAR, and LUX.",
         ),
     )
-    return await _run_llm_vision_diagnosis(update, context)
+    return await _ask_diagnosis_gps_context(update, context)
 
 
 async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6372,18 +7220,20 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start_upload(update, context)
     elif query.data == CMD_REPORT:
         await report(update, context)
-    elif query.data == CMD_SENSORS:
-        await sensors(update, context)
     elif query.data == CMD_EXPORT:
         await export_excel(update, context)
     elif query.data == CMD_IMAGES:
         await images(update, context)
-    elif query.data == CMD_HEALTH:
-        await health(update, context)
-    elif query.data == CMD_PREFLIGHT:
-        await preflight(update, context)
-    elif query.data == CMD_ACADEMY:
-        await academy_start(update, context)
+    elif query.data in {CMD_SENSORS, CMD_HEALTH, CMD_PREFLIGHT, CMD_ACADEMY}:
+        await _send(
+            update,
+            _ui_text(
+                context,
+                "Funzione non piu' disponibile da @DELTAPLANO_bot.",
+                "This function is no longer available from @DELTAPLANO_bot.",
+            ),
+            reply_markup=_menu_keyboard(context),
+        )
     elif query.data == CMD_LICENSE:
         await license_text(update, context)
     elif query.data == CMD_NASA_SAR:
@@ -7002,11 +7852,6 @@ def run_telegram_bot(agent=None):
             CallbackQueryHandler(start_diagnosis, pattern=f"^{CMD_DIAGNOSE}$"),
         ],
         states={
-            STATE_DIAG_IMAGE_SOURCE: [
-                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_UPLOAD}$"),
-                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_LAST}$"),
-                CallbackQueryHandler(choose_diag_image_source, pattern=f"^{DIAG_IMAGE_CAMERA}$"),
-            ],
             STATE_DIAG_WAIT_PHOTO: [
                 MessageHandler(filters.PHOTO | filters.Document.IMAGE, receive_diag_photo),
                 MessageHandler(filters.ALL, diag_expect_photo),
@@ -7014,16 +7859,6 @@ def run_telegram_bot(agent=None):
             STATE_DIAG_USER_DESCRIPTION: [
                 MessageHandler(filters.VOICE, receive_user_description_voice),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_description),
-            ],
-            STATE_DIAG_SENSOR_MODE: [
-                CallbackQueryHandler(
-                    choose_sensor_mode,
-                    pattern=f"^({DIAG_SENSOR_AUTO}|{DIAG_SENSOR_MANUAL})$",
-                )
-            ],
-            STATE_DIAG_TEMP: [
-                MessageHandler(filters.VOICE, manual_sensor_input_voice),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, manual_sensor_input),
             ],
             STATE_DIAG_FOLLOWUP: [
                 MessageHandler(filters.VOICE, receive_followup_answer_voice),
@@ -7094,29 +7929,28 @@ def run_telegram_bot(agent=None):
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu))
+    application.add_handler(CommandHandler("annulla", cancel))
     application.add_handler(CommandHandler("report", report))
     application.add_handler(CommandHandler("dettaglio", detail))
-    application.add_handler(CommandHandler("sensori", sensors))
-    application.add_handler(CommandHandler("health", health))
     application.add_handler(CommandHandler("export", export_excel))
     application.add_handler(CommandHandler("images", images))
-    application.add_handler(CommandHandler("preflight", preflight))
     application.add_handler(CommandHandler("voice", voice_mode_command))
     application.add_handler(CommandHandler("voice_lang", voice_language_command))
+    application.add_handler(CommandHandler("analisi", scientific_report_command))
+    application.add_handler(CommandHandler("analysis", scientific_report_command))
     application.add_handler(CommandHandler("nasa_sar", nasa_sar_connect))
     # /continua globale: funziona anche dopo END del ConversationHandler
     application.add_handler(CommandHandler("continua", continue_diagnosis_message))
     # Pulsante inline "Continua lettura" (CMD_CONTINUA) — stesso handler
     application.add_handler(CallbackQueryHandler(continue_diagnosis_message, pattern=r"^CMD_CONTINUA$"))
-    application.add_handler(CommandHandler("academy", academy_start))
     application.add_handler(CommandHandler("license", license_text))
     application.add_handler(CommandHandler("batch", batch_analyze))
     application.add_handler(diagnosis_handler)
     application.add_handler(upload_handler)
     application.add_handler(chat_conv_handler)
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_scientific_report_attachment))
     application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_unprompted_photo))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^CMD_"))
-    application.add_handler(CallbackQueryHandler(academy_callback, pattern=r"^ACAD_"))
     application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_nasa_sar_web_app_data), group=9)
     application.add_handler(MessageHandler(filters.LOCATION, handle_nasa_sar_location), group=10)
     application.add_handler(MessageHandler(filters.VOICE, handle_voice_message), group=-1)

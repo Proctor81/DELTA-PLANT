@@ -52,11 +52,11 @@ for d in [MODELS_DIR, DATASETS_DIR, EXPORTS_DIR, LOGS_DIR, INPUT_IMAGES_DIR, LEA
 SYSTEM_INFO = {
     "name": "DELTA Plant",
     "acronym": "DELTA",
-    "version": "3.2",
-    "release": "v3.2",
-    "release_name": "Unified Edge Intelligence",
-    "release_date": "2026-05-13",
-    "manual_revision": "2026-06-09",
+    "version": "3.3",
+    "release": "v3.3",
+    "release_name": "Advanced Agronomic LLM",
+    "release_date": "2026-06-11",
+    "manual_revision": "2026-06-11",
 }
 
 # ─────────────────────────────────────────────

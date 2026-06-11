@@ -1,3 +1,41 @@
+# Release v3.3 — 11 giugno 2026
+
+## Advanced Agronomic LLM, Cris/Ryan e lettura referti scientifici
+
+Questa revisione aggiorna DELTA Plant e la documentazione repository alle nuove implementazioni avanzate di DELTAPLANO: diagnosi iterativa, rimodulazione agronomica post-referto, lettura di documenti scientifici e coerenza bilingue tra testo e voce.
+
+### Highlights v3.3
+
+- **Rimodulazione post-diagnosi**: dopo ogni diagnosi Telegram, DELTA chiede se l'utente vuole integrare nuovi parametri agronomici come pH, conducibilita elettrica, salinita, substrato, irrigazione, nutrienti, luce, CO2 e dati di campo.
+- **Skill referti scientifici**: i comandi `/analisi` e `/analysis` permettono di allegare PDF, JPEG e PNG di analisi del suolo, acque, frutto, nichel/metalli, nutrienti o altri documenti di laboratorio per arricchire l'ultima diagnosi.
+- **Pipeline documentale multimodale**: PDF con `pypdf`, immagini con `Pillow`/`pytesseract`, fallback su Hugging Face Vision LLM quando l'OCR non e sufficiente.
+- **Cris/Ryan coerenti**: la scelta lingua governa testo scritto, caption Telegram e voce TTS; Ryan forza l'inglese anche quando la trascrizione vocale e in italiano.
+- **Repair lingua automatico**: se il modello LLM risponde nella lingua sbagliata, DELTA riscrive la risposta con un prompt interno stateless prima di inviarla.
+- **Prompt controllati**: rimodulazioni e referti usano `ChatEngine.chat_internal()` per evitare interferenze della knowledge base del manuale o della memoria conversazionale ordinaria.
+- **Manuale rigenerato**: `Manuale/DELTA_Manuale_Utente.pdf` documenta i nuovi flussi operativi, requisiti OCR/PDF, troubleshooting e casi d'uso avanzati.
+
+### Changelog v3.3
+
+| Area | Modifica |
+| --- | --- |
+| `interface/telegram_bot.py` | Nuovo contesto ultimo referto, rimodulazione agronomica, `/analisi`/`/analysis`, estrazione PDF/OCR/VLM e garanzie Cris/Ryan |
+| `requirements.txt` | Aggiunte dipendenze `pypdf`, `Pillow` e `pytesseract` per lettura referti |
+| `Manuale/genera_manuale.py` | Aggiornamento profondo di copertina, installazione, Telegram, LLM, troubleshooting e manuale PDF |
+| `Manuale/DELTA_3.0_ARCHITECTURE.md` | Nuova sezione architetturale sulle implementazioni avanzate LLM/report refinement |
+| `README.md` | Nuova sezione repository sugli Advanced DELTAPLANO LLM Workflows |
+
+### Nota operativa OCR
+
+Le dipendenze Python sono sufficienti per importare il flusso, ma l'OCR locale su immagini richiede anche il binario di sistema `tesseract`. Su Raspberry Pi/Linux:
+
+```bash
+sudo apt install tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng
+```
+
+Se `tesseract` non e disponibile, DELTA tenta comunque il fallback Vision LLM sui referti JPEG/PNG.
+
+---
+
 # Release v3.2 — 13 maggio 2026
 
 ## 🚀 Upgrade Manuale Operativo e Telegram VLM-first

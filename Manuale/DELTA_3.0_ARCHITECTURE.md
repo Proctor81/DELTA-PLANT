@@ -106,6 +106,59 @@ Operational boundary:
 - in guided diagnosis, voice is allowed only where a textual answer is still meaningful, such as manual sensor input or rare native fallback follow-up
 - voice is not accepted while DELTA is waiting for a required photo or inline button choice
 
+## Advanced Telegram LLM And Report Refinement
+
+This section documents the new advanced DELTAPLANO behavior added after the v3.2 manual baseline. The goal is to make a diagnosis iterative: the operator can enrich the same diagnosis with agronomic parameters or scientific documents instead of restarting the workflow.
+
+### Post-diagnosis agronomic refinement
+
+After each Telegram diagnosis, DELTA stores a structured `last_diagnosis_context` containing the report, sensor context, model path, language and timestamp. Free-chat messages that mention agronomic parameters can trigger a controlled refinement prompt.
+
+Examples of accepted refinement context:
+
+- pH and electrical conductivity (EC)
+- salinity, substrate, soil texture and irrigation water quality
+- N-P-K, calcium, magnesium, iron, boron and other nutrients
+- temperature, humidity, light/LUX and CO2
+- nickel, heavy metals or other lab-measured contaminants
+- operator observations that change risk interpretation
+
+Implementation notes:
+
+- refinement is routed through `ChatEngine.chat_internal()` to avoid manual knowledge-base hijacking
+- the LLM receives the previous diagnosis plus the new values and must state what changes, what remains unchanged, revised risk, corrective actions and monitoring
+- the refined diagnosis becomes the new active context for later follow-up
+
+### Scientific PDF/JPEG/PNG report reading
+
+Telegram commands:
+
+- `/analisi` for Italian/Cris mode
+- `/analysis` for English/Ryan mode
+
+Supported documents include soil reports, water reports, fruit quality reports, nickel/metals analysis, nutrient panels, salinity/pH/EC analysis and other agronomic or scientific lab documents.
+
+Extraction stack:
+
+- PDF text layer: `pypdf.PdfReader`
+- image OCR: `Pillow` plus `pytesseract`
+- image fallback: Hugging Face Vision LLM through `HuggingFaceLLM.chat_with_image()`
+
+Routing rule:
+
+- normal plant photos remain plant diagnosis inputs
+- images are treated as scientific reports only after `/analisi` or `/analysis`, or when the caption explicitly looks like a report/lab-analysis context
+
+### Cris/Ryan language guarantees
+
+The selected voice persona now controls both speech and written text.
+
+- Cris forces Italian output
+- Ryan forces English output
+- switching language clears transient chat seeds and resets chat memory while preserving diagnosis context
+- voice transcription language does not decide response language: Ryan still answers in English if the audio transcript is Italian
+- if the LLM returns the wrong language, DELTA rewrites the response with a stateless internal repair prompt before sending text, caption or TTS
+
 ### 5. NASA-ISRO/SAR from Telegram
 
 Entry point:

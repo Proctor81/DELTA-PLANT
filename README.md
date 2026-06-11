@@ -27,6 +27,29 @@ DELTA Plant is a premium deep-tech platform for AI plant health diagnostics, exp
 
 Built for researchers, agritech teams, biotech innovators, and venture capital audiences, DELTA Plant presents a differentiated narrative: cinematic product experience on GitHub Pages, production-oriented edge AI in the repository, and a clear bridge between research credibility and operational usability.
 
+## Advanced DELTAPLANO LLM Workflows
+
+DELTAPLANO now includes advanced bilingual agronomic reasoning for both Italian mode `Cris` and English mode `Ryan`. After each plant diagnosis, the bot keeps the latest diagnostic context and can refine it with new agronomic values or laboratory reports instead of forcing the operator to restart from a new photo.
+
+| Workflow | What DELTA Does |
+| --- | --- |
+| Post-diagnosis agronomic refinement | Reworks the latest diagnosis using extra parameters such as pH, electrical conductivity, salinity, substrate, irrigation, nutrients, light, CO2, temperature, humidity, and other field observations |
+| Scientific report reading | `/analisi` and `/analysis` accept PDF, JPEG, and PNG reports after a diagnosis: soil analysis, water analysis, fruit analysis, nickel/metals, pH/EC, nutrients, salinity, and other scientific/agronomic documents |
+| Extraction stack | PDF text extraction with `pypdf`, image OCR with `pytesseract` and `Pillow`, plus Hugging Face Vision LLM fallback for JPEG/PNG reports when OCR is unavailable or insufficient |
+| Bilingual voice/text consistency | Selecting Cris or Ryan now controls the written LLM response, Telegram captions, and TTS voice together; Ryan enforces English responses even when a voice transcript is in Italian |
+| Controlled internal prompts | Diagnosis refinement uses `ChatEngine.chat_internal()` so manual knowledge-base routing and older conversation state do not distort the technical reassessment |
+
+Operational flow:
+
+```text
+1. Run a DELTA Plant diagnosis in Telegram
+2. Add values directly: "pH 5.5, EC 2.4 mS/cm, high salinity, low potassium"
+3. Or run /analisi or /analysis and attach a PDF/JPEG/PNG laboratory report
+4. DELTA returns a revised agronomic diagnosis, updated risk, corrective actions, and monitoring plan
+```
+
+Image uploads remain safe for normal plant diagnosis: JPEG/PNG files are treated as scientific reports only after `/analisi` or `/analysis`, or when the caption clearly indicates a lab/report context.
+
 ## Website Preview
 
 The repository now includes a GitHub Pages-ready landing page in [website/index.html](website/index.html) with a cinematic space-meets-biology visual language, animated hero scene, ambient soundtrack controls, investor-facing storytelling, structured SEO metadata, and direct DELTAPLANO access.
@@ -83,12 +106,15 @@ Reference artifacts:
 | Orchestration | DELTA agent coordinating vision, sensors, diagnosis, and recommendations |
 | Interfaces | GitHub Pages, DELTAPLANO bot, CLI, admin panel, optional REST API |
 | Sensor intelligence | Temperature, humidity, pressure, light, CO2, pH, and EC |
+| Agronomic LLM refinement | Post-diagnosis reassessment with manual agronomic parameters and scientific PDF/JPEG/PNG reports |
 | MLOps pipeline | Training, export, evaluation, benchmarking, dissemination, manual regeneration |
 
 ## Product Highlights
 
 - AI Plant Health landing page engineered for GitHub Pages and search visibility
 - DELTAPLANO bot entry point for frictionless conversational interaction
+- Scientific report-aware DELTAPLANO workflow for soil, water, fruit, nickel/metals, pH/EC and nutrient analysis
+- Cris/Ryan bilingual operation with aligned written response, voice output, and diagnosis refinement language
 - LayerCAM-powered explainable diagnosis with overlay-ready visual outputs
 - Public benchmark storytelling aligned with v3.2 documentation surfaces
 - Research-to-deployment positioning for agritech, biotech, and deep-tech narratives
@@ -127,6 +153,7 @@ Then open `http://localhost:8080` and browse the landing page from [website/inde
 - [Live website](https://proctor81.github.io/DELTA-PLANT/)
 - [Access DELTAPLANO](https://t.me/DELTAPLANO_bot)
 - [User manual PDF](Manuale/DELTA_Manuale_Utente.pdf)
+- [Advanced Telegram LLM workflows](Manuale/DELTA_3.0_ARCHITECTURE.md#advanced-telegram-llm-and-report-refinement)
 - [Technical architecture](Manuale/DELTA_3.0_ARCHITECTURE.md)
 - [Model card](MODEL_CARD.md)
 - [Release notes](RELEASE.md)

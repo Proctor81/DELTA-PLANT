@@ -137,11 +137,11 @@ def _collect_modules() -> list[dict]:
 
 DEFAULT_SYSTEM_INFO = {
     "name": "DELTA Plant",
-    "version": "3.2",
-    "release": "v3.2",
-    "release_name": "Unified Edge Intelligence",
-    "release_date": "2026-05-13",
-    "manual_revision": "2026-06-09",
+    "version": "3.3",
+    "release": "v3.3",
+    "release_name": "Advanced Agronomic LLM",
+    "release_date": "2026-06-11",
+    "manual_revision": "2026-06-11",
 }
 
 
@@ -340,8 +340,8 @@ class ManualePDF(FPDF):
         # ── Pillole feature ───────────────────────────────────
         features = [
             ("Visione AI",    (35, 105, 195)),
-            ("Pipeline X",    (20, 125, 70)),
-            ("Manuale 3.2",   (130, 65, 25)),
+            ("Referti AI",    (20, 125, 70)),
+            ("Manuale 3.3",   (130, 65, 25)),
         ]
         x0 = 12
         for label, col in features:
@@ -558,7 +558,8 @@ def _add_intro(pdf: ManualePDF):
         f"La release {system_info['release']} consolida DELTA come piattaforma edge-AI "
         "ibrida: backend MobileNetV2 stabile in produzione, backend EfficientFormerV2-S1 "
         "int8 realmente eseguibile su questo hardware, Pipeline X resumable end-to-end, "
-        "telemetria locale, memoria diagnostica persistente e manualistica rigenerabile "
+        "telemetria locale, memoria diagnostica persistente, lettura di referti scientifici "
+        "PDF/JPEG/PNG per rimodulazione LLM e manualistica rigenerabile "
         "automaticamente a ogni rilascio."
     )
     pdf._subsection(f"Caratteristiche principali — {system_info['release']}")
@@ -570,6 +571,9 @@ def _add_intro(pdf: ManualePDF):
         "Lettura continua di 7 parametri ambientali via I2C o inserimento manuale guidato con fallback operativo",
         "Motore agronomico locale con regole esperte e Quantum Risk Score disponibile nel ramo nativo/fallback",
         "NASA-ISRO/SAR da Telegram con Mini App GPS, dashboard climatica e continuita immediata del follow-up",
+        "Rimodulazione post-diagnosi con parametri agronomici liberi: pH, EC, salinita, substrato, irrigazione, nutrienti, luce, CO2 e altri dati di campo",
+        "Lettura referti scientifici/agronomici PDF/JPEG/PNG: analisi suolo, acque, frutto, nichel/metalli, pH, EC e nutrienti usati per arricchire l'ultima diagnosi",
+        "Modalita bilingue Cris/Ryan: la selezione lingua governa insieme testo LLM, caption e voce TTS, con repair automatico se il modello risponde nella lingua sbagliata",
         "Pipeline X resumable, export/benchmark/evaluation e rigenerazione automatica del manuale PDF",
         "Installazione su Raspberry Pi 5 con preflight AI, API opzionale e autostart systemd",
     ])
@@ -829,6 +833,11 @@ def _add_software_install(pdf: ManualePDF, reqs: list):
         "            adafruit-circuitpython-ads1x15 \\\n"
         "            picamera2 RPi.GPIO"
     )
+    pdf._info_box(
+        "Lettura referti PDF/JPEG/PNG",
+        "La skill di rimodulazione da referti usa pypdf per PDF con testo selezionabile, Pillow/pytesseract per OCR locale su immagini e fallback Vision LLM per JPEG/PNG quando l'OCR non produce testo. Per OCR locale completo installare anche il binario di sistema tesseract: sudo apt install tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng.",
+        color=BLUE_MID,
+    )
 
     pdf._subsection("4.4 Installazione TFLite Runtime")
     pdf._body(
@@ -1008,7 +1017,59 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "Vanno mantenuti sul Raspberry o sul PC locale e non devono essere pubblicati su GitHub."
     )
 
-    pdf._subsection("5.4c Pannello amministratore — statistiche bot")
+    pdf._subsection("5.4c Rimodulazione post-diagnosi con parametri agronomici")
+    pdf._body(
+        "Dopo ogni diagnosi DELTA Plant, il bot chiede esplicitamente se l'utente vuole rimodulare il quadro con ulteriori parametri agronomici. "
+        "Questa funzione non avvia una nuova diagnosi e non richiede una nuova foto: usa l'ultima diagnosi strutturata come base e integra i dati aggiunti dall'operatore."
+    )
+    pdf._kv_table([
+        ("Contesto usato", "last_diagnosis_context: referto precedente, sensori/ambiente, modello usato e timestamp"),
+        ("Trigger testuale", "pH, EC/conducibilita elettrica, salinita, substrato, suolo, nutrienti, irrigazione, temperatura, umidita, luce/LUX, CO2 e altri parametri agronomici"),
+        ("Motore LLM", "ChatEngine.chat_internal(), stateless, per evitare che manuale/knowledge-base o cronologia contaminino la rimodulazione tecnica"),
+        ("Output", "Aggiornamento professionale: cosa cambia, cosa resta invariato, rischio rivisto, azioni correttive e monitoraggio"),
+        ("Lingua", "Cris genera italiano; Ryan genera inglese. La selezione lingua pilota testo, caption e voce."),
+    ])
+    pdf._code_block(
+        "Esempi dopo una diagnosi:\n"
+        "pH 5,5 e EC 2,4 mS/cm: rimodula la diagnosi\n"
+        "Substrato leggermente salino, acqua irrigua EC 1.8, lux medi in serra 30000\n"
+        "In English/Ryan: pH 6.2, EC 1.9 mS/cm, high nickel in soil: refine the diagnosis",
+        label="RIMODULAZIONE AGRONOMICA",
+    )
+
+    pdf._subsection("5.4d Lettura referti scientifici PDF/JPEG/PNG")
+    pdf._body(
+        "La nuova skill /analisi permette di allegare referti scientifici o agronomici dopo una diagnosi: analisi del suolo, analisi delle acque, analisi del frutto, concentrazione di nichel/metalli, pH, EC, salinita, nutrienti o qualsiasi documento tecnico utile. DELTA estrae il contenuto e rimodula il referto precedente alla luce dei nuovi valori."
+    )
+    pdf._kv_table([
+        ("Comandi", "/analisi in italiano, /analysis in inglese"),
+        ("Formati", "PDF, JPEG, PNG"),
+        ("PDF", "Estrazione text-layer con pypdf; utile per referti digitali esportati dal laboratorio"),
+        ("JPEG/PNG", "OCR locale con pytesseract se disponibile; fallback su Vision LLM per leggere referti fotografati o scannerizzati"),
+        ("Instradamento immagini", "Le immagini normali restano diagnosi pianta; un'immagine viene trattata come referto solo dopo /analisi oppure con caption referto/lab/suolo/acque/frutto/nichel/pH/EC"),
+        ("Output", "6 blocchi: documento interpretato, valori e anomalie, impatto sulla diagnosi, rischio/confidenza rivisti, azioni correttive, monitoraggio/analisi successive"),
+        ("Memoria", "La rimodulazione da referto diventa la nuova last_diagnosis_context per follow-up successivi"),
+    ])
+    pdf._code_block(
+        "# Flusso operativo in Telegram\n"
+        "1. Esegui una diagnosi DELTA Plant\n"
+        "2. /analisi    # oppure /analysis con Ryan\n"
+        "3. Allegare PDF/JPEG/PNG del laboratorio\n"
+        "4. DELTA estrae valori e rimodula la diagnosi\n\n"
+        "# Esempi referti supportati\n"
+        "- Analisi suolo con pH, EC, sostanza organica, N-P-K, microelementi\n"
+        "- Analisi acque irrigue con salinita, bicarbonati, cloruri, sodio\n"
+        "- Analisi frutto con Brix, consistenza, residui, fisiopatie\n"
+        "- Referto nichel/metalli pesanti su suolo, acqua o prodotto",
+        label="REFERTI SCIENTIFICI",
+    )
+    pdf._info_box(
+        "Nota OCR",
+        "Per PDF scannerizzati senza testo selezionabile e preferibile inviare anche una foto/PNG nitida del referto. Se il binario tesseract non e installato, DELTA prova il fallback Vision LLM sulle immagini supportate.",
+        color=BLUE_MID,
+    )
+
+    pdf._subsection("5.4e Pannello amministratore — statistiche bot")
     pdf._body(
         "Dal pannello amministratore (interface/admin.py) la voce [10] 'Statistiche "
         "inferenza DELTAPLANO_bot' produce un report per singolo utente autorizzato "
@@ -1020,7 +1081,7 @@ def _add_software_uso(pdf: ManualePDF, cfg: dict):
         "gonfiati. Il report viene salvato in logs/deltaplano_inference_stats.txt."
     )
 
-    pdf._subsection("5.4d Pannello amministratore — monitor visitatori del sito")
+    pdf._subsection("5.4f Pannello amministratore — monitor visitatori del sito")
     pdf._body(
         "Dal pannello amministratore la voce [11] 'Monitor visitatori deltaplant.ai' "
         "mostra il traffico del sito pubblico in forma first-party e privacy-safe. "
@@ -1219,14 +1280,16 @@ def _add_software_api(pdf: ManualePDF, cfg: dict):
 
     pdf._bullet([
         "Comandi principali: /menu, /diagnosi, /upload, /images, /report, /dettaglio <id>, /sensori",
-        "/export, /preflight, /academy, /license, /health, /batch, /nasa_sar",
+        "/export, /preflight, /academy, /license, /health, /batch, /nasa_sar, /analisi e /analysis",
         "Chat dedicata: pulsante inline 'Chiedi a DELTA Plant' e comando /chat per aprire una sessione esplicita di consulenza LLM.",
         "Chat libera: puoi scrivere direttamente in chat una domanda o richiesta (es. 'Mostrami lo stato', 'Spiega il rischio') e ricevere risposta dall'orchestrator DELTA.",
-        "Lingua operativa: il messaggio /start e sempre presentato in italiano; la selezione Ryan (EN) o Cris (IT) pilota invece sia la voce TTS sia la lingua delle risposte in chat libera.",
+        "Lingua operativa: la selezione Ryan (EN) o Cris (IT) pilota insieme voce TTS, testo LLM, caption, menu, diagnosi e rimodulazioni; al cambio lingua vengono puliti seed e memoria chat per evitare risposte contaminate dalla lingua precedente.",
         "Modalita voce: /voice on | off | auto controlla se DELTAPLANO deve rispondere anche in vocale; /voice_lang it | en | auto forza il pack voce da usare in chat libera.",
+        "Repair lingua: se Ryan riceve una trascrizione vocale italiana, il prompt forza comunque l'inglese; se il modello produce italiano, la risposta viene riscritta in inglese prima di testo/caption/TTS.",
         "Modalita NASA-ISRO/SAR: pulsante inline 'Connettiti a NASA-ISRO/SAR' o comando /nasa_sar per avviare acquisizione GPS automatica via Mini App Telegram oppure invio manuale della posizione.",
         "Diagnosi guidata da menu: foto -> sensori -> VLM multimodale; non viene piu richiesta la descrizione testuale della pianta prima del referto.",
         "Foto libera in chat: diagnosi vision-only immediata con VLM, separata dal wizard guidato.",
+        "Referti scientifici: dopo una diagnosi usare /analisi o /analysis e allegare PDF/JPEG/PNG per rimodulare il referto con dati di laboratorio.",
         "Diagnosi spiegabile: foto originale e overlay LayerCAM restano disponibili soprattutto nel ramo nativo/fallback, non nel percorso VLM-first standard.",
         "Se il bot non risponde, verificare token, autorizzazioni e API attiva",
     ])
@@ -1618,6 +1681,26 @@ def _add_troubleshooting(pdf: ManualePDF):
                 "Verificare connettivita rete e accesso HTTPS verso router.huggingface.co.",
                 "(Orchestrator) se configurato, verificare Ollama in ascolto su OLLAMA_ENDPOINT.",
                 "Per uscire dalla chat libera CLI digitare '/exit' (non 'exit' o 'esci').",
+            ]
+        ),
+        (
+            "Il referto PDF/JPEG/PNG non viene letto o non rimodula la diagnosi",
+            [
+                "Eseguire prima una diagnosi DELTA Plant: /analisi usa last_diagnosis_context e non funziona senza referto precedente.",
+                "Per PDF digitali verificare che il testo sia selezionabile; altrimenti inviare una foto/PNG nitida del referto.",
+                "Verificare dipendenze Python: .venv/bin/python -c \"import pypdf, PIL, pytesseract\".",
+                "Per OCR locale su immagini installare anche il binario di sistema: sudo apt install tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng.",
+                "Se tesseract non e disponibile, DELTA prova il fallback Vision LLM sulle immagini JPEG/PNG; servono HF_API_TOKEN e rete attiva.",
+                "Le immagini senza /analisi o senza caption referto/lab/suolo/acque/frutto/nichel/pH/EC vengono trattate come foto pianta e avviano una nuova diagnosi.",
+            ]
+        ),
+        (
+            "Ryan parla in inglese ma il testo resta in italiano",
+            [
+                "Selezionare di nuovo Ryan dopo un riavvio del servizio: voice_language_override e stato di sessione Telegram non persistono tra restart.",
+                "Usare /voice_lang en oppure il pulsante Voice in English dal menu.",
+                "Il percorso aggiornato forza response_language=en, aggiunge un suffisso English-only e ripara automaticamente output italiani accidentali.",
+                "Controllare i log: cercare CMD_VOICE_LANG_EN prima della riga free_chat_response dell'ultimo messaggio.",
             ]
         ),
     ]
@@ -4187,7 +4270,8 @@ def _add_hf_llm_chat(pdf: ManualePDF):
         ("Modulo Python",          "llm/huggingface_llm.py — HuggingFaceLLM"),
         ("Motore di chat",         "chat/chat_engine.py — ChatEngine"),
         ("Contesto manuale",       "knowledge_base_delta.md caricata automaticamente per domande operative su manuale, Excel, Telegram, NASA/SAR, API e troubleshooting"),
-        ("Memoria conversazione",  "Per-utente in dizionario in-memory (reset con /reset o Reset conversazione)"),
+        ("Memoria conversazione",  "Per-utente con cronologia locale e reset tramite pulsante Reset conversazione; alcune chiamate interne usano chat_internal() stateless"),
+        ("Skill referti",          "PDF/JPEG/PNG scientifici letti dopo diagnosi e trasformati in prompt di rimodulazione agronomica"),
         ("System prompt",         "Esperto agronomico italiano: diagnosi piante, sensori DELTA, consigli"),
         ("Token HuggingFace",     "DELTA_HF_TOKEN nel file .env — verificato all'avvio"),
         ("Validazione token",     "HfApi.whoami() — log: 'Token HF valido — utente: <username>'"),
@@ -4267,6 +4351,27 @@ def _add_hf_llm_chat(pdf: ManualePDF):
         "Il sistema usa il backend HF configurato",
         "Digitare '/exit' per tornare al menu principale",
     ])
+
+    pdf._subsection("14b.4a Skill documentale scientifica — /analisi e /analysis")
+    pdf._body(
+        "La skill documentale non e una semplice domanda al manuale: e un percorso controllato del bot Telegram che legge allegati scientifici e li trasforma in contesto tecnico per rimodulare la diagnosi piu recente. Per evitare interferenze con la knowledge base manuale e con la memoria conversazionale, la rimodulazione usa ChatEngine.chat_internal() con prompt costruito dal codice e lingua imposta da Cris/Ryan."
+    )
+    pdf._bullet([
+        "PDF con text-layer: pypdf estrae fino alle prime 12 pagine e passa il contenuto al modello LLM.",
+        "JPEG/PNG: pytesseract prova OCR locale; se non estrae testo, il Vision LLM legge l'immagine come referto e produce contenuto strutturato.",
+        "Il prompt chiede esplicitamente di interpretare analisi suolo, acque, frutto, nichel/metalli, salinita, pH, EC, nutrienti, soglie e anomalie.",
+        "La risposta aggiorna last_diagnosis_context, quindi i follow-up successivi partono dalla diagnosi gia arricchita dal referto.",
+        "La lingua e vincolata: Cris restituisce italiano, Ryan inglese, con repair automatico se il modello disobbedisce.",
+    ])
+    pdf._code_block(
+        "# Italiano/Cris\n"
+        "/analisi\n"
+        "[allega analisi_suolo_nichel.pdf]\n\n"
+        "# English/Ryan\n"
+        "/analysis\n"
+        "[attach water_or_fruit_lab_report.png]",
+        label="SKILL DOCUMENTALE LLM",
+    )
 
     pdf._subsection("14b.5 Preflight AI — verifica LLM")
     pdf._body(
