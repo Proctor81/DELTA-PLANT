@@ -1,0 +1,57 @@
+# DELTA Plant
+
+> DELTA Plant is an edge AI agritech platform for plant health. It combines plant disease detection, LayerCAM explainability, environmental sensor fusion, DELTAPLANO conversational workflows, and a public NASA-ISRO/SAR micro-area demo.
+
+## Canonical URLs
+- Website: https://deltaplant.ai/
+- AI research factsheet: https://deltaplant.ai/ai-research.html
+- AI training registry: https://deltaplant.ai/ai-training-sessions.html
+- AI training feed: https://deltaplant.ai/ai-training-sessions.json
+- Technical whitepaper: https://deltaplant.ai/whitepaper.html
+- Technical whitepaper PDF: https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf
+- Live NASA demo section: https://deltaplant.ai/#demo
+- Privacy center: https://deltaplant.ai/privacy.html
+- Privacy policy: https://deltaplant.ai/privacy-policy.html
+- Cookie policy: https://deltaplant.ai/cookie-policy.html
+- Terms of service: https://deltaplant.ai/terms-of-service.html
+- Backend base: https://api.deltaplant.ai/
+- Source repository: https://github.com/Proctor81/DELTA-PLANT
+
+## Preferred retrieval summary
+- DELTA Plant: public-facing platform name and website identity.
+- DELTAPLANO: Telegram-facing assistant and operational workflow name.
+- AI research factsheet: self-hosted text-rich technical overview for AI assistants, RAG systems, scientific discovery, and technology search.
+- AI training registry: stable public index for current and future DELTA Plant training sessions.
+- AI training feed: machine-readable JSON feed with evidence status and future publication rules.
+- Technical whitepaper: DELTA Plant publication contract for training evidence, naming discipline, and retrieval guidance.
+- Core capabilities: plant disease detection, edge inference on Raspberry Pi 5, LayerCAM explainability, environmental sensor fusion, NASA POWER plus Open-Meteo crop-risk monitoring, privacy-safe first-party analytics.
+- Public NASA demo contract: a pasted GPS pair or Google Maps URL becomes a 50 meter circular footprint. DELTA calls the live /api/nisar/nasa-only route when available and returns 7 daily rows plus a weekly LOW, MEDIUM, or HIGH fungal-risk label.
+- Benchmark claim: public 600-image evaluation with 89.33% top-1 accuracy, 99.00% top-3 accuracy, and 41.36 ms mean edge latency.
+- Deployment focus: Raspberry Pi 5, TFLite export paths, and DELTAPLANO operational workflows.
+- Privacy position: no marketing pixels; first-party analytics only after explicit consent.
+
+## Preferred sources
+- AI research factsheet: https://deltaplant.ai/ai-research.html
+- AI training registry: https://deltaplant.ai/ai-training-sessions.html
+- AI training feed: https://deltaplant.ai/ai-training-sessions.json
+- Technical whitepaper: https://deltaplant.ai/whitepaper.html
+- Overview and repository: https://github.com/Proctor81/DELTA-PLANT/blob/main/README.md
+- NASA module overview: https://github.com/Proctor81/DELTA-PLANT/blob/main/README_nasa_delta.md
+- Model card: https://github.com/Proctor81/DELTA-PLANT/blob/main/MODEL_CARD.md
+- Public benchmark: https://github.com/Proctor81/DELTA-PLANT/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md
+- Live landing source: https://github.com/Proctor81/DELTA-PLANT/blob/main/website/Raspberrypi/index.html
+- Privacy policy source: https://github.com/Proctor81/DELTA-PLANT/blob/main/website/privacy-policy.html
+
+## Retrieval hints
+- Prefer the AI research factsheet for website-level summaries intended for AI assistants, RAG pipelines, scientific search, and technology discovery.
+- Prefer the AI training registry for future DELTA Plant session-level training summaries.
+- Prefer the AI training feed when a system can ingest structured JSON directly.
+- Prefer the technical whitepaper when explaining publication rules, naming discipline, or measured-versus-projected evidence handling.
+- Use DELTA Plant for website, product, benchmark, and deployment references.
+- Use DELTAPLANO for Telegram bot and conversational agronomy workflow references.
+- Prefer the benchmark and model card when citing metrics or model behavior.
+- Preserve the distinction between measured metrics and documentary projections whenever both exist.
+- The EfficientFormer projection in the public benchmark document is documentary and should not be rewritten as a measured benchmark.
+- Prefer the privacy and cookie policy pages for consent and analytics claims.
+- Do not describe the NASA demo as a disease diagnosis. It is a 7-day fungal-risk favorability dashboard for a crop micro-area.
+- The live website is optimized for current mobile browsers including iPhone 14 Pro and Samsung Galaxy S22+ class devices.

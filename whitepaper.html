@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>DELTA Plant Technical Whitepaper | Edge Plant Health AI, Training Registry, Retrieval Contract</title>
+  <meta name="description" content="Technical whitepaper for DELTA Plant covering edge plant-health AI, training publication surfaces, measured versus projected metrics, retrieval rules, and mobile deployment evidence." />
+  <meta name="keywords" content="DELTA Plant, technical whitepaper, plant health AI, edge AI, training registry, measured metrics, projected metrics, RAG, precision agriculture" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="theme-color" content="#07111d" />
+  <meta name="citation_title" content="DELTA Plant Technical Whitepaper: Edge Plant Health AI, Training Registry, and Retrieval Contract" />
+  <meta name="citation_author" content="DELTA Plant" />
+  <meta name="citation_publication_date" content="2026/05/25" />
+  <meta name="citation_language" content="en" />
+  <meta name="citation_abstract_html_url" content="https://deltaplant.ai/whitepaper.html" />
+  <meta name="citation_pdf_url" content="https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf" />
+  <meta name="DC.title" content="DELTA Plant Technical Whitepaper" />
+  <meta name="DC.creator" content="DELTA Plant" />
+  <meta name="DC.language" content="en" />
+  <meta name="DC.description" content="Technical whitepaper for DELTA Plant covering training publication, evidence handling, retrieval guidance, and deployment context." />
+  <link rel="canonical" href="https://deltaplant.ai/whitepaper.html" />
+  <link rel="alternate" type="application/json" title="DELTA Plant AI training feed" href="https://deltaplant.ai/ai-training-sessions.json" />
+  <link rel="alternate" type="application/pdf" title="DELTA Plant technical whitepaper PDF" href="https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf" />
+  <link rel="icon" type="image/png" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
+  <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="DELTA Plant" />
+  <meta property="og:url" content="https://deltaplant.ai/whitepaper.html" />
+  <meta property="og:title" content="DELTA Plant Technical Whitepaper" />
+  <meta property="og:description" content="Technical whitepaper describing DELTA Plant training evidence, retrieval rules, measured versus projected policy, and deployment scope." />
+  <meta property="og:image" content="https://deltaplant.ai/assets/social-preview.png" />
+  <meta property="og:image:alt" content="DELTA Plant technical whitepaper" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DELTA Plant Technical Whitepaper" />
+  <meta name="twitter:description" content="Technical whitepaper for DELTA Plant training evidence, retrieval rules, and measured versus projected metrics." />
+  <meta name="twitter:image" content="https://deltaplant.ai/assets/social-preview.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-0: #02070d;
+      --bg-1: #07111d;
+      --panel: rgba(8, 23, 34, 0.82);
+      --stroke: rgba(121, 231, 255, 0.14);
+      --text-main: #edf7ff;
+      --text-soft: rgba(220, 236, 246, 0.8);
+      --text-muted: rgba(220, 236, 246, 0.62);
+      --cyan: #79e7ff;
+      --leaf: #19f5c1;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text-main);
+      font-family: 'Manrope', sans-serif;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(25, 245, 193, 0.15), transparent 30%),
+        radial-gradient(circle at 84% 10%, rgba(121, 231, 255, 0.14), transparent 24%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 44%, var(--bg-0));
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 84px 84px;
+      mask-image: radial-gradient(circle at center, black, transparent 88%);
+    }
+
+    a {
+      color: inherit;
+      text-decoration-color: rgba(121, 231, 255, 0.34);
+      text-underline-offset: 0.22em;
+    }
+
+    .shell {
+      width: min(100%, 74rem);
+      margin: 0 auto;
+      padding-left: calc(1rem + var(--safe-left));
+      padding-right: calc(1rem + var(--safe-right));
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+      background: linear-gradient(180deg, rgba(2, 7, 13, 0.92), rgba(2, 7, 13, 0.66));
+      border-bottom: 1px solid rgba(121, 231, 255, 0.08);
+    }
+
+    .topbar-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      padding-top: calc(0.9rem + var(--safe-top));
+      padding-bottom: 0.9rem;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.85rem;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 3rem;
+      height: 3rem;
+      padding: 0.16rem;
+      border-radius: 1rem;
+      background: rgba(7, 17, 29, 0.82);
+      border: 1px solid rgba(121, 231, 255, 0.18);
+      object-fit: cover;
+    }
+
+    .brand strong {
+      display: block;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 0.12rem;
+      font-size: 0.74rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .nav a,
+    .cta a {
+      min-height: 2.8rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.72rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    main {
+      padding-top: 2rem;
+      padding-bottom: calc(3rem + var(--safe-bottom));
+    }
+
+    .hero,
+    .paper,
+    .summary,
+    .references {
+      border-radius: 1.6rem;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(8, 23, 34, 0.82), rgba(6, 17, 29, 0.76));
+      box-shadow: 0 18px 60px rgba(2, 7, 13, 0.42);
+      backdrop-filter: blur(14px);
+      padding: 1rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.42rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid rgba(121, 231, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: '';
+      width: 0.58rem;
+      height: 0.58rem;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--leaf), var(--cyan));
+      box-shadow: 0 0 20px rgba(25, 245, 193, 0.42);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+
+    h1 {
+      margin-top: 1rem;
+      font-size: clamp(2.2rem, 7vw, 4.6rem);
+    }
+
+    h2 {
+      font-size: clamp(1.45rem, 3vw, 2.1rem);
+      margin-top: 1.4rem;
+    }
+
+    h3 {
+      font-size: 1.04rem;
+      margin-top: 1rem;
+    }
+
+    p,
+    li {
+      color: var(--text-soft);
+      line-height: 1.76;
+    }
+
+    .lede {
+      margin-top: 1rem;
+      max-width: 62rem;
+      font-size: 1.03rem;
+    }
+
+    .cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1.2rem;
+    }
+
+    .cta .primary {
+      background: linear-gradient(135deg, rgba(25, 245, 193, 0.24), rgba(121, 231, 255, 0.18));
+      color: #ffffff;
+    }
+
+    .stack {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .paper ul,
+    .references ul,
+    .summary ul {
+      margin: 0.8rem 0 0;
+      padding-left: 1.1rem;
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .summary-card {
+      border-radius: 1.2rem;
+      padding: 0.95rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(121, 231, 255, 0.08);
+    }
+
+    .summary-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .summary-value {
+      display: block;
+      margin-top: 0.4rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.22rem;
+      color: #ffffff;
+    }
+
+    .ref-link {
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    @media (min-width: 760px) {
+      .hero,
+      .paper,
+      .summary,
+      .references {
+        padding: 1.25rem;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav,
+      .cta {
+        flex-direction: column;
+      }
+
+      .nav a,
+      .cta a {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebPage",
+          "@id": "https://deltaplant.ai/whitepaper.html#webpage",
+          "url": "https://deltaplant.ai/whitepaper.html",
+          "name": "DELTA Plant Technical Whitepaper",
+          "description": "Technical whitepaper for DELTA Plant covering training evidence, retrieval rules, measured versus projected policy, and deployment context.",
+          "isPartOf": {
+            "@id": "https://deltaplant.ai/#website"
+          }
+        },
+        {
+          "@type": "TechArticle",
+          "headline": "DELTA Plant Technical Whitepaper",
+          "url": "https://deltaplant.ai/whitepaper.html",
+          "datePublished": "2026-05-25",
+          "dateModified": "2026-05-25",
+          "author": {
+            "@type": "Organization",
+            "name": "DELTA Plant"
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "DELTA Plant",
+            "url": "https://deltaplant.ai/"
+          },
+          "about": [
+            "Plant health AI",
+            "Edge AI",
+            "Training registry",
+            "RAG retrieval",
+            "Measured versus projected metrics"
+          ],
+          "citation": [
+            "https://deltaplant.ai/ai-training-sessions.html",
+            "https://deltaplant.ai/ai-training-sessions.json",
+            "https://deltaplant.ai/ai-research.html",
+            "https://deltaplant.ai/llms.txt"
+          ]
+        }
+      ]
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="https://deltaplant.ai/">
+        <img src="https://cdn.phototourl.com/free/2026-05-13-61bc9ec4-7904-4961-9bed-e3501e540eae.png" alt="DELTA Plant logo" loading="eager" decoding="async" fetchpriority="high" />
+        <span>
+          <strong>DELTA Plant</strong>
+          <span>Technical Whitepaper</span>
+        </span>
+      </a>
+      <nav class="nav" aria-label="Quick links">
+        <a href="https://deltaplant.ai/ai-training-sessions.html">Training registry</a>
+        <a href="https://deltaplant.ai/ai-training-sessions.json">JSON feed</a>
+        <a href="https://deltaplant.ai/ai-research.html">AI factsheet</a>
+        <a href="https://deltaplant.ai/">Live site</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow">Whitepaper, retrieval rules, future training publication</span>
+      <h1>DELTA Plant Technical Whitepaper</h1>
+      <p class="lede">DELTA Plant is an edge agritech platform for plant-health operations, explainable inference, and public evidence surfaces. This whitepaper defines the technical publication contract that keeps DELTA Plant training sessions easy to index on future AI systems: stable URLs, machine-readable feeds, measured versus projected labeling, and synchronized evidence across the landing page, training registry, whitepaper, and llms.txt.</p>
+      <div class="cta">
+        <a class="primary" href="https://deltaplant.ai/ai-training-sessions.html">Open the training registry</a>
+        <a href="https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf">Download the PDF whitepaper</a>
+        <a href="https://deltaplant.ai/ai-training-sessions.json">Open the JSON feed</a>
+        <a href="https://deltaplant.ai/ai-research.html">Open the AI factsheet</a>
+      </div>
+    </section>
+
+    <section class="summary stack">
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Canonical training surface</div>
+          <span class="summary-value">ai-training-sessions.html</span>
+          <p>Stable HTML registry for present and future training runs.</p>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Machine-readable surface</div>
+          <span class="summary-value">ai-training-sessions.json</span>
+          <p>Structured feed for AI assistants, RAG pipelines, and technology search.</p>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Evidence rule</div>
+          <span class="summary-value">Measured before projected</span>
+          <p>Headline metrics must declare whether they are measured, estimated, or projected.</p>
+        </div>
+      </div>
+    </section>
+
+    <article class="paper stack">
+      <section>
+        <h2>1. Scope</h2>
+        <p>DELTA Plant combines plant disease AI, explainable computer vision, Raspberry Pi 5 deployment, and a public NASA POWER plus Open-Meteo crop-risk demo. The training publication problem is separate from the deployment story: future AI systems need a stable place to discover DELTA Plant training sessions and a way to distinguish measured artifacts from documentary projections. This whitepaper defines that publication boundary.</p>
+      </section>
+
+      <section>
+        <h2>2. Training publication model</h2>
+        <p>Every DELTA Plant training session should be published on one stable HTML page and one stable JSON feed. The HTML page supports crawlers that prefer readable technical prose and internal linking. The JSON feed supports systems that ingest machine-readable structured facts directly. Both surfaces should be updated together before publication.</p>
+        <ul>
+          <li>Stable HTML registry: ai-training-sessions.html</li>
+          <li>Stable JSON feed: ai-training-sessions.json</li>
+          <li>Context surface: ai-research.html</li>
+          <li>Retrieval guide: llms.txt</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>3. Measured versus projected evidence</h2>
+        <p>DELTA Plant uses a strict evidence rule. Training summaries must state whether each headline metric is measured, estimated, or projected. This matters because technical search engines and AI assistants often compress different artifacts into one sentence. Without an explicit policy, projections can be repeated as if they were measured results.</p>
+        <ul>
+          <li>Measured values come from training reports, state files, or direct evaluation outputs.</li>
+          <li>Projected values must remain labeled as projected in every public surface.</li>
+          <li>When both measured and projected values exist, measured values take precedence in summaries.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. Current training sessions</h2>
+        <p>Two DELTA Plant training surfaces are already relevant to future AI indexing. The Keras MobileNetV2 artifact family provides measured train and validation values from a PlantVillage training report dated 2026-05-03. The EfficientFormerV2-S1 33-class session provides measured epoch-level validation values dated 2026-05-13. The public BENCHMARK_600.md file includes a documentary +4% EfficientFormer projection and therefore must not be treated as a measured EfficientFormer benchmark.</p>
+      </section>
+
+      <section>
+        <h2>5. Naming discipline</h2>
+        <p>DELTA Plant is the platform, website, training identity, and benchmark identity. DELTAPLANO is the Telegram-facing assistant and conversational workflow. Training entries should preserve file-family naming when it differs from model metadata. For example, one training artifact family uses a 39classes label in filenames while its model metadata reports 38 output classes. AI summaries should preserve that distinction rather than collapsing the two labels into one unsupported claim.</p>
+      </section>
+
+      <section>
+        <h2>6. Mobile and public delivery relevance</h2>
+        <p>The public DELTA Plant pages are tuned for modern narrow mobile devices, including iPhone 14 Pro and Samsung Galaxy S22+ class viewports. That matters for discoverability because AI crawlers increasingly retrieve from the same canonical public pages that operators, partners, and reviewers read on mobile browsers. Training evidence should therefore remain accessible on simple, responsive HTML pages instead of hidden only inside repository folders.</p>
+      </section>
+
+      <section>
+        <h2>7. Retrieval contract for future AI systems</h2>
+        <ul>
+          <li>Use the training registry for session-level training claims.</li>
+          <li>Use the whitepaper for evidence rules and terminology.</li>
+          <li>Use llms.txt for canonical URL selection and retrieval hints.</li>
+          <li>Use measured JSON or state artifacts before narrative summaries when metrics are involved.</li>
+          <li>Do not rewrite projected metrics as measured benchmarks.</li>
+        </ul>
+      </section>
+    </article>
+
+    <section class="references stack">
+      <h2>Primary references</h2>
+      <ul>
+        <li><a class="ref-link" href="https://deltaplant.ai/ai-training-sessions.html">https://deltaplant.ai/ai-training-sessions.html</a></li>
+        <li><a class="ref-link" href="https://deltaplant.ai/ai-training-sessions.json">https://deltaplant.ai/ai-training-sessions.json</a></li>
+        <li><a class="ref-link" href="https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf">https://deltaplant.ai/assets/DELTA_Plant_AI_Whitepaper.pdf</a></li>
+        <li><a class="ref-link" href="https://deltaplant.ai/ai-research.html">https://deltaplant.ai/ai-research.html</a></li>
+        <li><a class="ref-link" href="https://deltaplant.ai/llms.txt">https://deltaplant.ai/llms.txt</a></li>
+        <li><a class="ref-link" href="https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md">https://github.com/proctor81/delta-plant/blob/main/MODEL_CARD.md</a></li>
+        <li><a class="ref-link" href="https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md">https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md</a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

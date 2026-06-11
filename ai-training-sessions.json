@@ -1,0 +1,102 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-05-25",
+  "site": "https://deltaplant.ai",
+  "registry_url": "https://deltaplant.ai/ai-training-sessions.html",
+  "feed_purpose": "Machine-readable registry for DELTA Plant AI training sessions, evidence surfaces, and future publication rules for AI indexing and RAG retrieval.",
+  "sessions": [
+    {
+      "session_id": "keras-mobilenetv2-artifact-family-39classes-2026-05-03",
+      "session_date": "2026-05-03",
+      "title": "Keras MobileNetV2 PlantVillage training artifact family",
+      "status": "completed",
+      "evidence_status": "measured",
+      "model_family": "MobileNetV2",
+      "model_name": "plant_disease_model_39classes_v2.0",
+      "dataset_name": "PlantVillage",
+      "artifact_family_label": "39classes",
+      "num_output_classes": 38,
+      "epochs": 10,
+      "training_samples": 94484,
+      "validation_samples": 23609,
+      "hardware": "Raspberry Pi 5 4-core, 16GB RAM, 1TB SSD",
+      "primary_metrics": {
+        "final_train_accuracy": 0.8743,
+        "final_validation_accuracy": 0.865,
+        "final_train_loss": 0.3839,
+        "final_validation_loss": 0.401
+      },
+      "workspace_sources": [
+        "models/TRAINING_REPORT.json",
+        "models/model_metadata.json",
+        "models/training_history_39classes.json",
+        "ai/train_keras_classifier.py"
+      ],
+      "public_sources": [
+        "https://deltaplant.ai/whitepaper.html",
+        "https://deltaplant.ai/ai-training-sessions.html",
+        "https://github.com/proctor81/delta-plant/blob/main/ai/train_keras_classifier.py"
+      ],
+      "notes": [
+        "Repository artifact naming uses 39classes while model metadata reports 38 output classes.",
+        "Use measured training report values for this session when summarizing model training behavior."
+      ]
+    },
+    {
+      "session_id": "efficientformer-v2-s1-33classes-2026-05-13",
+      "session_date": "2026-05-13",
+      "title": "EfficientFormerV2-S1 33-class training session",
+      "status": "completed",
+      "evidence_status": "measured-training",
+      "projection_status": "a separate documentary benchmark projection exists and must not be reported as measured runtime evidence",
+      "model_family": "EfficientFormerV2-S1",
+      "model_name": "efficientformerv2_s1",
+      "dataset_root": "datasets/training_33classes",
+      "num_output_classes": 33,
+      "epochs": 8,
+      "completed_epochs": 8,
+      "primary_metrics": {
+        "best_validation_accuracy": 0.9958677685950413,
+        "epoch_1_validation_accuracy": 0.9696081045054652,
+        "epoch_8_validation_accuracy": 0.9948013862969874
+      },
+      "workspace_sources": [
+        "models/efficientformer_v2_s1_33classes.state.json",
+        "models/efficientformer_v2_s1_33classes.training.json",
+        "ai/export_efficientformer_tflite.py"
+      ],
+      "public_sources": [
+        "https://deltaplant.ai/whitepaper.html",
+        "https://deltaplant.ai/ai-training-sessions.html",
+        "https://github.com/proctor81/delta-plant/blob/main/ai/export_efficientformer_tflite.py",
+        "https://github.com/proctor81/delta-plant/blob/main/logs/vision_eval/public_600_dual/BENCHMARK_600.md"
+      ],
+      "notes": [
+        "Use the state JSON and training metrics JSON for measured training values.",
+        "The public BENCHMARK_600.md file contains a documentary +4% projection for EfficientFormer and must be labeled as projected rather than measured."
+      ]
+    }
+  ],
+  "future_session_contract": {
+    "required_fields": [
+      "session_id",
+      "session_date",
+      "status",
+      "model_family",
+      "dataset_name_or_root",
+      "num_output_classes",
+      "epochs",
+      "evidence_status",
+      "primary_metrics",
+      "workspace_sources_or_public_sources"
+    ],
+    "measured_vs_projected_rule": "Every future headline metric must be labeled as measured, estimated, or projected before publication.",
+    "discovery_surfaces": [
+      "https://deltaplant.ai/ai-training-sessions.html",
+      "https://deltaplant.ai/ai-training-sessions.json",
+      "https://deltaplant.ai/whitepaper.html",
+      "https://deltaplant.ai/llms.txt"
+    ],
+    "publication_note": "Append future sessions to this feed and update the public HTML registry so AI crawlers and retrieval systems can discover new DELTA Plant training runs from stable URLs."
+  }
+}
