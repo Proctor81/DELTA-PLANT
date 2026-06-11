@@ -17,7 +17,6 @@ on:
       - website/cookie-policy.html
       - website/terms-of-service.html
       - website/components/**
-      - website/CNAME
       - website/.nojekyll
       - website/robots.txt
       - website/sitemap.xml
@@ -59,7 +58,6 @@ jobs:
           cp website/cookie-policy.html site-dist/
           cp website/terms-of-service.html site-dist/
           cp website/components/*.js site-dist/components/
-          cp website/CNAME site-dist/
           cp website/.nojekyll site-dist/
           cp website/robots.txt site-dist/
           cp website/sitemap.xml site-dist/
