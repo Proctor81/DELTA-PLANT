@@ -1,3 +1,31 @@
+# Release v4.0 — 15 giugno 2026
+
+## DELTA-PLANT esce dalla Beta ed entra ufficialmente in Produzione (GA)
+
+Con questa release DELTA-PLANT passa dallo stato beta allo stato **Production GA (General Availability)**.
+La piattaforma e' ora dichiarata stabile per uso operativo continuativo in contesti reali, mantenendo la traiettoria di ricerca avanzata su VLM agronomici, edge AI e NASA-ISRO/SAR context reasoning.
+
+### Annuncio ufficiale
+
+- Stato progetto: **Production GA**
+- Versione ufficiale: **v4.0**
+- Canale: runtime operativo stabile + evoluzione continua controllata
+
+### Highlights v4.0
+
+- **Fix critico post-diagnosi su canale vocale**: eliminato il comportamento in cui il primo turno vocale poteva essere dirottato su spiegazioni stale del rischio fungino SAR invece di rispondere alla domanda reale dell'operatore.
+- **Seed context hardening**: il contesto seed viene applicato solo a follow-up testuali chiaramente pertinenti; sui turni vocali viene ignorato per evitare contaminazioni semantiche.
+- **Contesto ambiente satellite allineato**: la classificazione ambiente (esterno/serra/interno) usa la stessa pipeline immagine satellite utilizzata nel flusso NASA/SAR inviato su Telegram.
+- **Prompt diagnostico rafforzato**: la diagnosi guidata deve esplicitare la coerenza tra foto pianta e contesto satellitare GPS.
+- **Licenze aggiornate**: numerazione ufficiale EN/IT portata a `v4.0 (Production GA)`.
+- **Manuale tecnico aggiornato in profondita**: documentati GA, nuovi vincoli di qualità risposta e criteri operativi per ambiente/LUX.
+
+### Nota GitHub / comunicazione di rilascio
+
+Da oggi DELTA-PLANT e' comunicato come **progetto in produzione** alla versione **4.0**. Questa release sostituisce formalmente lo stato beta nelle superfici documentali principali (`README`, `RELEASE`, `LICENSE`, `LICENSE.it`, manuale tecnico).
+
+---
+
 # Release v3.3 — 11 giugno 2026
 
 ## Advanced Agronomic LLM, Cris/Ryan e lettura referti scientifici

@@ -20,10 +20,11 @@
   <img src="https://img.shields.io/badge/AI-Hybrid%20Edge%20Vision-0ea5e9" alt="Hybrid Edge Vision" />
   <img src="https://img.shields.io/badge/XAI-LayerCAM-f59e0b" alt="LayerCAM" />
   <img src="https://img.shields.io/badge/Classes-33%20PlantVillage-10b981" alt="33 Plant Classes" />
-  <img src="https://img.shields.io/badge/Version-v3.2-22c55e" alt="Version 3.2" />
+  <img src="https://img.shields.io/badge/Version-v4.0-22c55e" alt="Version 4.0" />
+  <img src="https://img.shields.io/badge/Status-Production%20GA-16a34a" alt="Production GA" />
 </p>
 
-DELTA Plant is a premium deep-tech platform for AI plant health diagnostics, explainable edge vision, robotics orchestration, and precision agriculture workflows. It unifies leaf disease detection, sensor-aware reasoning, agronomic recommendations, DELTAPLANO conversational access, and deployment-ready operations for Raspberry Pi 5.
+DELTA Plant v4.0 is now officially in Production GA (General Availability): the project is out of beta and enters stable production operations for AI plant diagnostics, explainable edge vision, robotics orchestration, and precision agriculture workflows. It unifies leaf disease detection, sensor-aware reasoning, agronomic recommendations, DELTAPLANO conversational access, and deployment-ready operations for Raspberry Pi 5.
 
 Built for researchers, agritech teams, biotech innovators, and venture capital audiences, DELTA Plant presents a differentiated narrative: cinematic product experience on GitHub Pages, production-oriented edge AI in the repository, and a clear bridge between research credibility and operational usability.
 

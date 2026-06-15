@@ -922,6 +922,8 @@ async def _generate_free_chat_response(
     update: Update,
     context: "ContextTypes.DEFAULT_TYPE",
     user_text: str,
+    *,
+    input_mode: str = "text",
 ) -> str:
     user_id = str(update.effective_user.id) if update.effective_user else "0"
 
@@ -1005,6 +1007,17 @@ async def _generate_free_chat_response(
         and _looks_like_agronomic_refinement_request(user_text)
     )
 
+    def _looks_like_seed_followup_query(text: str) -> bool:
+        normalized = str(text or "").strip().lower()
+        if not normalized:
+            return False
+        followup_markers = (
+            "diagnosi", "rischio", "fung", "nasa", "sar", "contesto", "lux", "umid",
+            "spiega", "approfond", "dettag", "perche", "perché", "confermi", "coerente",
+            "questa", "questo", "quel", "quello", "that", "this diagnosis", "why",
+        )
+        return any(marker in normalized for marker in followup_markers)
+
     # --- PATCH: reset contesto LLM se nuova pianta menzionata ---
     def extract_plant_name(text):
         # Semplice estrazione: cerca parole chiave di piante note (estendibile)
@@ -1027,9 +1040,11 @@ async def _generate_free_chat_response(
                 diagnosis_context,
                 response_language,
             )
-        elif chat_seed_context:
+        elif chat_seed_context and input_mode == "text" and _looks_like_seed_followup_query(user_text):
             seed_prefix = "User question" if response_language == VOICE_LANGUAGE_EN else "Domanda utente"
             base_prompt = f"{chat_seed_context}\n\n{seed_prefix}: {user_text}"
+        elif chat_seed_context and input_mode == "voice":
+            logger.info("chat_seed_context ignorato su input vocale per evitare risposte stale post-diagnosi")
         visual_prompt_suffix = _build_free_chat_visual_prompt_suffix(
             response_language=response_language,
             chart_request_mode=chart_request_mode,
@@ -1987,7 +2002,7 @@ async def _handle_free_chat_turn(
     *,
     input_mode: str,
 ) -> str:
-    response = await _generate_free_chat_response(update, context, user_text)
+    response = await _generate_free_chat_response(update, context, user_text, input_mode=input_mode)
     chart_request_mode = _free_chat_chart_request_mode(user_text)
     await _respond_free_chat_output(
         update,

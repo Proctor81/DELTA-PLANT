@@ -1,7 +1,7 @@
-# DELTA v3.3 — Advanced Technical User Guide
+# DELTA v4.0 — Advanced Technical User Guide (Production GA)
 
 **Date:** 15 June 2026  
-**Version:** 3.3  
+**Version:** 4.0 (Production GA)  
 **Audience:** technical users, agronomists, maintainers, field operators
 
 ---
@@ -10,7 +10,7 @@
 
 This guide reflects the runtime that is actually active in the current DELTA Plant repository. The legacy filename is kept for compatibility, but the content is no longer centered on the old Telegram diagnosis flow based on mandatory plant description, multi-question fallback loops and PlantVillage-only routing.
 
-Today DELTA v3.2 is an operational hybrid stack built around four coordinated layers:
+Today DELTA v4.0 (Production GA) is an operational hybrid stack built around four coordinated layers:
 
 1. Telegram operator experience with guided diagnosis, direct-photo diagnosis, free chat, voice and NASA-ISRO/SAR
 2. Hugging Face conversational and multimodal inference for advanced operator-facing reasoning
@@ -20,6 +20,14 @@ Today DELTA v3.2 is an operational hybrid stack built around four coordinated la
 ---
 
 ## Current Runtime At A Glance
+
+### Production GA status (v4.0)
+
+- DELTA-PLANT is officially out of beta and enters Production GA
+- the Telegram diagnosis pipeline is now treated as production-critical surface
+- diagnostics, free chat, voice and NASA/SAR context flows are hardened for continuity between turns
+- EN/IT license release numbering is aligned to `v4.0 (Production GA)`
+- release communication and docs now declare production status consistently
 
 ### Operator-facing diagnosis modes
 
@@ -105,6 +113,18 @@ Operational boundary:
 - voice is primarily intended for free chat
 - in guided diagnosis, voice is allowed only where a textual answer is still meaningful, such as manual sensor input or rare native fallback follow-up
 - voice is not accepted while DELTA is waiting for a required photo or inline button choice
+
+### Voice stability hardening (v4.0)
+
+In production telemetry we observed a post-diagnosis edge case: on the first voice turn after diagnosis, DELTA could answer with stale SAR fungal-risk explanatory context instead of the operator's actual question.
+
+v4.0 introduces a deterministic guard:
+
+- diagnosis/NASA seed context is no longer injected blindly at first turn
+- seed context is applied only for explicit text follow-up requests that are semantically related to diagnosis/SAR context
+- for voice turns, stale seed context is ignored to avoid semantic hijacking
+
+Operational result: first voice question after diagnosis now follows the actual transcript intent.
 
 ## Advanced Telegram LLM And Report Refinement
 
@@ -194,6 +214,36 @@ The corrected LUX values (`lux_today_adjusted`, `lux_mean_adjusted`) are passed 
 **GPS orphan fix (v3.3):** if GPS is received but no diagnosis or NASA/SAR flow is pending (e.g., after a bot restart), DELTA now replies with a clear message instead of silently ignoring the position.
 
 **Cancel fix (v3.3):** `/annulla` now preserves the operator's language preference (Cris/Ryan) when clearing the guided state.
+
+### 7. Satellite image coherence and environment validation (v4.0)
+
+v4.0 enforces image-source coherence between the two satellite-dependent flows:
+
+- the map sent in Telegram NASA/SAR flow
+- the satellite image used by the VLM to classify environment (`outdoor` / `greenhouse` / `indoor`)
+
+Both now use the same satellite-image generation path (`get_satellite_image_with_marker`) with aligned parameters (center, radius, zoom, marker), reducing divergence between human-visible map evidence and machine classification evidence.
+
+The guided diagnosis prompt now requires explicit coherence validation between:
+
+- plant-photo visual clues
+- GPS-derived satellite environment classification
+
+Expected output behavior in diagnosis block 1:
+
+- explicit environment statement (outdoor/greenhouse/indoor)
+- explicit coherence judgement (coherent/incoherent between satellite context and plant photo)
+- uncertainty declaration when evidence is weak
+
+### 8. GA acceptance criteria (operational)
+
+For production acceptance in DELTA v4.0, the following criteria are required:
+
+1. voice first-turn after diagnosis must answer the user transcript intent without stale SAR diversion
+2. GPS context must expose environment type with confidence and rationale
+3. LUX values must be environment-adjusted before diagnosis reasoning (`1.0 outdoor`, `0.5 greenhouse`, `N/A indoor`)
+4. diagnosis output must visibly expose environment context and coherence statement
+5. fallback behavior (models unavailable, GPS unavailable, web app fallback) must return actionable operator feedback
 
 ---
 
