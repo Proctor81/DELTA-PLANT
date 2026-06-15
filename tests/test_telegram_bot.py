@@ -2618,9 +2618,8 @@ def test_menu_callback_english_voice_button_sets_english_override(monkeypatch):
     assert requested == [tg.VOICE_LANGUAGE_EN]
 
 
-def test_export_excel_uses_last_30_days_and_sends_document(monkeypatch, tmp_path):
+def test_export_excel_is_disabled(monkeypatch):
     sent_messages = []
-    sent_documents = []
 
     async def fake_guard(update):
         return True
@@ -2628,70 +2627,15 @@ def test_export_excel_uses_last_30_days_and_sends_document(monkeypatch, tmp_path
     async def fake_send(update, text, reply_markup=None, parse_mode=None):
         sent_messages.append(text)
 
-    class FakeDatabase:
-        def __init__(self):
-            self.prune_calls = []
-            self.query_calls = []
-
-        def prune_older_than_days(self, days):
-            self.prune_calls.append(days)
-            return 2
-
-        def get_records_since_days(self, days):
-            self.query_calls.append(days)
-            return [
-                {
-                    "timestamp": "2026-05-24T10:00:00",
-                    "sensor_source": "sim",
-                    "ai_class": "Tomato_healthy",
-                    "ai_confidence": 0.91,
-                    "ai_simulated": 0,
-                    "ai_top3_json": "[]",
-                    "plant_status": "healthy",
-                    "overall_risk": "low",
-                    "needs_review": 0,
-                    "summary": "ok",
-                    "explanation": "ok",
-                    "activated_rules": "[]",
-                    "recommendations": "[]",
-                    "temperature_c": 22.0,
-                    "humidity_pct": 58.0,
-                    "pressure_hpa": 1012.0,
-                    "light_lux": 500.0,
-                    "co2_ppm": 420.0,
-                    "ph": 6.4,
-                    "ec_ms_cm": 1.3,
-                }
-            ]
-
-    class FakeExporter:
-        def export_all(self, records):
-            from data.excel_export import EXPORT_PATH
-
-            EXPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-            EXPORT_PATH.write_bytes(b"xlsx")
-            return True
-
-    class FakeChat:
-        async def send_document(self, document, filename=None):
-            sent_documents.append((filename, document.read()))
-
-    fake_agent = types.SimpleNamespace(database=FakeDatabase(), exporter=FakeExporter())
-
     monkeypatch.setattr(tg, "_guard", fake_guard)
     monkeypatch.setattr(tg, "_send", fake_send)
-    monkeypatch.setattr(tg, "_get_agent", lambda context: fake_agent)
-    monkeypatch.setattr("data.excel_export.EXPORT_PATH", tmp_path / "delta_diagnoses.xlsx")
 
-    update = types.SimpleNamespace(effective_chat=FakeChat())
+    update = types.SimpleNamespace(effective_chat=types.SimpleNamespace())
     context = types.SimpleNamespace(user_data={}, application=types.SimpleNamespace(bot_data={}))
 
     asyncio.run(tg.export_excel(update, context))
 
-    assert fake_agent.database.prune_calls == [30]
-    assert fake_agent.database.query_calls == [30]
-    assert sent_messages[0].startswith("📤 Report Excel in preparazione")
-    assert sent_documents == [("delta_diagnoses.xlsx", b"xlsx")]
+    assert sent_messages == ["La funzione Report Excel e' stata disabilitata."]
 
 
 def test_clear_diagnosis_state_resets_flags_and_transient_markers():

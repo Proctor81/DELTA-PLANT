@@ -2423,9 +2423,6 @@ def _menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> Inl
             InlineKeyboardButton("🆕 Diagnose a Plant" if english_ui else "🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
         ],
         [
-            InlineKeyboardButton("📤 Excel Reports" if english_ui else "📤 Report Excel", callback_data=CMD_EXPORT),
-        ],
-        [
             InlineKeyboardButton("📄 License" if english_ui else "📄 Licenza", callback_data=CMD_LICENSE),
         ],
         [
@@ -7513,8 +7510,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start_upload(update, context)
     elif query.data == CMD_REPORT:
         await report(update, context)
-    elif query.data == CMD_EXPORT:
-        await export_excel(update, context)
     elif query.data == CMD_IMAGES:
         await images(update, context)
     elif query.data in {CMD_SENSORS, CMD_HEALTH, CMD_PREFLIGHT, CMD_ACADEMY}:
@@ -7618,78 +7613,14 @@ async def batch_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
-    agent = _get_agent(context)
-    owns_database = False
-
-    if agent:
-        database = agent.database
-        exporter = agent.exporter
-    else:
-        from data.database import Database
-        from data.excel_export import ExcelExporter
-
-        database = Database()
-        exporter = ExcelExporter()
-        owns_database = True
-
-    await _send(update, _ui_text(context, "📤 Report Excel in preparazione: finestra mobile ultimi 30 giorni.", "📤 Excel report in preparation: rolling 30-day window."))
-
-    try:
-        await asyncio.to_thread(database.prune_older_than_days, 30)
-        records_db = await asyncio.to_thread(database.get_records_since_days, 30)
-        if not records_db:
-            await _send(update, _ui_text(context, "Nessun dato disponibile negli ultimi 30 giorni.", "No data available in the last 30 days."))
-            return
-
-        def _convert_records():
-            converted = []
-            import json as _json
-            for r in records_db:
-                converted.append({
-                    "timestamp": r.get("timestamp"),
-                    "sensor_data": {"source": r.get("sensor_source")},
-                    "ai_result": {
-                        "class": r.get("ai_class"),
-                        "confidence": r.get("ai_confidence", 0),
-                        "simulated": bool(r.get("ai_simulated")),
-                        "top3": _json.loads(r.get("ai_top3_json") or "[]"),
-                    },
-                    "diagnosis": {
-                        "plant_status": r.get("plant_status"),
-                        "overall_risk": r.get("overall_risk"),
-                        "needs_human_review": bool(r.get("needs_review")),
-                        "summary": r.get("summary"),
-                        "explanation": r.get("explanation"),
-                        "activated_rules": _json.loads(r.get("activated_rules") or "[]"),
-                        "sensor_snapshot": {
-                            "temperature_c": r.get("temperature_c"),
-                            "humidity_pct":  r.get("humidity_pct"),
-                            "pressure_hpa":  r.get("pressure_hpa"),
-                            "light_lux":     r.get("light_lux"),
-                            "co2_ppm":       r.get("co2_ppm"),
-                            "ph":            r.get("ph"),
-                            "ec_ms_cm":      r.get("ec_ms_cm"),
-                            "source":        r.get("sensor_source"),
-                        },
-                    },
-                    "recommendations": _json.loads(r.get("recommendations") or "[]"),
-                })
-            return converted
-
-        converted = await asyncio.to_thread(_convert_records)
-        ok = await asyncio.to_thread(exporter.export_all, converted)
-        if not ok:
-            await _send(update, _ui_text(context, "Errore durante l'esportazione Excel.", "Error during Excel export."))
-            return
-        from data.excel_export import EXPORT_PATH
-        if not EXPORT_PATH.exists():
-            await _send(update, _ui_text(context, "File Excel non trovato.", "Excel file not found."))
-            return
-        with open(EXPORT_PATH, "rb") as f:
-            await update.effective_chat.send_document(document=f, filename=EXPORT_PATH.name)
-    finally:
-        if owns_database:
-            database.close()
+    await _send(
+        update,
+        _ui_text(
+            context,
+            "La funzione Report Excel e' stata disabilitata.",
+            "The Excel Report feature has been disabled.",
+        ),
+    )
 
 
 async def preflight(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7867,7 +7798,7 @@ async def academy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 TUTORIAL_STEPS = [
     ("PASSO 1 — Avvio", "DELTA avvia modello AI e thread sensori; se l'hardware manca usa modalità simulata."),
-    ("PASSO 2 — Menu", "Dal menu puoi avviare diagnosi, sensori, report, export Excel e Academy."),
+    ("PASSO 2 — Menu", "Dal menu puoi avviare diagnosi, report e Academy."),
     ("PASSO 3 — Diagnosi", "Invia una foto o usa input_images, poi DELTA analizza immagine + sensori."),
     ("PASSO 4 — Rischio", "Livelli: nessuno/basso/medio/alto/critico. Confidenza bassa richiede revisione."),
     ("PASSO 5 — Parametri", "Temperatura, umidità, luce, CO₂, pH, EC: restano la base per la diagnosi."),
@@ -7875,7 +7806,7 @@ TUTORIAL_STEPS = [
 
 TUTORIAL_STEPS_EN = [
     ("STEP 1 — Startup", "DELTA starts the AI model and sensor threads; if hardware is missing it uses simulated mode."),
-    ("STEP 2 — Menu", "From the menu you can start diagnosis, sensors, reports, Excel export, and Academy."),
+    ("STEP 2 — Menu", "From the menu you can start diagnosis, reports, and Academy."),
     ("STEP 3 — Diagnosis", "Send a photo or use input_images, then DELTA analyzes image plus sensors."),
     ("STEP 4 — Risk", "Levels: none, low, medium, high, critical. Low confidence requires review."),
     ("STEP 5 — Parameters", "Temperature, humidity, light, CO₂, pH, and EC remain the basis for diagnosis."),
@@ -8225,7 +8156,6 @@ def run_telegram_bot(agent=None):
     application.add_handler(CommandHandler("annulla", cancel))
     application.add_handler(CommandHandler("report", report))
     application.add_handler(CommandHandler("dettaglio", detail))
-    application.add_handler(CommandHandler("export", export_excel))
     application.add_handler(CommandHandler("images", images))
     application.add_handler(CommandHandler("voice", voice_mode_command))
     application.add_handler(CommandHandler("voice_lang", voice_language_command))
