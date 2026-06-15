@@ -163,6 +163,16 @@ except ImportError:
 
 logger = logging.getLogger("delta.interface.telegram")
 
+_NASA_SAR_WEBAPP_URL_CACHE: Optional[str] = None
+
+
+def _url_is_reachable(url: str, timeout_sec: float = 2.5) -> bool:
+    try:
+        response = requests.get(url, timeout=timeout_sec, allow_redirects=True)
+        return 200 <= int(response.status_code) < 400
+    except Exception:
+        return False
+
 _FREE_CHAT_TRANSIENT_MARKERS = (
     "diag_waiting_for_photo",
     "diag_waiting_for_location",
@@ -2363,8 +2373,29 @@ def _load_allowed_usernames() -> Set[str]:
 
 
 def _nasa_sar_webapp_url() -> str:
+    global _NASA_SAR_WEBAPP_URL_CACHE
+
+    if _NASA_SAR_WEBAPP_URL_CACHE:
+        return _NASA_SAR_WEBAPP_URL_CACHE
+
     base = TELEGRAM_CONFIG.get("web_app_base_url", "https://deltaplant.ai").rstrip("/")
-    return f"{base}/telegram/nasa-sar-locator.html"
+    primary_url = f"{base}/telegram/nasa-sar-locator.html"
+    fallback_url = "https://proctor81.github.io/DELTA-PLANT/telegram/nasa-sar-locator.html"
+
+    # Prova prima la URL configurata; se non raggiungibile usa fallback GitHub Pages.
+    for candidate in (primary_url, fallback_url):
+        if _url_is_reachable(candidate):
+            _NASA_SAR_WEBAPP_URL_CACHE = candidate
+            if candidate != primary_url:
+                logger.warning("Mini App NASA/SAR fallback attivo: %s", candidate)
+            return candidate
+
+    _NASA_SAR_WEBAPP_URL_CACHE = fallback_url
+    logger.warning(
+        "Mini App NASA/SAR: nessuna URL verificata raggiungibile, uso fallback forzato: %s",
+        fallback_url,
+    )
+    return fallback_url
 
 
 def _menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> InlineKeyboardMarkup:

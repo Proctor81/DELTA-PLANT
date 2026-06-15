@@ -423,7 +423,7 @@ API_CONFIG = {
 TELEGRAM_CONFIG = {
     "enable_telegram": True,
     "token_env": "TELEGRAM_BOT_TOKEN",  # Assicurarsi che la variabile sia impostata
-    "web_app_base_url": "https://deltaplant.ai",
+    "web_app_base_url": "https://proctor81.github.io/DELTA-PLANT",
 }
 
 # ─────────────────────────────────────────────
@@ -437,7 +437,7 @@ TELEGRAM_CONFIG = {
     "authorized_usernames": [],        # Lista nickname (con @) (vuota = accesso aperto)
     "authorized_usernames_file": str(BASE_DIR / "data" / "telegram_scientists.local.json"),
     "api_base_url": "http://localhost:5000",
-    "web_app_base_url": "https://deltaplant.ai",
+    "web_app_base_url": "https://proctor81.github.io/DELTA-PLANT",
     "request_timeout_sec": 5,
     "conversation_timeout_sec": 300,   # 5 minuti
     "poll_interval_sec": 1.0,
