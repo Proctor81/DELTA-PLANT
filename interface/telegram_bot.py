@@ -342,7 +342,7 @@ def _is_nasa_sar_manual_location_fallback_text(text: str) -> bool:
         .replace("🛰️", " ")
         .split()
     ).strip().lower()
-    return normalized in {"invia gps manualmente", "send gps manually"}
+    return normalized in {"invia gps manualmente", "send gps manually", "invia gps ora", "send gps now"}
 
 
 def is_guided_diagnosis_mode(
@@ -2233,8 +2233,8 @@ async def free_chat_handler(update: "Update", context: "ContextTypes.DEFAULT_TYP
             update,
             _ui_text(
                 context,
-                "📍 Questo client Telegram non ha condiviso una posizione GPS reale. Apri DELTAPLANO dal telefono e usa di nuovo Invia GPS manualmente oppure Apri NASA-ISRO/SAR GPS. Qui resto in attesa della posizione; usa /annulla per uscire.",
-                "📍 This Telegram client did not share a real GPS position. Open DELTAPLANO on your phone and use Send GPS manually again or Open NASA-ISRO/SAR GPS. I will keep waiting for the location here; use /annulla to exit.",
+                "📍 Questo client Telegram non ha condiviso una posizione GPS reale. Apri DELTAPLANO dal telefono e usa di nuovo Invia GPS ora. Qui resto in attesa della posizione; usa /annulla per uscire.",
+                "📍 This Telegram client did not share a real GPS position. Open DELTAPLANO on your phone and use Send GPS now again. I will keep waiting for the location here; use /annulla to exit.",
             ),
             reply_markup=_nasa_sar_reply_keyboard(context),
         )
@@ -4073,15 +4073,14 @@ def _build_nasa_sar_scientific_interpretation(
 def _nasa_sar_reply_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton(_ui_text(context, "🛰️ Apri NASA-ISRO/SAR GPS", "🛰️ Open NASA-ISRO/SAR GPS"), web_app=WebAppInfo(url=_nasa_sar_webapp_url()))],
-            [KeyboardButton(_ui_text(context, "📍 Invia GPS manualmente", "📍 Send GPS manually"), request_location=True)],
+            [KeyboardButton(_ui_text(context, "📍 Invia GPS ora", "📍 Send GPS now"), request_location=True)],
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
         input_field_placeholder=_ui_text(
             context,
-            "Apri il locator automatico oppure condividi manualmente la posizione.",
-            "Open the automatic locator or manually share your position.",
+            "Condividi la posizione GPS direttamente in chat.",
+            "Share your GPS location directly in chat.",
         ),
     )
 
@@ -4395,12 +4394,10 @@ async def nasa_sar_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         _ui_text(
             context,
             "🛰️ <b>NASA-ISRO/SAR pronto</b>\n\n"
-            "Tocca <b>Apri NASA-ISRO/SAR GPS</b> per avviare la Mini App Telegram e rilevare automaticamente la posizione del telefono. "
-            "Se il client non supporta il passaggio automatico, usa <b>Invia GPS manualmente</b>. "
+            "Tocca <b>Invia GPS ora</b> per condividere la posizione direttamente in Telegram. "
             "Analizzero' un'area circolare di 50 metri e ti mostrero' la dashboard SAR con mappa, localita' e sintesi semplice basata su umidita' del suolo satellitare e meteo ufficiale Open-Meteo Archive.",
             "🛰️ <b>NASA-ISRO/SAR ready</b>\n\n"
-            "Tap <b>Open NASA-ISRO/SAR GPS</b> to start the Telegram Mini App and detect your phone position automatically. "
-            "If your client does not support the automatic handoff, use <b>Send GPS manually</b>. "
+            "Tap <b>Send GPS now</b> to share your location directly in Telegram. "
             "I will analyze a circular area of 50 meters and show you the SAR dashboard with map, locality, and a simple summary based on satellite soil moisture and official Open-Meteo Archive weather.",
         ),
         reply_markup=_nasa_sar_reply_keyboard(context),
@@ -4486,8 +4483,8 @@ async def handle_nasa_sar_web_app_data(update: Update, context: ContextTypes.DEF
                 update,
                 _ui_text(
                     context,
-                    "La posizione automatica non e' disponibile. Condividi la posizione con <b>Invia GPS manualmente</b> per completare la diagnosi.",
-                    "Automatic position is unavailable. Share the position with <b>Send GPS manually</b> to complete the diagnosis.",
+                    "La posizione automatica non e' disponibile. Condividi la posizione con <b>Invia GPS ora</b> per completare la diagnosi.",
+                    "Automatic position is unavailable. Share the position with <b>Send GPS now</b> to complete the diagnosis.",
                 ),
                 reply_markup=_nasa_sar_reply_keyboard(context),
                 parse_mode="HTML",

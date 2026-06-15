@@ -200,15 +200,60 @@ def _fallback_satellite_image(lat: float, lon: float, radius_m: int = 50, size: 
     return img
 
 
+def _draw_target_overlay(img: Image.Image, lat: float, radius_m: int, zoom: int, size: int) -> Image.Image:
+    draw = ImageDraw.Draw(img)
+    center = (size // 2, size // 2)
+    meters_per_pixel = 156543.03392 * abs(np.cos(np.radians(lat))) / (2 ** zoom)
+    radius_px = max(int(radius_m / max(meters_per_pixel, 0.01)), 12)
+    draw.ellipse(
+        [
+            center[0] - radius_px,
+            center[1] - radius_px,
+            center[0] + radius_px,
+            center[1] + radius_px,
+        ],
+        outline="red",
+        width=3,
+    )
+    cross_len = 16
+    draw.line([center[0] - cross_len, center[1], center[0] + cross_len, center[1]], fill="red", width=2)
+    draw.line([center[0], center[1] - cross_len, center[0], center[1] + cross_len], fill="red", width=2)
+    return img
+
+
+def _arcgis_world_imagery_url(lat: float, lon: float, size: int, context_meters: float = 220.0) -> str:
+    lat_delta = context_meters / 111320.0
+    cos_lat = abs(np.cos(np.radians(lat)))
+    lon_delta = context_meters / (111320.0 * max(cos_lat, 1e-6))
+    params = {
+        "bbox": f"{lon - lon_delta},{lat - lat_delta},{lon + lon_delta},{lat + lat_delta}",
+        "bboxSR": "4326",
+        "imageSR": "4326",
+        "size": f"{size},{size}",
+        "format": "jpg",
+        "transparent": "false",
+        "f": "image",
+    }
+    return "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?" + requests.compat.urlencode(params)
+
+
 def get_satellite_image_with_marker(lat: float, lon: float, radius_m: int = 50, zoom: int = 18, size: int = 512) -> Image.Image:
     """
     Scarica un'immagine satellitare centrata su lat/lon e disegna un mirino + cerchio di raggio specificato.
-    Usa Mapbox Static API se e presente un token ambiente; altrimenti genera un fallback locale.
+    Usa Mapbox Static API se e presente un token ambiente; se assente usa ArcGIS World Imagery.
+    Il placeholder locale viene usato solo come ultima risorsa in caso di errore rete/provider.
     """
     access_token = (os.getenv("DELTA_MAPBOX_ACCESS_TOKEN") or os.getenv("MAPBOX_ACCESS_TOKEN") or "").strip()
     if not access_token:
-        logging.warning("NASA/SAR map fallback: token Mapbox non configurato, uso placeholder locale")
-        return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
+        try:
+            arcgis_url = _arcgis_world_imagery_url(lat, lon, size=size)
+            response = requests.get(arcgis_url, timeout=10)
+            response.raise_for_status()
+            img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+            return _draw_target_overlay(img, lat=lat, radius_m=radius_m, zoom=zoom, size=size)
+        except Exception as exc:
+            logging.warning("NASA/SAR map fallback: ArcGIS imagery non disponibile (%s), uso placeholder locale", exc)
+            return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
 
     url = (
         f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/"
@@ -218,21 +263,22 @@ def get_satellite_image_with_marker(lat: float, lon: float, radius_m: int = 50, 
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         img = Image.open(io.BytesIO(response.content)).convert("RGBA")
-        draw = ImageDraw.Draw(img)
-        center = (size // 2, size // 2)
-        meters_per_pixel = 156543.03392 * abs(np.cos(np.radians(lat))) / (2 ** zoom)
-        radius_px = max(int(radius_m / meters_per_pixel), 12)
-        draw.ellipse([
-            center[0] - radius_px, center[1] - radius_px,
-            center[0] + radius_px, center[1] + radius_px
-        ], outline="red", width=3)
-        cross_len = 16
-        draw.line([center[0] - cross_len, center[1], center[0] + cross_len, center[1]], fill="red", width=2)
-        draw.line([center[0], center[1] - cross_len, center[0], center[1] + cross_len], fill="red", width=2)
-        return img
+        return _draw_target_overlay(img, lat=lat, radius_m=radius_m, zoom=zoom, size=size)
     except Exception as exc:
-        logging.warning("NASA/SAR map fallback: download mappa satellite fallito (%s), uso placeholder locale", exc)
-        return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
+        try:
+            arcgis_url = _arcgis_world_imagery_url(lat, lon, size=size)
+            response = requests.get(arcgis_url, timeout=10)
+            response.raise_for_status()
+            img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+            logging.warning("NASA/SAR map fallback: Mapbox non disponibile (%s), uso ArcGIS World Imagery", exc)
+            return _draw_target_overlay(img, lat=lat, radius_m=radius_m, zoom=zoom, size=size)
+        except Exception as arcgis_exc:
+            logging.warning(
+                "NASA/SAR map fallback: download satellite fallito (Mapbox=%s, ArcGIS=%s), uso placeholder locale",
+                exc,
+                arcgis_exc,
+            )
+            return _fallback_satellite_image(lat, lon, radius_m=radius_m, size=size)
 import datetime
 
 

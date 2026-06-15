@@ -465,17 +465,13 @@ def test_send_falls_back_to_chat_send_message_when_reply_text_fails():
     ]
 
 
-def test_nasa_sar_reply_keyboard_contains_webapp_and_manual_location(monkeypatch):
-    monkeypatch.setitem(tg.TELEGRAM_CONFIG, "web_app_base_url", "https://deltaplant.ai")
-
+def test_nasa_sar_reply_keyboard_contains_direct_location_button():
     keyboard = tg._nasa_sar_reply_keyboard()
-    first_button = keyboard.keyboard[0][0]
-    second_button = keyboard.keyboard[1][0]
+    button = keyboard.keyboard[0][0]
 
-    assert first_button.text == "🛰️ Apri NASA-ISRO/SAR GPS"
-    assert first_button.web_app.url == "https://deltaplant.ai/telegram/nasa-sar-locator.html"
-    assert second_button.text == "📍 Invia GPS manualmente"
-    assert second_button.request_location is True
+    assert button.text == "📍 Invia GPS ora"
+    assert button.request_location is True
+    assert button.web_app is None
 
 
 def test_handle_nasa_sar_web_app_data_runs_analysis(monkeypatch):
@@ -1944,7 +1940,7 @@ def test_nasa_sar_reply_keyboard_uses_english_labels_when_override_active():
     keyboard = tg._nasa_sar_reply_keyboard(context)
     labels = [button.text for row in keyboard.keyboard for button in row]
 
-    assert labels == ["🛰️ Open NASA-ISRO/SAR GPS", "📍 Send GPS manually"]
+    assert labels == ["📍 Send GPS now"]
 
 
 def test_chat_exit_keyboard_uses_english_labels_when_override_active():
@@ -2862,7 +2858,7 @@ def test_free_chat_handler_explains_manual_gps_fallback_on_telegram_web(monkeypa
         logger.propagate = old_propagate
 
     assert len(sends) == 1
-    assert "Telegram Web/Desktop" in sends[0][0]
+    assert "client Telegram" in sends[0][0]
     assert "resto in attesa della posizione" in sends[0][0]
     assert isinstance(sends[0][1], tg.ReplyKeyboardMarkup)
     assert sends[0][2] is None
