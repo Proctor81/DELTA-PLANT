@@ -3314,19 +3314,30 @@ def _build_nasa_sar_map_photo_payload(
     language: str = VOICE_LANGUAGE_IT,
     locality_label: Optional[str] = None,
 ) -> Optional[BytesIO]:
-    map_url = _build_nasa_sar_map_url(latitude, longitude)
-
     try:
-        response = requests.get(map_url, timeout=10)
-        response.raise_for_status()
+        # Usa la stessa pipeline satellitare utilizzata anche dalla classificazione
+        # ambiente del VLM (stessa immagine base: lat/lon + marker + zoom).
+        from bot.nasa_sar_dashboard import get_satellite_image_with_marker
 
+        satellite = get_satellite_image_with_marker(
+            float(latitude),
+            float(longitude),
+            radius_m=80,
+            zoom=19,
+            size=512,
+        )
+        if satellite is None:
+            logger.warning("Mappa NASA/SAR non disponibile: get_satellite_image_with_marker ha restituito None")
+            return None
+
+        image = satellite.convert("RGBA") if PIL_AVAILABLE else satellite
         if not PIL_AVAILABLE:
-            payload = BytesIO(response.content)
+            payload = BytesIO()
+            image.save(payload, format="JPEG", quality=88)
             payload.seek(0)
             payload.name = "nasa_sar_dashboard.jpg"
             return payload
 
-        image = Image.open(BytesIO(response.content)).convert("RGBA")
         width, height = image.size
         center_x, center_y = width // 2, height // 2
 
@@ -4889,6 +4900,7 @@ def _build_guided_multimodal_diagnosis_prompt(
             "Analyze ONLY the attached plant photo together with any available GPS/NASA-ISRO/SAR/LUX environmental context.",
             "Mandatory constraints:",
             "- Use the photo as the primary source and the GPS/NASA-ISRO/SAR/LUX context as supporting evidence.",
+            "- The GPS context includes a satellite-based environment classification (outdoor/greenhouse/indoor): explicitly validate coherence between this satellite context and the plant photo clues.",
             "- If optional operator notes are available, use them only as secondary context when they are coherent with the image.",
             "- Do not use PlantVillage classes, local classifiers, hidden native AI outputs, or explainability overlays.",
             "- Do not ask for another photo: image acquisition is already complete.",
@@ -4912,6 +4924,7 @@ def _build_guided_multimodal_diagnosis_prompt(
             "- Plant: ...",
             "- Technical assessment: ...",
             "- Confidence: ...",
+            "- Environment context (outdoor/greenhouse/indoor): ... (state if coherent/incoherent between satellite context and photo)",
             "2) Diagnosis and risk",
             "- ...",
             "3) Immediate control actions (0-24h)",
@@ -4930,6 +4943,7 @@ def _build_guided_multimodal_diagnosis_prompt(
         "Analizza SOLO la foto allegata della pianta insieme agli eventuali dati ambientali disponibili.",
         "Vincoli obbligatori:",
         "- Usa la foto come fonte primaria e il contesto GPS/NASA-ISRO/SAR/LUX come supporto diagnostico.",
+        "- Il contesto GPS include la classificazione ambiente da satellite (esterno/serra/interno): verifica esplicitamente la coerenza tra questo contesto satellitare e gli indizi visivi della foto della pianta.",
         "- Se sono presenti note operatore opzionali, usale solo come contesto secondario quando sono coerenti con l'immagine.",
         "- Non usare classi PlantVillage, classificatori locali, output nascosti dell'AI nativa o overlay di explainability.",
         "- Non chiedere un'altra foto: l'acquisizione immagine è già completa.",
@@ -4953,6 +4967,7 @@ def _build_guided_multimodal_diagnosis_prompt(
         "- Pianta: ...",
         "- Esito tecnico: ...",
         "- Certezza: ...",
+        "- Contesto ambiente (esterno/serra/interno): ... (indica se coerente/non coerente tra satellite e foto)",
         "2) Diagnosi e rischio",
         "- ...",
         "3) Interventi immediati (0-24h)",
