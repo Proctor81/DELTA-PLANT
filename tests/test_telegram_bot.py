@@ -1471,6 +1471,44 @@ def test_generate_free_chat_response_consumes_seed_context(monkeypatch):
     assert "chat_seed_context" not in context.user_data
 
 
+def test_free_chat_handler_ignores_low_signal_followup_with_seed_context(monkeypatch):
+    async def fake_guard(update):
+        return True
+
+    async def fake_send_action(*args, **kwargs):
+        return None
+
+    update = types.SimpleNamespace(
+        message=types.SimpleNamespace(text="1"),
+        effective_user=types.SimpleNamespace(id=42),
+        effective_chat=types.SimpleNamespace(send_action=fake_send_action),
+    )
+    context = types.SimpleNamespace(
+        user_data={"chat_seed_context": "Contesto della piu recente diagnosi DELTA Plant"},
+        application=types.SimpleNamespace(bot_data={}),
+    )
+    logger = logging.getLogger("deltaplano.chat")
+    old_handlers = list(logger.handlers)
+    old_propagate = logger.propagate
+    logger.handlers = [logging.NullHandler()]
+    logger.propagate = False
+
+    monkeypatch.setattr(tg, "_guard", fake_guard)
+    monkeypatch.setattr(
+        tg,
+        "_get_chat_engine",
+        lambda current_context: (_ for _ in ()).throw(AssertionError("engine.chat non deve essere chiamato")),
+    )
+
+    try:
+        asyncio.run(tg.free_chat_handler(update, context))
+    finally:
+        logger.handlers = old_handlers
+        logger.propagate = old_propagate
+
+    assert context.user_data["chat_seed_context"] == "Contesto della piu recente diagnosi DELTA Plant"
+
+
 def test_generate_free_chat_response_localizes_seed_context_prefix_in_english(monkeypatch):
     prompts = []
 

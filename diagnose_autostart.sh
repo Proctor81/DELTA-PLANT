@@ -203,12 +203,37 @@ header "TEST 8: Verifica PID file"
 
 PID_FILE="${DELTA_DIR}/delta.pid"
 if [[ -f "$PID_FILE" ]]; then
-    PID=$(cat "$PID_FILE")
-    if ps -p "$PID" > /dev/null 2>&1; then
-        warn "PID file contiene processo attivo (PID $PID). OK."
+    PID=$(python3 - "$PID_FILE" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+raw = path.read_text(encoding='utf-8').strip()
+try:
+    payload = json.loads(raw)
+except json.JSONDecodeError:
+    payload = raw
+
+if isinstance(payload, dict):
+    print(payload.get("pid", ""))
+else:
+    print(str(payload).strip())
+PY
+)
+    if [[ "$PID" =~ ^[0-9]+$ ]]; then
+        if ps -p "$PID" > /dev/null 2>&1; then
+            warn "PID file contiene processo attivo (PID $PID). OK."
+            CMDLINE=$(tr '\0' ' ' < "/proc/${PID}/cmdline" 2>/dev/null || true)
+            if [[ "$CMDLINE" == *"main.py --preflight --enable-api --enable-telegram --daemon"* ]]; then
+                warn "Istanza manuale rilevata: puo bloccare l'avvio di delta.service finche non viene terminata."
+            fi
+        else
+            warn "PID file contiene processo TERMINATO (PID $PID)"
+            warn "Ripulire con: rm '${PID_FILE}'"
+        fi
     else
-        warn "PID file contiene processo TERMINATO (PID $PID)"
-        warn "Ripulire con: rm '${PID_FILE}'"
+        warn "PID file presente ma non interpretabile: ${PID_FILE}"
     fi
 else
     info "Nessun PID file (normale se servizio non è attivo)"
