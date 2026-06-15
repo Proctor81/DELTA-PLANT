@@ -3603,9 +3603,16 @@ def _fetch_external_weather_reference(result: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _fetch_weekly_lux_reference(latitude: float, longitude: float, days: int = 7) -> Dict[str, Any]:
-    """Recupera una stima LUX settimanale da NASA POWER per il punto GPS."""
+    """Recupera una stima LUX settimanale da NASA POWER per il punto GPS.
+
+    Scarica una finestra di 14 giorni per compensare il ritardo tipico di NASA POWER
+    (3-7 giorni), poi mantiene i 'days' valori piu recenti disponibili in modo da
+    ottenere sempre la media settimanale piu affidabile possibile.
+    """
     end = datetime.utcnow().date()
-    start = end - timedelta(days=max(days - 1, 0))
+    # Scarica 14 giorni: 7 richiesti + 7 di buffer per il lag di NASA POWER
+    query_window = max(days + 7, 14)
+    start = end - timedelta(days=query_window - 1)
     try:
         response = requests.get(
             "https://power.larc.nasa.gov/api/temporal/daily/point",
@@ -3619,33 +3626,39 @@ def _fetch_weekly_lux_reference(latitude: float, longitude: float, days: int = 7
                 "format": "JSON",
             },
             headers={"User-Agent": "DELTA Plant/1.0 (+https://deltaplant.ai)"},
-            timeout=10,
+            timeout=12,
         )
         response.raise_for_status()
         payload = response.json() or {}
         raw_daily = ((payload.get("properties") or {}).get("parameter") or {}).get("ALLSKY_SFC_SW_DWN") or {}
-        daily: List[Dict[str, Any]] = []
+        all_daily: List[Dict[str, Any]] = []
         for raw_day, raw_value in sorted(raw_daily.items()):
             value = _coerce_float(raw_value)
+            # NASA POWER usa -999 per dati mancanti; saltiamo valori negativi
             if value is None or value < 0:
                 continue
             day_text = str(raw_day)
             day = f"{day_text[:4]}-{day_text[4:6]}-{day_text[6:8]}" if len(day_text) == 8 else day_text
             mean_w_m2_24h = (float(value) * 1000.0) / 24.0
-            daily.append(
+            all_daily.append(
                 {
                     "day": day,
                     "solar_kwh_m2_day": round(float(value), 3),
                     "lux_estimate": round(mean_w_m2_24h * 120.0, 1),
                 }
             )
+        # Mantieni solo i 'days' giorni piu recenti disponibili
+        daily = all_daily[-days:] if len(all_daily) > days else all_daily
         lux_values = [float(item["lux_estimate"]) for item in daily]
+        most_recent_day = daily[-1]["day"] if daily else None
         return {
             "source": "NASA POWER ALLSKY_SFC_SW_DWN",
             "source_url": "https://power.larc.nasa.gov/",
             "daily": daily,
             "mean_lux": round(_safe_average(lux_values), 1) if lux_values else None,
             "today_lux": daily[-1]["lux_estimate"] if daily else None,
+            "most_recent_day": most_recent_day,
+            "days_available": len(daily),
             "conversion_note": "Stima: irradianza solare giornaliera media 24h convertita con 120 lux per W/m2.",
         }
     except Exception as exc:
@@ -3667,6 +3680,7 @@ def _build_diagnosis_environment_payload(
     date_range: Dict[str, str],
     nasa_result: Optional[Dict[str, Any]],
     lux_reference: Dict[str, Any],
+    env_classification: Optional[Dict[str, Any]] = None,
     locality_label: Optional[str] = None,
     error: str = "",
 ) -> Dict[str, Any]:
@@ -3680,6 +3694,17 @@ def _build_diagnosis_environment_payload(
     weekly_risk = _coerce_float(dashboard.get("weekly_risk"))
     lux_mean = lux_reference.get("mean_lux")
     lux_today = lux_reference.get("today_lux")
+
+    # Applica fattore correttivo LUX in base al tipo di ambiente rilevato
+    env_type = (env_classification or {}).get("environment", _ENV_OUTDOOR)
+    lux_factor = float((env_classification or {}).get("lux_factor", 1.0))
+    lux_mean_adj = round(lux_mean * lux_factor, 1) if lux_mean is not None else None
+    lux_today_adj = round(lux_today * lux_factor, 1) if lux_today is not None else None
+    # Se siamo all'interno, il dato lux solare non è applicabile
+    effective_lux = lux_today_adj if lux_today_adj is not None else lux_mean_adj
+    if env_type == _ENV_INDOOR:
+        effective_lux = None  # Lux solare non rilevante per piante indoor
+
     payload: Dict[str, Any] = {
         "source": "gps_nasa_sar_lux",
         "context_type": "gps_weekly_nasa_sar_lux",
@@ -3694,13 +3719,24 @@ def _build_diagnosis_environment_payload(
         "sar_acquired_at": summary.get("sar_acquired_at"),
         "weekly_fungal_risk": round(weekly_risk, 3) if weekly_risk is not None else None,
         "weekly_fungal_risk_label": dashboard.get("weekly_label"),
+        # LUX raw (solare)
         "lux_mean": lux_mean,
         "lux_today": lux_today,
-        "light_lux": lux_today if lux_today is not None else lux_mean,
+        "lux_days_available": lux_reference.get("days_available"),
+        "lux_most_recent_day": lux_reference.get("most_recent_day"),
+        # LUX corretto per ambiente
+        "lux_mean_adjusted": lux_mean_adj,
+        "lux_today_adjusted": lux_today_adj,
+        "light_lux": effective_lux,
         "lux_source": lux_reference.get("source"),
         "lux_source_url": lux_reference.get("source_url"),
         "lux_conversion_note": lux_reference.get("conversion_note"),
         "lux_daily": lux_reference.get("daily", []),
+        # Classificazione ambiente
+        "environment_type": env_type,
+        "environment_lux_factor": lux_factor,
+        "environment_confidence": (env_classification or {}).get("env_confidence"),
+        "environment_reasoning": (env_classification or {}).get("env_reasoning"),
         "nasa_sar_daily": daily[:7],
         "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
     }
@@ -3709,6 +3745,128 @@ def _build_diagnosis_environment_payload(
     if lux_reference.get("warning"):
         payload["lux_warning"] = lux_reference.get("warning")
     return {key: value for key, value in payload.items() if value is not None}
+
+
+# ── Rilevamento ambiente esterno/interno/serra da immagine satellitare ────────
+
+_ENV_OUTDOOR = "outdoor"
+_ENV_INDOOR = "indoor"
+_ENV_GREENHOUSE = "greenhouse"
+
+# Fattori di correzione LUX per tipo ambiente:
+# - esterno: lux pieno (1.0)
+# - serra:   filtraggio vetro/polietilene tipicamente riduce PAR del 30-55% (factor 0.50)
+# - interno: dato solare non applicabile (0.0)
+_LUX_FACTOR: Dict[str, float] = {
+    _ENV_OUTDOOR: 1.0,
+    _ENV_GREENHOUSE: 0.50,
+    _ENV_INDOOR: 0.0,
+}
+
+
+def _classify_environment_from_satellite(
+    vision_llm,
+    latitude: float,
+    longitude: float,
+) -> Dict[str, Any]:
+    """Classifica l'ambiente (esterno / serra / interno) analizzando l'immagine
+    satellitare del punto GPS con il VLM HuggingFace.
+
+    Riceve il VLM già inizializzato (evita di usare il context PTB fuori dall'event loop).
+
+    Ritorna un dict con:
+      - environment: 'outdoor' | 'greenhouse' | 'indoor'
+      - lux_factor:  fattore correttivo da applicare al dato LUX solare
+      - env_confidence: 'high' | 'medium' | 'low'
+      - env_reasoning: descrizione testuale dal VLM
+    """
+    default = {
+        "environment": _ENV_OUTDOOR,
+        "lux_factor": 1.0,
+        "env_confidence": "low",
+        "env_reasoning": "classificazione non disponibile (fallback outdoor)",
+    }
+    try:
+        from bot.nasa_sar_dashboard import get_satellite_image_with_marker
+        sat_img = get_satellite_image_with_marker(latitude, longitude, radius_m=80, zoom=19, size=512)
+        if sat_img is None:
+            logger.info("Classificazione ambiente: immagine satellite non disponibile, fallback outdoor")
+            return default
+
+        import io as _io
+        buf = _io.BytesIO()
+        sat_img.save(buf, format="JPEG", quality=85)
+        buf.seek(0)
+
+        # Il VLM viene passato come argomento (già inizializzato prima di entrare nel thread)
+        if vision_llm is None:
+            logger.info("Classificazione ambiente: VLM non disponibile, fallback outdoor")
+            return default
+
+        classification_prompt = (
+            "You are a satellite image analyst. Look at this overhead satellite image of a GPS location."
+            " Based ONLY on what is visible, classify the environment into exactly ONE of these three categories:"
+            " 'outdoor' (open field, garden, terrace, rooftop garden, natural land);"
+            " 'greenhouse' (glass or plastic greenhouse structure with panels/tunnels visible);"
+            " 'indoor' (enclosed building interior — not determinable from satellite because no roof opening)."
+            " Respond with a JSON object and nothing else, in this exact format:"
+            ' {"environment": "outdoor"|"greenhouse"|"indoor", "confidence": "high"|"medium"|"low", "reasoning": "one sentence"}'
+        )
+
+        import tempfile as _tempfile
+        with _tempfile.NamedTemporaryFile(suffix="_sat_env.jpg", delete=False) as tmp:
+            tmp.write(buf.read())
+            tmp_path = tmp.name
+
+        try:
+            raw_response, _ = vision_llm.chat_with_image(classification_prompt, tmp_path)
+        finally:
+            try:
+                import os as _os
+                _os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        raw_response = (raw_response or "").strip()
+        # Estrai il JSON dalla risposta
+        import re as _re
+        json_match = _re.search(r'\{[^}]+\}', raw_response, _re.DOTALL)
+        if json_match:
+            import json as _json
+            parsed = _json.loads(json_match.group())
+            env = str(parsed.get("environment", "")).strip().lower()
+            if env not in (_ENV_OUTDOOR, _ENV_GREENHOUSE, _ENV_INDOOR):
+                env = _ENV_OUTDOOR
+            confidence = str(parsed.get("confidence", "low")).strip().lower()
+            if confidence not in ("high", "medium", "low"):
+                confidence = "medium"
+            reasoning = str(parsed.get("reasoning", "")).strip()
+            logger.info("Classificazione ambiente satellite: %s (conf=%s)", env, confidence)
+            return {
+                "environment": env,
+                "lux_factor": _LUX_FACTOR.get(env, 1.0),
+                "env_confidence": confidence,
+                "env_reasoning": reasoning,
+            }
+        else:
+            # Fallback: cerca parole chiave nella risposta testuale
+            resp_lower = raw_response.lower()
+            if "greenhouse" in resp_lower or "serra" in resp_lower:
+                env = _ENV_GREENHOUSE
+            elif "indoor" in resp_lower or "interno" in resp_lower:
+                env = _ENV_INDOOR
+            else:
+                env = _ENV_OUTDOOR
+            logger.info("Classificazione ambiente satellite (keyword fallback): %s", env)
+            return {
+                "environment": env,
+                "lux_factor": _LUX_FACTOR.get(env, 1.0),
+                "env_confidence": "low",
+                "env_reasoning": raw_response[:200] if raw_response else "parsing fallback",
+            }
+    except Exception as exc:
+        logger.warning("Classificazione ambiente satellite fallita: %s", exc)
+        return default
 
 
 async def _build_diagnosis_environment_context(
@@ -3733,13 +3891,23 @@ async def _build_diagnosis_environment_context(
     locality_label = await asyncio.to_thread(_reverse_geocode_locality, latitude, longitude)
     if locality_label and nasa_result:
         nasa_result.setdefault("geo_summary", {})["locality_label"] = locality_label
-    lux_reference = await asyncio.to_thread(_fetch_weekly_lux_reference, latitude, longitude, 7)
+
+    # Inizializza il VLM nel thread asyncio (prima di passarlo in un worker thread)
+    vision_llm = _get_hf_vision_llm(context)
+
+    # Esegui in parallelo: LUX da NASA POWER + classificazione ambiente da satellite
+    lux_reference, env_classification = await asyncio.gather(
+        asyncio.to_thread(_fetch_weekly_lux_reference, latitude, longitude, 7),
+        asyncio.to_thread(_classify_environment_from_satellite, vision_llm, latitude, longitude),
+    )
+
     return _build_diagnosis_environment_payload(
         latitude=latitude,
         longitude=longitude,
         date_range=date_range,
         nasa_result=nasa_result,
         lux_reference=lux_reference,
+        env_classification=env_classification,
         locality_label=locality_label,
         error=nasa_error,
     )
@@ -4202,16 +4370,29 @@ async def handle_nasa_sar_location(update: Update, context: ContextTypes.DEFAULT
         )
         return
 
-    if not context.user_data.get("awaiting_nasa_sar_location"):
+    if context.user_data.get("awaiting_nasa_sar_location"):
+        context.user_data.pop("awaiting_nasa_sar_location", None)
+        await _run_nasa_sar_analysis(
+            update,
+            context,
+            location.latitude,
+            location.longitude,
+            reply_markup=ReplyKeyboardRemove(),
+        )
         return
 
-    context.user_data.pop("awaiting_nasa_sar_location", None)
-    await _run_nasa_sar_analysis(
+    # GPS orfano: nessun flusso attivo (es. dopo riavvio del bot o sessione scaduta).
+    # Offre una via d'uscita chiara invece di ignorare silenziosamente la posizione.
+    await _send(
         update,
-        context,
-        location.latitude,
-        location.longitude,
-        reply_markup=ReplyKeyboardRemove(),
+        _ui_text(
+            context,
+            "📍 Posizione GPS ricevuta, ma non era attesa nessuna diagnosi o analisi."
+            " Usa /diagnosi per avviare una nuova diagnosi o /nasa_sar per l'analisi ambientale.",
+            "📍 GPS position received, but no diagnosis or analysis was pending."
+            " Use /diagnosi to start a new diagnosis or /nasa_sar for environmental analysis.",
+        ),
+        reply_markup=_menu_keyboard(context),
     )
 
 
@@ -4392,6 +4573,16 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
     if sensor and sensor.get("context_type") == "gps_weekly_nasa_sar_lux":
         msg.append("")
         msg.append("<b>Contesto GPS/NASA-ISRO/SAR/LUX:</b>")
+        # Tipo ambiente rilevato da satellite
+        env_type = sensor.get("environment_type", "outdoor")
+        env_emoji = {"outdoor": "🌳", "greenhouse": "🏡", "indoor": "🏠"}.get(env_type, "❓")
+        env_label_it = {"outdoor": "Esterno", "greenhouse": "Serra", "indoor": "Interno"}.get(env_type, env_type)
+        env_conf = sensor.get("environment_confidence", "")
+        msg.append(f"  {'Ambiente rilevato':20s}: {env_emoji} {env_label_it}" + (f" (certezza: {env_conf})" if env_conf else ""))
+        if sensor.get("environment_reasoning"):
+            reasoning = str(sensor["environment_reasoning"])[:120]
+            msg.append(f"  {'Nota ambiente':20s}: {reasoning}")
+
         env_fields = [
             ("gps_latitude", "Latitudine", ""),
             ("gps_longitude", "Longitudine", ""),
@@ -4401,18 +4592,29 @@ def _format_diagnosis_full(record: Dict[str, Any]) -> str:
             ("sar_soil_moisture_percent", "Umidita suolo SAR", "%"),
             ("weekly_fungal_risk", "Rischio fungino", ""),
             ("weekly_fungal_risk_label", "Classe rischio", ""),
-            ("lux_today", "LUX odierno", " lux"),
-            ("lux_mean", "LUX medio", " lux"),
+            ("lux_today", "LUX odierno (raw)", " lux"),
+            ("lux_mean", "LUX medio (raw)", " lux"),
+            ("lux_today_adjusted", "LUX odierno corretto", " lux"),
+            ("lux_mean_adjusted", "LUX medio corretto", " lux"),
         ]
         for key, label, unit in env_fields:
             val = sensor.get(key)
             if val is None:
                 continue
             val_str = fmt(val, unit)
-            msg.append(f"  {label:20s}: {val_str}")
+            msg.append(f"  {label:24s}: {val_str}")
+        if env_type == "indoor":
+            msg.append(f"  {'Nota LUX':24s}: dato solare non applicabile (pianta indoor)")
+        elif env_type == "greenhouse":
+            lf = sensor.get("environment_lux_factor", 0.5)
+            msg.append(f"  {'Fattore LUX serra':24s}: {lf:.0%} (filtraggio vetro/politene)")
         source = sensor.get("source", "gps_nasa_sar_lux")
         ts = sensor.get("timestamp", "?")
-        msg.append(f"  Fonte: {source} | Timestamp: {ts}")
+        days_avail = sensor.get("lux_days_available")
+        most_recent = sensor.get("lux_most_recent_day")
+        lux_info = f" | giorni LUX: {days_avail}" if days_avail else ""
+        lux_info += f" | ultimo: {most_recent}" if most_recent else ""
+        msg.append(f"  Fonte: {source} | Timestamp: {ts}{lux_info}")
         if sensor.get("lux_source"):
             msg.append(f"  Fonte LUX: {sensor.get('lux_source')}")
         if sensor.get("sar_source"):
@@ -4590,16 +4792,37 @@ def _format_sensor_text_for_language(
             lines.append(f"- {label('Localita', 'Locality')}: {cleaned['locality_label']}")
         if period:
             lines.append(f"- {label('Finestra dati', 'Data window')}: {period} ({label('oggi e 6 giorni precedenti', 'today and previous 6 days')})")
+        # Ambiente rilevato da immagine satellite
+        env_type = cleaned.get("environment_type", "outdoor")
+        env_emoji = {"outdoor": "🌳", "greenhouse": "🏡", "indoor": "🏠"}.get(env_type, "")
+        env_labels_it = {"outdoor": "Esterno (campo/giardino)", "greenhouse": "Serra (struttura vetro/politene)", "indoor": "Interno (edificio)"}
+        env_labels_en = {"outdoor": "Outdoor (field/garden)", "greenhouse": "Greenhouse (glass/plastic structure)", "indoor": "Indoor (building)"}
+        env_conf = cleaned.get("environment_confidence", "")
+        env_label_str = (env_labels_en if english_ui else env_labels_it).get(env_type, env_type)
+        lines.append(f"- {label('Tipo ambiente', 'Environment type')}: {env_emoji} {env_label_str}" + (f" ({label('certezza', 'confidence')}: {env_conf})" if env_conf else ""))
+        if cleaned.get("environment_reasoning"):
+            reasoning = str(cleaned["environment_reasoning"])[:120]
+            lines.append(f"- {label('Nota ambiente', 'Environment note')}: {reasoning}")
         if cleaned.get("sar_soil_moisture_percent") is not None:
             lines.append(f"- {label('Umidita suolo SAR', 'SAR soil moisture')}: {fmt_number(cleaned['sar_soil_moisture_percent'], '%')}")
         if cleaned.get("weekly_fungal_risk") is not None:
             risk_pct = float(cleaned["weekly_fungal_risk"]) * 100.0
             risk_label = cleaned.get("weekly_fungal_risk_label") or label("non classificato", "unclassified")
             lines.append(f"- {label('Rischio fungino settimanale', 'Weekly fungal risk')}: {risk_pct:.1f}% ({risk_label})")
-        if cleaned.get("lux_today") is not None:
-            lines.append(f"- {label('LUX odierno stimato', 'Estimated current-day LUX')}: {fmt_number(cleaned['lux_today'], ' lux')}")
-        if cleaned.get("lux_mean") is not None:
-            lines.append(f"- {label('LUX medio settimanale stimato', 'Estimated weekly mean LUX')}: {fmt_number(cleaned['lux_mean'], ' lux')}")
+        # LUX: mostra sia raw che corretto per ambiente
+        if env_type == "indoor":
+            lines.append(f"- {label('LUX solare', 'Solar LUX')}: {label('non applicabile (pianta indoor)', 'not applicable (indoor plant)')}")
+        else:
+            lux_adj = cleaned.get("lux_today_adjusted") if cleaned.get("lux_today_adjusted") is not None else cleaned.get("lux_mean_adjusted")
+            lux_raw = cleaned.get("lux_today") if cleaned.get("lux_today") is not None else cleaned.get("lux_mean")
+            if lux_adj is not None:
+                lines.append(f"- {label('LUX corretto per ambiente', 'Environment-adjusted LUX')}: {fmt_number(lux_adj, ' lux')}"
+                             + (f" ({label('fattore', 'factor')}: {cleaned.get('environment_lux_factor', 1.0):.0%})" if env_type == "greenhouse" else ""))
+            elif lux_raw is not None:
+                lines.append(f"- {label('LUX stimato', 'Estimated LUX')}: {fmt_number(lux_raw, ' lux')}")
+        if cleaned.get("lux_mean") is not None and env_type != "indoor":
+            lines.append(f"- {label('LUX medio settimanale (raw)', 'Weekly mean LUX (raw)')}: {fmt_number(cleaned['lux_mean'], ' lux')}"
+                         + (f" ({label('su', 'over')} {cleaned['lux_days_available']} {label('giorni disponibili', 'available days')})" if cleaned.get("lux_days_available") else ""))
         if cleaned.get("lux_source"):
             lines.append(f"- {label('Fonte luminosita', 'Light source')}: {cleaned['lux_source']}")
         if cleaned.get("sar_source"):
@@ -5622,8 +5845,8 @@ async def _ask_diagnosis_gps_context(update: Update, context: ContextTypes.DEFAU
         update,
         _ui_text(
             context,
-            "📍 Foto ricevuta. Ora condividi la posizione GPS del telefono. Usero' NASA-ISRO/SAR per oggi e i 6 giorni precedenti, piu' luminosita' LUX da NASA POWER, come contesto della diagnosi.",
-            "📍 Photo received. Now share the phone GPS position. I will use NASA-ISRO/SAR for today and the previous 6 days, plus LUX light data from NASA POWER, as diagnosis context.",
+            "📍 Foto ricevuta. Ora condividi la posizione GPS del telefono. Usero' NASA-ISRO/SAR per oggi e i 6 giorni precedenti, luminosita' LUX da NASA POWER e rilevo il tipo di ambiente (esterno/serra/interno) dall'immagine satellitare, come contesto della diagnosi.",
+            "📍 Photo received. Now share the phone GPS position. I will use NASA-ISRO/SAR for today and the previous 6 days, LUX light data from NASA POWER, and detect the environment type (outdoor/greenhouse/indoor) from the satellite image, as diagnosis context.",
         ),
         reply_markup=_nasa_sar_reply_keyboard(context),
     )
@@ -5641,8 +5864,8 @@ async def _run_diagnosis_from_gps(
         update,
         _ui_text(
             context,
-            "🛰️ GPS ricevuto. Acquisisco contesto NASA-ISRO/SAR settimanale e luminosita' LUX...",
-            "🛰️ GPS received. Acquiring weekly NASA-ISRO/SAR context and LUX light data...",
+            "🛰️ GPS ricevuto. Acquisisco contesto NASA-ISRO/SAR settimanale, luminosita' LUX e classifico l'ambiente (esterno/serra/interno) dall'immagine satellitare...",
+            "🛰️ GPS received. Acquiring weekly NASA-ISRO/SAR context, LUX light data, and classifying the environment (outdoor/greenhouse/indoor) from the satellite image...",
         ),
         reply_markup=reply_markup,
     )
@@ -7189,8 +7412,20 @@ async def handle_label_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return ConversationHandler.END
+    # Preserva le preferenze lingua/voce prima di svuotare lo stato
+    saved_voice_lang = context.user_data.get("voice_language")
+    saved_voice_mode = context.user_data.get("voice_mode")
     context.user_data.clear()
-    await _send(update, _ui_text(context, "Operazione annullata.", "Operation cancelled."))
+    if saved_voice_lang is not None:
+        context.user_data["voice_language"] = saved_voice_lang
+    if saved_voice_mode is not None:
+        context.user_data["voice_mode"] = saved_voice_mode
+    # Rimuove la tastiera GPS eventualmente visibile sul client
+    await _send(
+        update,
+        _ui_text(context, "Operazione annullata.", "Operation cancelled."),
+        reply_markup=ReplyKeyboardRemove(),
+    )
     return ConversationHandler.END
 
 

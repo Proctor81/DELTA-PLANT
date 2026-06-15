@@ -1,7 +1,7 @@
-# DELTA v3.2 — Advanced Technical User Guide
+# DELTA v3.3 — Advanced Technical User Guide
 
-**Date:** 9 June 2026  
-**Version:** 3.2  
+**Date:** 15 June 2026  
+**Version:** 3.3  
 **Audience:** technical users, agronomists, maintainers, field operators
 
 ---
@@ -174,6 +174,26 @@ Runtime behavior:
 4. After the dashboard is delivered, free chat becomes immediately available again
 
 This matters because NASA-ISRO/SAR is no longer a detached side feature: it is part of the same operator experience and the follow-up context remains continuous.
+
+### 6. Diagnosis GPS context: LUX and Environment Type (v3.3)
+
+When a photo is submitted for diagnosis, DELTA asks for GPS position and then:
+
+1. **NASA-ISRO/SAR soil moisture** — weekly analysis (today and previous 6 days)
+2. **NASA POWER LUX estimate** — fetches a 14-day window to compensate the 3-7 day NASA POWER data lag, keeps the 7 most recent valid days and computes both daily and mean LUX
+3. **Environment classification from satellite image** — downloads the satellite view at zoom 19 (≈50 m radius) and sends it to the VLM with a structured prompt to classify the site as one of:
+
+| Type | Emoji | LUX correction factor |
+|------|-------|-----------------------|
+| `outdoor` | 🌳 | 1.00 — full solar LUX applied |
+| `greenhouse` | 🏡 | 0.50 — glass/polyethylene typically filters 30-55% PAR |
+| `indoor` | 🏠 | 0.00 — solar LUX not applicable |
+
+The corrected LUX values (`lux_today_adjusted`, `lux_mean_adjusted`) are passed in the diagnosis prompt so the VLM can reason about light availability in the actual growing context.
+
+**GPS orphan fix (v3.3):** if GPS is received but no diagnosis or NASA/SAR flow is pending (e.g., after a bot restart), DELTA now replies with a clear message instead of silently ignoring the position.
+
+**Cancel fix (v3.3):** `/annulla` now preserves the operator's language preference (Cris/Ryan) when clearing the guided state.
 
 ---
 
