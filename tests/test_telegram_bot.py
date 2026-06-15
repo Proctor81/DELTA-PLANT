@@ -408,7 +408,7 @@ def test_send_diagnosis_visuals_sends_original_and_overlay(tmp_path):
 def test_menu_keyboard_contains_nasa_sar_callback_button():
     keyboard = tg._menu_keyboard()
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    nasa_button = next(button for button in buttons if button.text == "🛰️ Connettiti a NASA-ISRO/SAR")
+    nasa_button = next(button for button in buttons if button.text == "🛰️ Connettiti a NISAR")
 
     assert nasa_button.callback_data == tg.CMD_NASA_SAR
     assert nasa_button.web_app is None
@@ -884,7 +884,7 @@ def test_menu_sends_english_prompt_when_override_active(monkeypatch):
     assert calls[0][0] == "Main menu:"
     labels = [button.text for row in calls[0][1].inline_keyboard for button in row]
     assert "🔵 💬 Ask DELTA Plant" in labels
-    assert "🛰️ Connect to NASA-ISRO/SAR" in labels
+    assert "🛰️ Connect to NISAR" in labels
 
 
 def test_report_uses_english_heading_when_override_active(monkeypatch):
@@ -1919,7 +1919,13 @@ def test_menu_keyboard_includes_chat_button():
     assert tg.CMD_VOICE_LANG_IT in callback_data
     assert tg.CMD_VOICE_LANG_EN in callback_data
     assert "👩‍🔬 Cris (IT)" in labels
-    assert "👨‍🔬 Ryan (EN)" in labels
+    assert "👨‍🔬 Ryan(EN)" in labels
+
+    voice_row = next(
+        row for row in keyboard.inline_keyboard
+        if any(button.callback_data == tg.CMD_VOICE_LANG_IT for button in row)
+    )
+    assert [button.callback_data for button in voice_row] == [tg.CMD_VOICE_LANG_IT, tg.CMD_VOICE_LANG_EN]
 
 
 def test_menu_keyboard_uses_english_labels_when_override_active():
@@ -1930,8 +1936,8 @@ def test_menu_keyboard_uses_english_labels_when_override_active():
 
     assert "🔵 💬 Ask DELTA Plant" in labels
     assert "🆕 Diagnose a Plant" in labels
-    assert "📄 License" in labels
-    assert "🛰️ Connect to NASA-ISRO/SAR" in labels
+    assert "🛰️ Connect to NISAR" in labels
+    assert "📄 License" not in labels
 
 
 def test_nasa_sar_reply_keyboard_uses_english_labels_when_override_active():

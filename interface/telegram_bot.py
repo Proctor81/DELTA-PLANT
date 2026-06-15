@@ -2423,16 +2423,11 @@ def _menu_keyboard(context: Optional["ContextTypes.DEFAULT_TYPE"] = None) -> Inl
             InlineKeyboardButton("🆕 Diagnose a Plant" if english_ui else "🆕 Effettua una diagnosi della Pianta", callback_data=CMD_DIAGNOSE),
         ],
         [
-            InlineKeyboardButton("📄 License" if english_ui else "📄 Licenza", callback_data=CMD_LICENSE),
-        ],
-        [
-            InlineKeyboardButton("🛰️ Connect to NASA-ISRO/SAR" if english_ui else "🛰️ Connettiti a NASA-ISRO/SAR", callback_data=CMD_NASA_SAR),
+            InlineKeyboardButton("🛰️ Connect to NISAR" if english_ui else "🛰️ Connettiti a NISAR", callback_data=CMD_NASA_SAR),
         ],
         [
             InlineKeyboardButton("👩‍🔬 Cris (IT)", callback_data=CMD_VOICE_LANG_IT),
-        ],
-        [
-            InlineKeyboardButton("👨‍🔬 Ryan (EN)", callback_data=CMD_VOICE_LANG_EN),
+            InlineKeyboardButton("👨‍🔬 Ryan(EN)", callback_data=CMD_VOICE_LANG_EN),
         ],
     ])
 
