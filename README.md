@@ -1,5 +1,9 @@
 # DELTA Plant
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23273904.svg)](https://doi.org/10.5281/zenodo.23273904)
+
+### AI Plant Health and Robotics Orchestrator for Precision Agriculture
+
 ### AI Plant Health and Robotics Orchestrator for Precision Agriculture
 
 <p align="center">
@@ -192,3 +196,10 @@ The repository also includes a GitHub Actions workflow that republishes a minima
 ## License
 
 See [LICENSE](LICENSE) for repository terms.
+
+
+## Citation
+
+This repository is archived on Zenodo and can be referenced using the following DOI:
+
+https://doi.org/10.5281/zenodo.23273904
